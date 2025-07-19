@@ -8,6 +8,8 @@
   "search": "Buscar",
   "export": "Exportar",
   "import": "Importar",
+  "copy": "Copiar",
+  "paste": "Pegar",
   "actions": "Acciones",
   "status": "Estado",
   "date": "Fecha",
@@ -220,4 +222,4 @@
     "signOut": "Cerrar Sesión",
     "user": "Usuario"
   }
-} 
+}

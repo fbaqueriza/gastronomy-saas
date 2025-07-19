@@ -1,7 +1,7 @@
-'use client'
+'use client';
 
-import { useState, useCallback, useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useState, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   useReactTable,
   getCoreRowModel,
@@ -9,39 +9,25 @@ import {
   getSortedRowModel,
   flexRender,
   createColumnHelper,
-} from '@tanstack/react-table'
-import { 
-  Download, 
-  Upload, 
-  Plus, 
-  Trash2, 
-  Copy, 
+} from '@tanstack/react-table';
+import {
+  Download,
+  Upload,
+  Plus,
+  Trash2,
+  Copy,
   Clipboard,
-  Search
-} from 'lucide-react'
+  Search,
+} from 'lucide-react';
+import { DataGridProps, EditingCell } from './types';
+import {
+  filterDataBySearchTerm,
+  generateCSVContent,
+  parsePastedData,
+  updateRowData,
+} from './utils';
 
-interface Column {
-  key: string
-  name: string
-  width?: number
-  editable?: boolean
-  render?: (value: any, rowData: any) => React.ReactNode
-}
-
-interface DataGridProps {
-  columns: Column[]
-  data: any[]
-  onDataChange: (newData: any[]) => void
-  onExport?: () => void
-  onImport?: (file: File) => void
-  onAddRow?: () => void
-  onDeleteRows?: (selectedRows: any[]) => void
-  searchable?: boolean
-  selectable?: boolean
-  loading?: boolean
-}
-
-export default function SpreadsheetGrid({
+export default function DataGrid({
   columns,
   data,
   onDataChange,
@@ -51,24 +37,26 @@ export default function SpreadsheetGrid({
   onDeleteRows,
   searchable = true,
   selectable = true,
-  loading = false
+  loading = false,
 }: DataGridProps) {
-  const { t } = useTranslation()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedRows, setSelectedRows] = useState<Set<string>>( new Set())
-  const [editingCell, setEditingCell] = useState<{ rowId: string; columnKey: string } | null>(null)
-  const [editingValue, setEditingValue] = useState('')
+  const { t } = useTranslation();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
+  const [editingValue, setEditingValue] = useState('');
 
-  const columnHelper = createColumnHelper<any>()
+  const columnHelper = createColumnHelper<any>();
 
   // Create table columns
   const tableColumns = useMemo(() => {
-    const cols = columns.map(col => 
+    const cols = columns.map((col) =>
       columnHelper.accessor(col.key as any, {
         header: col.name,
         cell: ({ row, column }) => {
           const rowData = row.original;
-          const isEditing = editingCell?.rowId === row.id && editingCell?.columnKey === column.id;
+          const isEditing =
+            editingCell?.rowId === row.id &&
+            editingCell?.columnKey === column.id;
           const value = rowData[column.id];
 
           if (isEditing) {
@@ -78,23 +66,25 @@ export default function SpreadsheetGrid({
                 value={editingValue}
                 onChange={(e) => setEditingValue(e.target.value)}
                 onBlur={() => {
-                  const newData = [...data];
-                  const rowIndex = newData.findIndex(r => r.id === rowData.id);
-                  if (rowIndex !== -1) {
-                    newData[rowIndex] = { ...newData[rowIndex], [column.id]: editingValue };
-                    onDataChange(newData);
-                  }
+                  const newData = updateRowData(
+                    data,
+                    rowData.id,
+                    column.id,
+                    editingValue,
+                  );
+                  onDataChange(newData);
                   setEditingCell(null);
                   setEditingValue('');
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    const newData = [...data];
-                    const rowIndex = newData.findIndex(r => r.id === rowData.id);
-                    if (rowIndex !== -1) {
-                      newData[rowIndex] = { ...newData[rowIndex], [column.id]: editingValue };
-                      onDataChange(newData);
-                    }
+                    const newData = updateRowData(
+                      data,
+                      rowData.id,
+                      column.id,
+                      editingValue,
+                    );
+                    onDataChange(newData);
                     setEditingCell(null);
                     setEditingValue('');
                   } else if (e.key === 'Escape') {
@@ -123,8 +113,8 @@ export default function SpreadsheetGrid({
           );
         },
         size: col.width || 150,
-      })
-    )
+      }),
+    );
 
     if (selectable) {
       cols.unshift(
@@ -136,9 +126,11 @@ export default function SpreadsheetGrid({
               checked={selectedRows.size === data.length && data.length > 0}
               onChange={(e) => {
                 if (e.target.checked) {
-                  setSelectedRows(new Set(data.map(row => row.id || row.toString())))
+                  setSelectedRows(
+                    new Set(data.map((row) => row.id || row.toString())),
+                  );
                 } else {
-                  setSelectedRows(new Set())
+                  setSelectedRows(new Set());
                 }
               }}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
@@ -161,77 +153,68 @@ export default function SpreadsheetGrid({
             />
           ),
           size: 50,
-        })
-      )
+        }),
+      );
     }
 
-    return cols
-  }, [columns, data, selectedRows, editingCell, editingValue, selectable, onDataChange])
+    return cols;
+  }, [
+    columns,
+    data,
+    selectedRows,
+    editingCell,
+    editingValue,
+    selectable,
+    onDataChange,
+    columnHelper,
+  ]);
 
   // Filter data based on search term
   const filteredData = useMemo(() => {
-    if (!searchTerm) return data
-    
-    return data.filter(row => 
-      Object.values(row).some(value => 
-        String(value).toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    )
-  }, [data, searchTerm])
+    return filterDataBySearchTerm(data, searchTerm);
+  }, [data, searchTerm]);
 
   // Handle copy/paste
   const handleCopy = useCallback(() => {
-    const selectedData = filteredData.filter((row) => 
-      selectedRows.has(row.id || row.toString())
-    )
-    
-    if (selectedData.length === 0) return
-    
-    const csvContent = [
-      columns.map(col => col.name).join('\t'),
-      ...selectedData.map(row => 
-        columns.map(col => row[col.key] || '').join('\t')
-      )
-    ].join('\n')
-    
-    navigator.clipboard.writeText(csvContent)
-  }, [selectedRows, filteredData, columns])
+    const csvContent = generateCSVContent(data, columns, selectedRows);
+    if (csvContent) {
+      navigator.clipboard.writeText(csvContent);
+    }
+  }, [selectedRows, data, columns]);
 
   const handlePaste = useCallback(async () => {
     try {
-      const text = await navigator.clipboard.readText()
-      const rows = text.split('\n').map(row => 
-        row.split('\t').reduce((obj, value, idx) => {
-          obj[columns[idx]?.key || `col${idx}`] = value
-          return obj
-        }, {} as any)
-      )
-      
+      const text = await navigator.clipboard.readText();
+      const rows = parsePastedData(text, columns);
+
       // Add pasted rows to data
-      const newData = [...data, ...rows]
-      onDataChange(newData)
+      const newData = [...data, ...rows];
+      onDataChange(newData);
     } catch (error) {
-      console.error('Failed to paste data:', error)
+      console.error('Failed to paste data:', error);
     }
-  }, [data, columns, onDataChange])
+  }, [data, columns, onDataChange]);
 
   // Handle file import
-  const handleFileImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file && onImport) {
-      onImport(file)
-    }
-  }, [onImport])
+  const handleFileImport = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file && onImport) {
+        onImport(file);
+      }
+    },
+    [onImport],
+  );
 
   // Handle delete selected rows
   const handleDeleteSelected = useCallback(() => {
-    if (selectedRows.size === 0 || !onDeleteRows) return
-    
+    if (selectedRows.size === 0 || !onDeleteRows) return;
+
     const rowsToDelete = filteredData.filter((row) => selectedRows.has(row.id));
-    
-    onDeleteRows(rowsToDelete)
-    setSelectedRows(new Set())
-  }, [selectedRows, filteredData, onDeleteRows])
+
+    onDeleteRows(rowsToDelete);
+    setSelectedRows(new Set());
+  }, [selectedRows, filteredData, onDeleteRows]);
 
   const table = useReactTable({
     data: filteredData,
@@ -239,14 +222,14 @@ export default function SpreadsheetGrid({
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
-  })
+  });
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
-    )
+    );
   }
 
   return (
@@ -264,7 +247,7 @@ export default function SpreadsheetGrid({
                 {t('common.add')}
               </button>
             )}
-            
+
             {onDeleteRows && selectedRows.size > 0 && (
               <button
                 onClick={handleDeleteSelected}
@@ -337,9 +320,9 @@ export default function SpreadsheetGrid({
       <div className="overflow-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
-            {table.getHeaderGroups().map(headerGroup => (
+            {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
-                {headerGroup.headers.map(header => (
+                {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -348,18 +331,18 @@ export default function SpreadsheetGrid({
                     {header.isPlaceholder
                       ? null
                       : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
                   </th>
                 ))}
               </tr>
             ))}
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {table.getRowModel().rows.map(row => (
+            {table.getRowModel().rows.map((row) => (
               <tr key={row.id} className="hover:bg-gray-50">
-                {row.getVisibleCells().map(cell => (
+                {row.getVisibleCells().map((cell) => (
                   <td
                     key={cell.id}
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
@@ -375,11 +358,11 @@ export default function SpreadsheetGrid({
 
       {/* Footer */}
       <div className="p-4 border-t border-gray-200 text-sm text-gray-500">
-        {filteredData.length} {filteredData.length === 1 ? 'row' : 'rows'} 
+        {filteredData.length} {filteredData.length === 1 ? 'row' : 'rows'}
         {searchTerm && filteredData.length !== data.length && (
           <span> (filtered from {data.length} total)</span>
         )}
       </div>
     </div>
-  )
+  );
 } 

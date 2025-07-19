@@ -215,4 +215,4 @@ export interface FileUpload {
   status: 'uploading' | 'success' | 'error';
   url?: string;
   error?: string;
-} 
+}

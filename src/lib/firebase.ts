@@ -3,10 +3,15 @@
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'demo-api-key',
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'demo-project.firebaseapp.com',
+  authDomain:
+    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ||
+    'demo-project.firebaseapp.com',
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'demo-project',
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'demo-project.appspot.com',
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '123456789',
+  storageBucket:
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+    'demo-project.appspot.com',
+  messagingSenderId:
+    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '123456789',
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || 'demo-app-id',
 };
 
@@ -38,12 +43,22 @@ export const auth = {
     return () => window.removeEventListener('storage', handler);
   },
   signInWithEmailAndPassword: async (email: string, password: string) => {
-    const user = { uid: 'mock-user-id', email, displayName: email.split('@')[0], metadata: { creationTime: new Date().toISOString() } };
+    const user = {
+      uid: 'mock-user-id',
+      email,
+      displayName: email.split('@')[0],
+      metadata: { creationTime: new Date().toISOString() },
+    };
     saveUserToStorage(user);
     return { user };
   },
   createUserWithEmailAndPassword: async (email: string, password: string) => {
-    const user = { uid: 'mock-user-id', email, displayName: email.split('@')[0], metadata: { creationTime: new Date().toISOString() } };
+    const user = {
+      uid: 'mock-user-id',
+      email,
+      displayName: email.split('@')[0],
+      metadata: { creationTime: new Date().toISOString() },
+    };
     saveUserToStorage(user);
     return { user };
   },
@@ -52,7 +67,12 @@ export const auth = {
     return Promise.resolve();
   },
   signInWithPopup: async (provider: any) => {
-    const user = { uid: 'mock-google-user-id', email: 'user@example.com', displayName: 'Demo User', metadata: { creationTime: new Date().toISOString() } };
+    const user = {
+      uid: 'mock-google-user-id',
+      email: 'user@example.com',
+      displayName: 'Demo User',
+      metadata: { creationTime: new Date().toISOString() },
+    };
     saveUserToStorage(user);
     return { user };
   },
@@ -73,9 +93,12 @@ export const db = {
 
 export const storage = {
   ref: (path: string) => ({
-    put: async (file: File) => Promise.resolve({ ref: { getDownloadURL: () => Promise.resolve('mock-url') } }),
+    put: async (file: File) =>
+      Promise.resolve({
+        ref: { getDownloadURL: () => Promise.resolve('mock-url') },
+      }),
     getDownloadURL: async () => Promise.resolve('mock-url'),
   }),
 };
 
-export default { firebaseConfig: {} }; 
+export default { firebaseConfig: {} };

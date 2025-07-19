@@ -1,25 +1,25 @@
-'use client'
+'use client';
 
-import { useState, useCallback } from 'react'
-import { useTranslation } from 'react-i18next'
-import { useAuth } from '../../components/AuthProvider'
-import Navigation from '../../components/Navigation'
-import SpreadsheetGrid from '../../components/DataGrid'
-import { Payment } from '../../types'
-import { 
-  Download, 
-  CreditCard, 
+import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../components/AuthProvider';
+import Navigation from '../../components/Navigation';
+import SpreadsheetGrid from '../../components/DataGrid';
+import { Payment } from '../../types';
+import {
+  Download,
+  CreditCard,
   CheckCircle,
   Clock,
   AlertCircle,
   FileText,
-  Send
-} from 'lucide-react'
-import * as XLSX from 'xlsx'
+  Send,
+} from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export default function PaymentsPage() {
-  const { user, loading: authLoading } = useAuth()
-  const { t } = useTranslation()
+  const { user, loading: authLoading } = useAuth();
+  const { t } = useTranslation();
   const [payments, setPayments] = useState<Payment[]>([
     {
       id: '1',
@@ -33,10 +33,10 @@ export default function PaymentsPage() {
       bankInfo: {
         iban: 'ES9121000418450200051332',
         swift: 'CAIXESBBXXX',
-        bankName: 'CaixaBank'
+        bankName: 'CaixaBank',
       },
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     },
     {
       id: '2',
@@ -50,10 +50,10 @@ export default function PaymentsPage() {
       bankInfo: {
         iban: 'ES9121000418450200051333',
         swift: 'CAIXESBBXXX',
-        bankName: 'CaixaBank'
+        bankName: 'CaixaBank',
       },
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     },
     {
       id: '3',
@@ -67,60 +67,85 @@ export default function PaymentsPage() {
       bankInfo: {
         iban: 'ES9121000418450200051332',
         swift: 'CAIXESBBXXX',
-        bankName: 'CaixaBank'
+        bankName: 'CaixaBank',
       },
       paidAt: new Date('2024-01-19'),
       createdAt: new Date(),
-      updatedAt: new Date()
-    }
-  ])
-  const [loading, setLoading] = useState(false)
-  const [selectedPayments, setSelectedPayments] = useState<string[]>([])
+      updatedAt: new Date(),
+    },
+  ]);
+  const [loading, setLoading] = useState(false);
+  const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
 
   const columns = [
     { key: 'orderId', name: 'Order ID', width: 120, editable: false },
     { key: 'providerId', name: 'Provider', width: 150, editable: false },
     { key: 'amount', name: t('common.amount'), width: 100, editable: false },
     { key: 'currency', name: 'Currency', width: 80, editable: false },
-    { 
-      key: 'status', 
-      name: t('common.status'), 
-      width: 120, 
+    {
+      key: 'status',
+      name: t('common.status'),
+      width: 120,
       editable: false,
       render: (value: string) => {
         const statusConfig = {
           pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
           paid: { color: 'bg-green-100 text-green-800', icon: CheckCircle },
-          overdue: { color: 'bg-red-100 text-red-800', icon: AlertCircle }
-        }
-        const config = statusConfig[value as keyof typeof statusConfig] || statusConfig.pending
-        const Icon = config.icon
+          overdue: { color: 'bg-red-100 text-red-800', icon: AlertCircle },
+        };
+        const config =
+          statusConfig[value as keyof typeof statusConfig] ||
+          statusConfig.pending;
+        const Icon = config.icon;
         return (
-          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+          <span
+            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${config.color}`}
+          >
             <Icon className="h-3 w-3 mr-1" />
             {t(`payments.${value}`)}
           </span>
-        )
-      }
+        );
+      },
     },
-    { 
-      key: 'dueDate', 
-      name: t('common.dueDate'), 
-      width: 120, 
+    {
+      key: 'dueDate',
+      name: t('common.dueDate'),
+      width: 120,
       editable: false,
-      render: (value: Date) => value ? new Date(value).toLocaleDateString() : ''
+      render: (value: Date) =>
+        value ? new Date(value).toLocaleDateString() : '',
     },
-    { key: 'invoiceNumber', name: t('common.invoiceNumber'), width: 150, editable: false },
-    { key: 'bankInfo.bankName', name: t('common.bankName'), width: 150, editable: false },
-    { key: 'bankInfo.iban', name: t('common.iban'), width: 200, editable: false },
-    { key: 'bankInfo.swift', name: t('common.swift'), width: 120, editable: false },
+    {
+      key: 'invoiceNumber',
+      name: t('common.invoiceNumber'),
+      width: 150,
+      editable: false,
+    },
+    {
+      key: 'bankInfo.bankName',
+      name: t('common.bankName'),
+      width: 150,
+      editable: false,
+    },
+    {
+      key: 'bankInfo.iban',
+      name: t('common.iban'),
+      width: 200,
+      editable: false,
+    },
+    {
+      key: 'bankInfo.swift',
+      name: t('common.swift'),
+      width: 120,
+      editable: false,
+    },
     {
       key: 'actions',
       name: t('common.actions'),
       width: 120,
       editable: false,
       render: (value: any, row: any) => {
-        if (!row) return null;
+        if (!row) {return null;}
         return (
           <div className="flex items-center space-x-2">
             {row.status === 'pending' && (
@@ -141,92 +166,111 @@ export default function PaymentsPage() {
             </button>
           </div>
         );
-      }
-    }
-  ]
+      },
+    },
+  ];
 
   const handleMarkAsPaid = useCallback((paymentId: string) => {
-    setPayments(prev => prev.map(payment => 
-      payment.id === paymentId 
-        ? { ...payment, status: 'paid' as const, paidAt: new Date(), updatedAt: new Date() }
-        : payment
-    ))
-  }, [])
+    setPayments((prev) =>
+      prev.map((payment) =>
+        payment.id === paymentId
+          ? {
+            ...payment,
+            status: 'paid' as const,
+            paidAt: new Date(),
+            updatedAt: new Date(),
+          }
+          : payment,
+      ),
+    );
+  }, []);
 
   const handleSendConfirmation = useCallback(async (paymentId: string) => {
-    setLoading(true)
+    setLoading(true);
     try {
       // Simulate WhatsApp API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      console.log('Sending payment confirmation via WhatsApp:', paymentId)
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log('Sending payment confirmation via WhatsApp:', paymentId);
     } catch (error) {
-      console.error('Failed to send confirmation:', error)
+      console.error('Failed to send confirmation:', error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   const handleExportSelected = useCallback(() => {
-    if (selectedPayments.length === 0) return
+    if (selectedPayments.length === 0) {return;}
 
-    const selectedData = payments.filter(payment => selectedPayments.includes(payment.id))
-    
+    const selectedData = payments.filter((payment) =>
+      selectedPayments.includes(payment.id),
+    );
+
     // Prepare data for export
-    const exportData = selectedData.map(payment => ({
+    const exportData = selectedData.map((payment) => ({
       'Provider Name': `Provider ${payment.providerId}`,
       'Order ID': payment.orderId,
-      'Amount': payment.amount,
-      'Currency': payment.currency,
+      Amount: payment.amount,
+      Currency: payment.currency,
       'Invoice Number': payment.invoiceNumber,
-      'Due Date': payment.dueDate ? new Date(payment.dueDate).toLocaleDateString() : '',
+      'Due Date': payment.dueDate
+        ? new Date(payment.dueDate).toLocaleDateString()
+        : '',
       'Bank Name': payment.bankInfo?.bankName || '',
-      'IBAN': payment.bankInfo?.iban || '',
-      'SWIFT': payment.bankInfo?.swift || '',
-      'Status': payment.status
-    }))
+      IBAN: payment.bankInfo?.iban || '',
+      SWIFT: payment.bankInfo?.swift || '',
+      Status: payment.status,
+    }));
 
     // Create workbook and worksheet
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(exportData);
 
     // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(wb, ws, 'Payments')
+    XLSX.utils.book_append_sheet(wb, ws, 'Payments');
 
     // Generate file and download
-    XLSX.writeFile(wb, `payments-export-${new Date().toISOString().split('T')[0]}.xlsx`)
-  }, [selectedPayments, payments])
+    XLSX.writeFile(
+      wb,
+      `payments-export-${new Date().toISOString().split('T')[0]}.xlsx`,
+    );
+  }, [selectedPayments, payments]);
 
   const handleExportAll = useCallback(() => {
     // Prepare data for export
-    const exportData = payments.map(payment => ({
+    const exportData = payments.map((payment) => ({
       'Provider Name': `Provider ${payment.providerId}`,
       'Order ID': payment.orderId,
-      'Amount': payment.amount,
-      'Currency': payment.currency,
+      Amount: payment.amount,
+      Currency: payment.currency,
       'Invoice Number': payment.invoiceNumber,
-      'Due Date': payment.dueDate ? new Date(payment.dueDate).toLocaleDateString() : '',
+      'Due Date': payment.dueDate
+        ? new Date(payment.dueDate).toLocaleDateString()
+        : '',
       'Bank Name': payment.bankInfo?.bankName || '',
-      'IBAN': payment.bankInfo?.iban || '',
-      'SWIFT': payment.bankInfo?.swift || '',
-      'Status': payment.status
-    }))
+      IBAN: payment.bankInfo?.iban || '',
+      SWIFT: payment.bankInfo?.swift || '',
+      Status: payment.status,
+    }));
 
     // Create workbook and worksheet
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(exportData);
 
     // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(wb, ws, 'Payments')
+    XLSX.utils.book_append_sheet(wb, ws, 'Payments');
 
     // Generate file and download
-    XLSX.writeFile(wb, `all-payments-${new Date().toISOString().split('T')[0]}.xlsx`)
-  }, [payments])
+    XLSX.writeFile(
+      wb,
+      `all-payments-${new Date().toISOString().split('T')[0]}.xlsx`,
+    );
+  }, [payments]);
 
-  const pendingPayments = payments.filter(p => p.status === 'pending')
-  const overduePayments = payments.filter(p => {
-    if (p.status !== 'pending') return false
-    return p.dueDate && new Date(p.dueDate) < new Date()
-  })
+  const pendingPayments = payments.filter((p) => p.status === 'pending');
+  const overduePayments = payments.filter((p) => {
+    if (p.status !== 'pending') {return false;}
+    return p.dueDate && new Date(p.dueDate) < new Date();
+  });
 
   if (authLoading) {
     return (
@@ -236,17 +280,17 @@ export default function PaymentsPage() {
           <p className="mt-4 text-gray-600">{t('common.loading')}</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (!user) {
-    return null // Will redirect to login
+    return null; // Will redirect to login
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-      
+
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="px-4 py-6 sm:px-0">
@@ -259,7 +303,7 @@ export default function PaymentsPage() {
                 Manage payments and export data for accounting
               </p>
             </div>
-            
+
             <div className="flex items-center space-x-3">
               {selectedPayments.length > 0 && (
                 <button
@@ -270,7 +314,7 @@ export default function PaymentsPage() {
                   {t('payments.exportSelected')} ({selectedPayments.length})
                 </button>
               )}
-              
+
               <button
                 onClick={handleExportAll}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -337,7 +381,8 @@ export default function PaymentsPage() {
                         Total Amount Pending
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        {pendingPayments.reduce((sum, p) => sum + p.amount, 0)} EUR
+                        {pendingPayments.reduce((sum, p) => sum + p.amount, 0)}{' '}
+                        EUR
                       </dd>
                     </dl>
                   </div>
@@ -373,11 +418,17 @@ export default function PaymentsPage() {
                 </h3>
                 <div className="mt-2 text-sm text-blue-700">
                   <ul className="list-disc list-inside space-y-1">
-                    <li>Select payments to export specific data for accounting</li>
+                    <li>
+                      Select payments to export specific data for accounting
+                    </li>
                     <li>Export all payments for comprehensive reporting</li>
                     <li>Mark payments as paid when transfers are completed</li>
-                    <li>Send confirmation messages to providers via WhatsApp</li>
-                    <li>Track overdue payments to maintain good relationships</li>
+                    <li>
+                      Send confirmation messages to providers via WhatsApp
+                    </li>
+                    <li>
+                      Track overdue payments to maintain good relationships
+                    </li>
                   </ul>
                 </div>
               </div>
@@ -386,5 +437,5 @@ export default function PaymentsPage() {
         </div>
       </main>
     </div>
-  )
-} 
+  );
+}

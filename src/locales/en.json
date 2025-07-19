@@ -8,6 +8,8 @@
   "search": "Search",
   "export": "Export",
   "import": "Import",
+  "copy": "Copy",
+  "paste": "Paste",
   "actions": "Actions",
   "status": "Status",
   "date": "Date",
@@ -119,6 +121,7 @@
   },
   "stock": {
     "title": "Stock Needs",
+    "category": "Category",
     "addItem": "Add Stock Item",
     "editItem": "Edit Stock Item",
     "productName": "Product Name",
@@ -220,4 +223,4 @@
     "signOut": "Sign Out",
     "user": "User"
   }
-} 
+}

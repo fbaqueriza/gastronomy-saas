@@ -1,87 +1,31 @@
-'use client'
+'use client';
 
-import { useState, useCallback, useRef } from 'react'
-import { useTranslation } from 'react-i18next'
-import { useAuth } from '../../components/AuthProvider'
-import Navigation from '../../components/Navigation'
-import SpreadsheetGrid from '../../components/DataGrid'
-import { Provider } from '../../types'
-import { 
-  Plus, 
-  Upload, 
-  Download,
-  FileText,
-  Eye
-} from 'lucide-react'
+import { useState, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../hooks/useAuth';
+import Navigation from '../../components/Navigation';
+import DataGrid from '../../components/DataGrid';
+import { Provider } from '../../types';
+import { Plus, Upload, Download, FileText, Eye } from 'lucide-react';
+import { useUndo } from '../../hooks/useUndo';
+import { useCSV } from '../../hooks/useCSV';
+import {
+  createNewProvider,
+  processProviderData,
+  handleCatalogUpload,
+  csvEscape,
+  parseCsvRow,
+} from '../../features/providers/providerUtils';
 
 export default function ProvidersPage() {
-  const { user, loading: authLoading } = useAuth()
-  const { t } = useTranslation()
-  const [providers, setProviders] = useState<Provider[]>([
-    {
-      id: '1',
-      name: 'Fresh Foods Inc.',
-      email: 'orders@freshfoods.com',
-      phone: '+1-555-0123',
-      address: '123 Market St, City, State 12345',
-      categories: ['Produce', 'Dairy'],
-      tags: ['organic', 'local'],
-      notes: 'Reliable supplier for fresh produce',
-      cbu: 'ES9121000418450200051332',
-      alias: 'CAIXESBBXXX',
-      cuitCuil: '20-12345678-9',
-      razonSocial: 'CaixaBank',
-      catalogs: [],
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: '2',
-      name: 'Organic Valley Co.',
-      email: 'sales@organicvalley.com',
-      phone: '+1-555-0456',
-      address: '456 Farm Rd, Country, State 67890',
-      categories: ['Organic', 'Dairy'],
-      tags: ['organic', 'sustainable'],
-      notes: 'Premium organic dairy products',
-      cbu: 'ES9121000418450200051333',
-      alias: 'CAIXESBBXXX',
-      cuitCuil: '20-98765432-1',
-      razonSocial: 'CaixaBank',
-      catalogs: [],
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-  ])
-  const [loading, setLoading] = useState(false)
+  const { user, loading: authLoading } = useAuth();
+  const { t } = useTranslation();
+  const [loading, setLoading] = useState(false);
 
   // PDF upload handler
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const handleCatalogUpload = (providerId: string, file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const url = URL.createObjectURL(file);
-      setProviders(prev => prev.map(p =>
-        p.id === providerId
-          ? {
-              ...p,
-              catalogs: [
-                ...p.catalogs,
-                {
-                  id: Date.now().toString(),
-                  providerId,
-                  name: file.name,
-                  fileUrl: url,
-                  fileName: file.name,
-                  fileSize: file.size,
-                  uploadedAt: new Date(),
-                }
-              ]
-            }
-          : p
-      ));
-    };
-    reader.readAsArrayBuffer(file);
+  const handleCatalogUploadLocal = (providerId: string, file: File) => {
+    setProviders((prev) => handleCatalogUpload(prev, providerId, file));
   };
 
   const columns = [
@@ -89,8 +33,20 @@ export default function ProvidersPage() {
     { key: 'email', name: t('email'), width: 200, editable: true },
     { key: 'phone', name: t('phone'), width: 150, editable: true },
     { key: 'address', name: t('address'), width: 250, editable: true },
-    { key: 'categories', name: t('category'), width: 150, editable: true, render: (row: Provider) => row?.categories?.join(', ') || '' },
-    { key: 'tags', name: t('tags'), width: 150, editable: true, render: (row: Provider) => row?.tags?.join(', ') || '' },
+    {
+      key: 'categories',
+      name: t('category'),
+      width: 150,
+      editable: true,
+      render: (row: Provider) => row?.categories?.join(', ') || '',
+    },
+    {
+      key: 'tags',
+      name: t('tags'),
+      width: 150,
+      editable: true,
+      render: (row: Provider) => row?.tags?.join(', ') || '',
+    },
     { key: 'notes', name: t('notes'), width: 200, editable: true },
     { key: 'cbu', name: t('cbu'), width: 200, editable: true },
     { key: 'alias', name: t('alias'), width: 150, editable: true },
@@ -112,7 +68,7 @@ export default function ProvidersPage() {
               title="View PDF"
               onClick={() => {
                 const pdf = row.catalogs[0];
-                if (pdf?.fileUrl) window.open(pdf.fileUrl, '_blank');
+                if (pdf?.fileUrl) {window.open(pdf.fileUrl, '_blank');}
               }}
             >
               <Eye className="h-4 w-4" />
@@ -124,72 +80,98 @@ export default function ProvidersPage() {
               type="file"
               accept="application/pdf"
               style={{ display: 'none' }}
-              onChange={e => {
+              onChange={(e) => {
                 if (e.target.files && e.target.files[0]) {
-                  handleCatalogUpload(row.id, e.target.files[0]);
+                  handleCatalogUploadLocal(row.id, e.target.files[0]);
                   e.target.value = '';
                 }
               }}
             />
           </label>
         </div>
-      )
-    }
-  ]
+      ),
+    },
+  ];
 
-  // Undo stack
-  const [undoStack, setUndoStack] = useState<Provider[][]>([]);
-  const pushUndo = () => setUndoStack(stack => [...stack, providers]);
-  const handleUndo = () => {
-    setUndoStack(stack => {
-      if (stack.length === 0) return stack;
-      const prev = stack[stack.length - 1];
-      setProviders(prev);
-      return stack.slice(0, -1);
-    });
-  };
-
-  const handleDataChange = useCallback((newData: any[]) => {
-    pushUndo();
-    setProviders(newData.map(row => ({
-      ...row,
-      categories: typeof row.categories === 'string' ? row.categories.split(',').map((c: string) => c.trim()) : row.categories || [],
-      tags: typeof row.tags === 'string' ? row.tags.split(',').map((t: string) => t.trim()) : row.tags || [],
-      updatedAt: new Date()
-    })));
-  }, [providers]);
-
-  const handleAddRow = useCallback(() => {
-    pushUndo();
-    const newProvider: Provider = {
-      id: Date.now().toString(),
-      name: '',
-      email: '',
-      phone: '',
-      address: '',
-      categories: [],
-      tags: [],
-      notes: '',
-      cbu: '',
-      alias: '',
-      cuitCuil: '',
-      razonSocial: '',
+  // Undo functionality
+  const { data: providers, setData: setProviders, pushUndo, undo, canUndo } = useUndo<Provider>([
+    {
+      id: '1',
+      name: 'Fresh Foods Inc.',
+      email: 'orders@freshfoods.com',
+      phone: '+1-555-0123',
+      address: '123 Market St, City, State 12345',
+      categories: ['Produce', 'Dairy'],
+      tags: ['organic', 'local'],
+      notes: 'Reliable supplier for fresh produce',
+      cbu: 'ES9121000418450200051332',
+      alias: 'CAIXESBBXXX',
+      cuitCuil: '20-12345678-9',
+      razonSocial: 'CaixaBank',
       catalogs: [],
       createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    setProviders([...providers, newProvider]);
-  }, [providers]);
+      updatedAt: new Date(),
+    },
+    {
+      id: '2',
+      name: 'Organic Valley Co.',
+      email: 'sales@organicvalley.com',
+      phone: '+1-555-0456',
+      address: '456 Farm Rd, Country, State 67890',
+      categories: ['Organic', 'Dairy'],
+      tags: ['organic', 'sustainable'],
+      notes: 'Premium organic dairy products',
+      cbu: 'ES9121000418450200051333',
+      alias: 'CAIXESBBXXX',
+      cuitCuil: '20-98765432-1',
+      razonSocial: 'CaixaBank',
+      catalogs: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  ]);
 
-  const handleDeleteRows = useCallback((rowsToDelete: Provider[]) => {
-    pushUndo();
-    const idsToDelete = rowsToDelete.map(row => row.id);
-    setProviders(providers.filter(provider => !idsToDelete.includes(provider.id)));
-  }, [providers]);
+  const handleDataChange = useCallback(
+    (newData: any[]) => {
+      pushUndo(providers);
+      setProviders(
+        newData.map((row) => ({
+          ...row,
+          categories:
+            typeof row.categories === 'string'
+              ? row.categories.split(',').map((c: string) => c.trim())
+              : row.categories || [],
+          tags:
+            typeof row.tags === 'string'
+              ? row.tags.split(',').map((t: string) => t.trim())
+              : row.tags || [],
+          updatedAt: new Date(),
+        })),
+      );
+    },
+    [providers, pushUndo],
+  );
+
+  const handleAddRow = useCallback(() => {
+    pushUndo(providers);
+    const newProvider = createNewProvider();
+    setProviders([...providers, newProvider]);
+  }, [providers, pushUndo]);
+
+  const handleDeleteRows = useCallback(
+    (rowsToDelete: Provider[]) => {
+      pushUndo(providers);
+      const idsToDelete = rowsToDelete.map((row) => row.id);
+      setProviders(
+        providers.filter((provider) => !idsToDelete.includes(provider.id)),
+      );
+    },
+    [providers, pushUndo],
+  );
 
   const csvEscape = (value: string) => {
-    if (typeof value !== 'string') value = String(value ?? '');
-    if (value.includes('"')) value = value.replace(/"/g, '""');
+    if (typeof value !== 'string') {value = String(value ?? '');}
+    if (value.includes('"')) {value = value.replace(/"/g, '""');}
     if (value.includes(',') || value.includes('"') || value.includes('\n')) {
       return `"${value}"`;
     }
@@ -198,20 +180,22 @@ export default function ProvidersPage() {
 
   const handleExport = useCallback(() => {
     const csvContent = [
-      columns.map(col => csvEscape(col.name)).join(','),
-      ...providers.map(provider => [
-        csvEscape(provider.name ?? ''),
-        csvEscape(provider.email ?? ''),
-        csvEscape(provider.phone ?? ''),
-        csvEscape(provider.address ?? ''),
-        csvEscape((provider.categories ?? []).join(';')),
-        csvEscape((provider.tags ?? []).join(';')),
-        csvEscape(provider.notes ?? ''),
-        csvEscape(provider.cbu ?? ''),
-        csvEscape(provider.alias ?? ''),
-        csvEscape(provider.cuitCuil ?? ''),
-        csvEscape(provider.razonSocial ?? '')
-      ].join(','))
+      columns.map((col) => csvEscape(col.name)).join(','),
+      ...providers.map((provider) =>
+        [
+          csvEscape(provider.name ?? ''),
+          csvEscape(provider.email ?? ''),
+          csvEscape(provider.phone ?? ''),
+          csvEscape(provider.address ?? ''),
+          csvEscape((provider.categories ?? []).join(';')),
+          csvEscape((provider.tags ?? []).join(';')),
+          csvEscape(provider.notes ?? ''),
+          csvEscape(provider.cbu ?? ''),
+          csvEscape(provider.alias ?? ''),
+          csvEscape(provider.cuitCuil ?? ''),
+          csvEscape(provider.razonSocial ?? ''),
+        ].join(','),
+      ),
     ].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -248,15 +232,21 @@ export default function ProvidersPage() {
   }
 
   const handleImport = useCallback((file: File) => {
-    pushUndo();
+    pushUndo(providers);
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
       const lines = text.split('\n').filter(Boolean);
       // Normalize headers: remove common. prefix, lowercase, remove spaces
-      const headers = parseCsvRow(lines[0]).map(h => h.trim().toLowerCase().replace(/^common\./, '').replace(/\s+/g, ''));
+      const headers = parseCsvRow(lines[0]).map((h) =>
+        h
+          .trim()
+          .toLowerCase()
+          .replace(/^common\./, '')
+          .replace(/\s+/g, ''),
+      );
       const importedProviders = lines.slice(1).map((line, index) => {
-        const values = parseCsvRow(line).map(v => v.trim());
+        const values = parseCsvRow(line).map((v) => v.trim());
         const get = (name: string) => {
           const idx = headers.indexOf(name);
           return idx !== -1 ? values[idx] : '';
@@ -267,8 +257,16 @@ export default function ProvidersPage() {
           email: get('email'),
           phone: get('phone'),
           address: get('address'),
-          categories: get('category') ? get('category').split(';').map(c => c.trim()) : [],
-          tags: get('tags') ? get('tags').split(';').map(t => t.trim()) : [],
+          categories: get('category')
+            ? get('category')
+              .split(';')
+              .map((c) => c.trim())
+            : [],
+          tags: get('tags')
+            ? get('tags')
+              .split(';')
+              .map((t) => t.trim())
+            : [],
           notes: get('notes'),
           cbu: get('cbu'),
           alias: get('alias'),
@@ -276,10 +274,10 @@ export default function ProvidersPage() {
           razonSocial: get('razonsocial'),
           catalogs: [],
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
         };
       });
-      setProviders(prev => [...prev, ...importedProviders]);
+      setProviders((prev) => [...prev, ...importedProviders]);
     };
     reader.readAsText(file);
   }, []);
@@ -292,17 +290,17 @@ export default function ProvidersPage() {
           <p className="mt-4 text-gray-600">{t('common.loading')}</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (!user) {
-    return null // Will redirect to login
+    return null; // Will redirect to login
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-      
+
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="px-4 py-6 sm:px-0">
@@ -315,7 +313,7 @@ export default function ProvidersPage() {
                 Manage your provider database with spreadsheet-style editing
               </p>
             </div>
-            
+
             <div className="flex items-center space-x-3">
               <button
                 onClick={handleAddRow}
@@ -330,7 +328,7 @@ export default function ProvidersPage() {
 
         {/* Spreadsheet Grid */}
         <div className="px-4 sm:px-0">
-          <SpreadsheetGrid
+          <DataGrid
             columns={columns}
             data={providers}
             onDataChange={handleDataChange}
@@ -358,7 +356,9 @@ export default function ProvidersPage() {
                 <div className="mt-2 text-sm text-blue-700">
                   <ul className="list-disc list-inside space-y-1">
                     <li>Click any cell to edit inline</li>
-                    <li>Use Ctrl+C/Ctrl+V to copy and paste from Excel/Sheets</li>
+                    <li>
+                      Use Ctrl+C/Ctrl+V to copy and paste from Excel/Sheets
+                    </li>
                     <li>Import CSV files to bulk add providers</li>
                     <li>Categories and tags should be comma-separated</li>
                     <li>Select multiple rows for bulk operations</li>
@@ -370,5 +370,5 @@ export default function ProvidersPage() {
         </div>
       </main>
     </div>
-  )
-} 
+  );
+}

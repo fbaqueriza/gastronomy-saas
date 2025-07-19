@@ -1,38 +1,30 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { useAuth } from './AuthProvider'
-import { auth } from '../lib/firebase'
-import { 
-  Menu, 
-  X, 
-  Globe, 
-  User, 
-  LogOut,
-  Settings,
-  Bell
-} from 'lucide-react'
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useAuth } from './AuthProvider';
+import { auth } from '../lib/firebase';
+import { Menu, X, Globe, User, LogOut, Settings, Bell } from 'lucide-react';
 
 export default function Navigation() {
-  const { t, i18n } = useTranslation()
-  const { user } = useAuth()
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   const toggleLanguage = () => {
-    const newLang = i18n.language === 'en' ? 'es' : 'en'
-    i18n.changeLanguage(newLang)
-  }
+    const newLang = i18n.language === 'en' ? 'es' : 'en';
+    i18n.changeLanguage(newLang);
+  };
 
   const handleSignOut = async () => {
     try {
-      await auth.signOut()
-      setIsUserMenuOpen(false)
+      await auth.signOut();
+      setIsUserMenuOpen(false);
     } catch (error) {
-      console.error('Error signing out:', error)
+      console.error('Error signing out:', error);
     }
-  }
+  };
 
   const navigation = [
     { name: t('nav.dashboard'), href: '/dashboard' },
@@ -40,7 +32,7 @@ export default function Navigation() {
     { name: t('nav.stock'), href: '/stock' },
     { name: t('nav.orders'), href: '/orders' },
     { name: t('nav.payments'), href: '/payments' },
-  ]
+  ];
 
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200">
@@ -52,7 +44,7 @@ export default function Navigation() {
                 {t('nav.appName')}
               </h1>
             </div>
-            
+
             {/* Desktop Navigation */}
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               {navigation.map((item) => (
@@ -144,7 +136,7 @@ export default function Navigation() {
               </a>
             ))}
           </div>
-          
+
           <div className="pt-4 pb-3 border-t border-gray-200">
             <div className="flex items-center px-4">
               <div className="flex-shrink-0">
@@ -159,7 +151,7 @@ export default function Navigation() {
                 </div>
               </div>
             </div>
-            
+
             <div className="mt-3 space-y-1">
               <a
                 href="/settings"
@@ -180,5 +172,5 @@ export default function Navigation() {
         </div>
       )}
     </nav>
-  )
-} 
+  );
+}
