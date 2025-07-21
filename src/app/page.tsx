@@ -20,7 +20,7 @@ export default function HomePage() {
         console.log('HomePage - Loading timeout, redirecting to login');
         router.push('/auth/login');
       }
-    }, 3000);
+    }, 2000);
 
     if (!loading) {
       clearTimeout(timeout);
@@ -45,6 +45,12 @@ export default function HomePage() {
         <p className="mt-2 text-sm text-gray-500">
           If this takes too long, please refresh the page
         </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+        >
+          Refresh Page
+        </button>
       </div>
     </div>
   );
