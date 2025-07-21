@@ -689,7 +689,10 @@ export default function OrdersPage() {
                               <span
                                 className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
                               >
-                                {t(`orders.${order.status}`)}
+                                {order.status === 'pending' ? 'Pendiente' : 
+                                 order.status === 'sent' ? 'Enviado' : 
+                                 order.status === 'delivered' ? 'Entregado' : 
+                                 order.status === 'cancelled' ? 'Cancelado' : order.status}
                               </span>
                             </div>
                             <div className="mt-1 flex items-center text-sm text-gray-500">
