@@ -202,7 +202,7 @@ export default function StockPage() {
           ...row,
           associatedProviders:
             typeof row.associatedProviders === 'string'
-              ? row.associatedProviders.spli','.map((p: string) => p.trim())
+              ? row.associatedProviders.split(',').map((p: string) => p.trim())
               : row.associatedProviders || [],
           restockFrequency: rf,
           lastOrdered: row.lastOrdered ? new Date(row.lastOrdered) : undefined,

@@ -90,7 +90,7 @@ export default function CreateOrderModal({
   useEffect(() => {
     if (!isOpen) {
       setSelectedProvider('');
-      setOrderTex'';
+      setOrderText('');
       setNotes('');
     }
   }, [isOpen]);
