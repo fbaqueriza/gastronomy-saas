@@ -38,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const timeout = setTimeout(() => {
       console.log('AuthProvider - Loading timeout, setting loading to false');
       setLoading(false);
-    }, 2000);
+    }, 3000);
 
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser: any) => {
       console.log('AuthProvider - Auth state changed:', firebaseUser);
@@ -67,6 +67,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       setLoading(false);
     });
+
+    // Force an initial check
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      console.log('AuthProvider - Found current user:', currentUser);
+      const userData: User = {
+        id: currentUser.uid,
+        email: currentUser.email || '',
+        name:
+          currentUser.displayName || currentUser.email?.split('@')[0] || '',
+        role: 'editor',
+        createdAt: new Date(
+          currentUser.metadata?.creationTime || Date.now(),
+        ),
+        updatedAt: new Date(),
+      };
+      setUser(userData);
+      setFirebaseUser(currentUser);
+      setLoading(false);
+    }
 
     return () => {
       clearTimeout(timeout);
