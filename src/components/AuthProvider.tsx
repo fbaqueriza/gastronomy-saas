@@ -34,6 +34,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     console.log('AuthProvider - Initializing auth state');
 
+    // CRITICAL FIX: Force completion immediately to prevent infinite loading
+    const immediateTimeout = setTimeout(() => {
+      console.log('AuthProvider - Immediate timeout, forcing completion');
+      setLoading(false);
+    }, 1000);
+
     // Set a timeout to prevent infinite loading
     const timeout = setTimeout(() => {
       console.log('AuthProvider - Loading timeout, setting loading to false');
@@ -43,6 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser: any) => {
       console.log('AuthProvider - Auth state changed:', firebaseUser);
       clearTimeout(timeout);
+      clearTimeout(immediateTimeout);
       setFirebaseUser(firebaseUser);
 
       if (firebaseUser) {
@@ -98,6 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     return () => {
       clearTimeout(timeout);
+      clearTimeout(immediateTimeout);
       clearTimeout(fallbackTimeout);
       unsubscribe();
     };

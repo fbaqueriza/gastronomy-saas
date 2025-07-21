@@ -1,29 +1,28 @@
 'use client';
 
 import { useAuth } from '../components/AuthProvider';
-import { useTranslation } from 'react-i18next';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
   const { user, loading } = useAuth();
-  const { t } = useTranslation();
   const router = useRouter();
+  const [forceRedirect, setForceRedirect] = useState(false);
 
   useEffect(() => {
     console.log('HomePage - User:', user);
     console.log('HomePage - Loading:', loading);
 
-    // Add a timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      if (loading) {
-        console.log('HomePage - Loading timeout, redirecting to login');
-        router.push('/auth/login');
-      }
-    }, 2000);
+    // Force redirect after 1.5 seconds regardless of auth state
+    const forceTimeout = setTimeout(() => {
+      console.log('HomePage - Force redirect timeout');
+      setForceRedirect(true);
+      router.push('/auth/login');
+    }, 1500);
 
+    // Normal auth-based redirect
     if (!loading) {
-      clearTimeout(timeout);
+      clearTimeout(forceTimeout);
       if (user) {
         console.log('HomePage - Redirecting to dashboard');
         router.push('/dashboard');
@@ -33,7 +32,7 @@ export default function HomePage() {
       }
     }
 
-    return () => clearTimeout(timeout);
+    return () => clearTimeout(forceTimeout);
   }, [user, loading, router]);
 
   // Show a simple loading state
@@ -50,6 +49,12 @@ export default function HomePage() {
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
         >
           Refresh Page
+        </button>
+        <button
+          onClick={() => router.push('/auth/login')}
+          className="mt-2 ml-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+        >
+          Go to Login
         </button>
       </div>
     </div>
