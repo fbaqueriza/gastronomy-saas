@@ -264,12 +264,12 @@ export default function CreateOrderModal({
                       <span>
                         {item.productName} - {item.quantity} {item.unit}
                       </span>
-                                             <span>${item.total.toFixed(0)}</span>
+                      <span>${item.total.toFixed(0)}</span>
                     </div>
                   ))}
                   <div className="border-t pt-2 flex justify-between font-medium">
                     <span>Total:</span>
-                                         <span>${totalAmount.toFixed(0)}</span>
+                    <span>${totalAmount.toFixed(0)}</span>
                   </div>
                 </div>
               </div>

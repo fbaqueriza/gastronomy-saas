@@ -86,17 +86,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const currentUser = auth.currentUser;
     if (currentUser) {
       console.log('AuthProvider - Found current user:', currentUser);
-              const userData: User = {
-          id: currentUser.uid,
-          email: currentUser.email || '',
-          name:
-            currentUser.displayName || currentUser.email?.split('@')[0] || '',
-          role: 'editor',
-          createdAt: new Date(
-            currentUser.metadata?.creationTime || Date.now(),
-          ),
-          updatedAt: new Date(),
-        };
+      const userData: User = {
+        id: currentUser.uid,
+        email: currentUser.email || '',
+        name:
+          currentUser.displayName || currentUser.email?.split('@')[0] || '',
+        role: 'editor',
+        createdAt: new Date(
+          currentUser.metadata?.creationTime || Date.now(),
+        ),
+        updatedAt: new Date(),
+      };
       setUser(userData);
       setFirebaseUser(currentUser);
       setLoading(false);
