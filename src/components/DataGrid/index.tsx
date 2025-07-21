@@ -38,7 +38,7 @@ export default function DataGrid({
   selectable = true,
   loading = false,
 }: DataGridProps) {
-  const { t } = useTranslation();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);

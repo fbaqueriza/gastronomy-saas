@@ -26,7 +26,7 @@ export default function WhatsAppChat({
   isOpen,
   onClose,
 }: WhatsAppChatProps) {
-  const { t } = useTranslation();
+  
   const [messages, setMessages] = useState<WhatsAppMessage[]>([
     {
       id: '1',

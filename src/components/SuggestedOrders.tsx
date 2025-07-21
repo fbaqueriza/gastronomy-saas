@@ -28,7 +28,7 @@ export default function SuggestedOrders({
   providers,
   onCreateOrder,
 }: SuggestedOrdersProps) {
-  const { t } = useTranslation();
+  
   const [selectedOrder, setSelectedOrder] = useState<SuggestedOrder | null>(null);
 
   // Generate suggested orders based on stock data

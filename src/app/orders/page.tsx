@@ -22,7 +22,7 @@ import {
 
 export default function OrdersPage() {
   const { user, loading: authLoading } = useAuth();
-  const { t } = useTranslation();
+  
   const [orders, setOrders] = useState<Order[]>([
     {
       id: '1',

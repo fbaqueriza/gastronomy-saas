@@ -23,11 +23,11 @@ export const processProviderData = (data: any[]): Provider[] => {
     ...row,
     categories:
       typeof row.categories === 'string'
-        ? row.categories.split(',').map((c: string) => c.trim())
+        ? row.categories.spli','.map((c: string) => c.trim())
         : row.categories || [],
     tags:
       typeof row.tags === 'string'
-        ? row.tags.split(',').map((t: string) => t.trim())
+        ? row.tags.spli','.map((t: string) => t.trim())
         : row.tags || [],
     updatedAt: new Date(),
   }));

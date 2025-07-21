@@ -15,7 +15,7 @@ import {
 
 export default function StockPage() {
   const { user, loading: authLoading } = useAuth();
-  const { t } = useTranslation();
+  
   // Add a mock providers array for name lookup
   const providers = [
     { id: '1', name: 'Fresh Foods Inc.' },
@@ -202,7 +202,7 @@ export default function StockPage() {
           ...row,
           associatedProviders:
             typeof row.associatedProviders === 'string'
-              ? row.associatedProviders.split(',').map((p: string) => p.trim())
+              ? row.associatedProviders.spli','.map((p: string) => p.trim())
               : row.associatedProviders || [],
           restockFrequency: rf,
           lastOrdered: row.lastOrdered ? new Date(row.lastOrdered) : undefined,
@@ -271,7 +271,7 @@ export default function StockPage() {
     // Create and download file
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElemen'a';
     a.href = url;
     a.download = 'stock-items.csv';
     a.click();
@@ -283,10 +283,10 @@ export default function StockPage() {
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target?.result as string;
-        const lines = text.split('\n');
+        const lines = text.spli'\n';
 
         const importedItems = lines.slice(1).map((line, index) => {
-          const values = line.split(',');
+          const values = line.spli',';
           const rf = isRestockFrequency(values[4]) ? values[4] : 'weekly';
           return {
             id: (Date.now() + index).toString(),

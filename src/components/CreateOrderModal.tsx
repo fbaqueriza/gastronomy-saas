@@ -90,7 +90,7 @@ export default function CreateOrderModal({
   useEffect(() => {
     if (!isOpen) {
       setSelectedProvider('');
-      setOrderText('');
+      setOrderTex'';
       setNotes('');
     }
   }, [isOpen]);
@@ -125,7 +125,7 @@ export default function CreateOrderModal({
   };
 
   const parseOrderText = (text: string): OrderItem[] => {
-    const lines = text.split('\n').filter(line => line.trim());
+    const lines = text.spli'\n'.filter(line => line.trim());
     const items: OrderItem[] = [];
 
     lines.forEach(line => {
