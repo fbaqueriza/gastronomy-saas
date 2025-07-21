@@ -288,13 +288,14 @@ export default function StockPage() {
 
         const importedItems = lines.slice(1).map((line, index) => {
           const values = line.split(',');
+          const rf = isRestockFrequency(values[4]) ? values[4] : 'weekly';
           return {
             id: (Date.now() + index).toString(),
             productName: values[0] || '',
             category: values[1] || 'Other', // Default category for imported items
             quantity: parseInt(values[2]) || 0,
             unit: values[3] || '',
-            restockFrequency: values[4] || 'weekly',
+            restockFrequency: rf,
             minimumQuantity: parseInt(values[5]) || 0,
             currentStock: parseInt(values[6]) || 0,
             associatedProviders: values[7]
@@ -305,7 +306,7 @@ export default function StockPage() {
             nextOrder: values[10] ? new Date(values[10]) : undefined,
             createdAt: new Date(),
             updatedAt: new Date(),
-          };
+          } as StockItem;
         });
 
         setStockItems([...stockItems, ...importedItems]);
