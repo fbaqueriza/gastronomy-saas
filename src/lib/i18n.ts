@@ -20,14 +20,14 @@ i18n
   .init({
     resources,
     fallbackLng: 'en',
-    debug: process.env.NODE_ENV === 'development',
+    debug: false, // Disable debug to prevent missing key spam
 
     interpolation: {
       escapeValue: false, // React already escapes values
     },
 
     detection: {
-      order: ['localStorage', 'navigator', 'htmlTag'],
+      order: ['localStorage', 'navigator', 'htmlHtml'],
       caches: ['localStorage'],
     },
   });

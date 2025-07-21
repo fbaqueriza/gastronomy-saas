@@ -38,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const timeout = setTimeout(() => {
       console.log('AuthProvider - Loading timeout, setting loading to false');
       setLoading(false);
-    }, 3000);
+    }, 2000); // Reduced timeout
 
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser: any) => {
       console.log('AuthProvider - Auth state changed:', firebaseUser);
@@ -88,11 +88,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(false);
     }
 
+    // Additional fallback: force completion after 1.5 seconds
+    const fallbackTimeout = setTimeout(() => {
+      if (loading) {
+        console.log('AuthProvider - Fallback timeout, forcing completion');
+        setLoading(false);
+      }
+    }, 1500);
+
     return () => {
       clearTimeout(timeout);
+      clearTimeout(fallbackTimeout);
       unsubscribe();
     };
-  }, []);
+  }, [loading]);
 
   console.log('AuthProvider - Current state:', { user, firebaseUser, loading });
 
