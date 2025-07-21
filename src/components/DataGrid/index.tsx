@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   useReactTable,
   getCoreRowModel,
@@ -244,7 +243,7 @@ export default function DataGrid({
                 className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <Plus className="h-4 w-4 mr-1" />
-                {t('common.add')}
+                {'Add'}
               </button>
             )}
 
@@ -254,7 +253,7 @@ export default function DataGrid({
                 className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
-                {t('common.delete')} ({selectedRows.size})
+                {'Delete'} ({selectedRows.size})
               </button>
             )}
           </div>
@@ -265,7 +264,7 @@ export default function DataGrid({
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder={t('common.search')}
+                  placeholder={'Search'}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
@@ -279,7 +278,7 @@ export default function DataGrid({
               className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
               <Copy className="h-4 w-4 mr-1" />
-              {t('common.copy')}
+              {'common.copy'}
             </button>
 
             <button
@@ -287,13 +286,13 @@ export default function DataGrid({
               className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               <Clipboard className="h-4 w-4 mr-1" />
-              {t('common.paste')}
+              {'common.paste'}
             </button>
 
             {onImport && (
               <label className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer">
                 <Upload className="h-4 w-4 mr-1" />
-                {t('common.import')}
+                {'Import'}
                 <input
                   type="file"
                   accept=".csv,.xlsx,.xls"
@@ -309,7 +308,7 @@ export default function DataGrid({
                 className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <Download className="h-4 w-4 mr-1" />
-                {t('common.export')}
+                {'Export'}
               </button>
             )}
           </div>

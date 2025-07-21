@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import Navigation from '../../components/Navigation';
 import DataGrid from '../../components/DataGrid';
@@ -29,32 +28,32 @@ export default function ProvidersPage() {
   };
 
   const columns = [
-    { key: 'name', name: t('name'), width: 200, editable: true },
-    { key: 'email', name: t('email'), width: 200, editable: true },
-    { key: 'phone', name: t('phone'), width: 150, editable: true },
-    { key: 'address', name: t('address'), width: 250, editable: true },
+    { key: 'name', name: 'name', width: 200, editable: true },
+    { key: 'email', name: 'email', width: 200, editable: true },
+    { key: 'phone', name: 'phone', width: 150, editable: true },
+    { key: 'address', name: 'address', width: 250, editable: true },
     {
       key: 'categories',
-      name: t('category'),
+      name: 'category',
       width: 150,
       editable: true,
       render: (row: Provider) => row?.categories?.join(', ') || '',
     },
     {
       key: 'tags',
-      name: t('tags'),
+      name: 'tags',
       width: 150,
       editable: true,
       render: (row: Provider) => row?.tags?.join(', ') || '',
     },
-    { key: 'notes', name: t('notes'), width: 200, editable: true },
-    { key: 'cbu', name: t('cbu'), width: 200, editable: true },
-    { key: 'alias', name: t('alias'), width: 150, editable: true },
-    { key: 'cuitCuil', name: t('cuitCuil'), width: 150, editable: true },
-    { key: 'razonSocial', name: t('razonSocial'), width: 200, editable: true },
+    { key: 'notes', name: 'notes', width: 200, editable: true },
+    { key: 'cbu', name: 'cbu', width: 200, editable: true },
+    { key: 'alias', name: 'alias', width: 150, editable: true },
+    { key: 'cuitCuil', name: 'cuitCuil', width: 150, editable: true },
+    { key: 'razonSocial', name: 'razonSocial', width: 200, editable: true },
     {
       key: 'catalogs',
-      name: t('catalog'),
+      name: 'catalog',
       width: 120,
       editable: false,
       render: (row: Provider) => (
@@ -139,11 +138,11 @@ export default function ProvidersPage() {
           ...row,
           categories:
             typeof row.categories === 'string'
-              ? row.categories.split(',').map((c: string) => c.trim())
+              ? row.categories.spli','.map((c: string) => c.trim())
               : row.categories || [],
           tags:
             typeof row.tags === 'string'
-              ? row.tags.split(',').map((t: string) => t.trim())
+              ? row.tags.spli','.map((t: string) => t.trim())
               : row.tags || [],
           updatedAt: new Date(),
         })),
@@ -199,7 +198,7 @@ export default function ProvidersPage() {
     ].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElemen'a';
     a.href = url;
     a.download = 'providers.csv';
     a.click();
@@ -236,7 +235,7 @@ export default function ProvidersPage() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const lines = text.split('\n').filter(Boolean);
+      const lines = text.spli'\n'.filter(Boolean);
       // Normalize headers: remove common. prefix, lowercase, remove spaces
       const headers = parseCsvRow(lines[0]).map((h) =>
         h
@@ -253,25 +252,25 @@ export default function ProvidersPage() {
         };
         return {
           id: (Date.now() + index).toString(),
-          name: get('name'),
-          email: get('email'),
-          phone: get('phone'),
-          address: get('address'),
-          categories: get('category')
-            ? get('category')
-              .split(';')
+          name: ge'name',
+          email: ge'email',
+          phone: ge'phone',
+          address: ge'address',
+          categories: ge'category'
+            ? ge'category'
+              .spli';'
               .map((c) => c.trim())
             : [],
-          tags: get('tags')
-            ? get('tags')
-              .split(';')
+          tags: ge'tags'
+            ? ge'tags'
+              .spli';'
               .map((t) => t.trim())
             : [],
-          notes: get('notes'),
-          cbu: get('cbu'),
-          alias: get('alias'),
-          cuitCuil: get('cuitcuil'),
-          razonSocial: get('razonsocial'),
+          notes: ge'notes',
+          cbu: ge'cbu',
+          alias: ge'alias',
+          cuitCuil: ge'cuitcuil',
+          razonSocial: ge'razonsocial',
           catalogs: [],
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -287,7 +286,7 @@ export default function ProvidersPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">{t('common.loading')}</p>
+          <p className="mt-4 text-gray-600">{'Loading...'}</p>
         </div>
       </div>
     );
@@ -307,7 +306,7 @@ export default function ProvidersPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">
-                {t('providers.title')}
+                {'Provider Database'}
               </h1>
               <p className="mt-1 text-sm text-gray-500">
                 Manage your provider database with spreadsheet-style editing
@@ -320,7 +319,7 @@ export default function ProvidersPage() {
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                {t('providers.addProvider')}
+                {'Add Provider'}
               </button>
             </div>
           </div>

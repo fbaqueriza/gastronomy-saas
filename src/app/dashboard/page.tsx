@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import Navigation from '../../components/Navigation';
 import SuggestedOrders from '../../components/SuggestedOrders';
@@ -25,7 +24,6 @@ import {
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
-  const { t } = useTranslation();
 
   // Mock data - same as orders page
   const [orders, setOrders] = useState<Order[]>([
@@ -510,7 +508,7 @@ export default function DashboardPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">{t('common.loading')}</p>
+          <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
     );
@@ -530,7 +528,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">
-                {t('dashboard.welcome')}, {user.name}!
+                Welcome, {user.name}!
               </h1>
               <p className="mt-1 text-sm text-gray-500">
                 Overview of your gastronomy business operations
@@ -678,7 +676,7 @@ export default function DashboardPage() {
                               <span
                                 className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
                               >
-                                {t(`orders.${order.status}`)}
+                                {order.status}
                               </span>
                             </div>
                             <div className="mt-1 flex items-center text-sm text-gray-500">

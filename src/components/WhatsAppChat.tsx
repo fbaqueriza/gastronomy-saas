@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Send, Paperclip, Phone, Video, MoreVertical } from 'lucide-react';
 
 interface WhatsAppMessage {

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import Navigation from '../../components/Navigation';
 import WhatsAppChat from '../../components/WhatsAppChat';
@@ -616,7 +615,7 @@ export default function OrdersPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">{t('common.loading')}</p>
+          <p className="mt-4 text-gray-600">{'Loading...'}</p>
         </div>
       </div>
     );
@@ -636,7 +635,7 @@ export default function OrdersPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">
-                {t('orders.title')}
+                {'Orders'}
               </h1>
               <p className="mt-1 text-sm text-gray-500">
                 Manage orders and communicate with providers via WhatsApp
@@ -649,7 +648,7 @@ export default function OrdersPage() {
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                {t('orders.newOrder')}
+                {'orders.newOrder'}
               </button>
             </div>
           </div>

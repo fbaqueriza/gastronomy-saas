@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../components/AuthProvider';
 import Navigation from '../../components/Navigation';
 import SpreadsheetGrid from '../../components/DataGrid';
@@ -80,11 +79,11 @@ export default function PaymentsPage() {
   const columns = [
     { key: 'orderId', name: 'Order ID', width: 120, editable: false },
     { key: 'providerId', name: 'Provider', width: 150, editable: false },
-    { key: 'amount', name: t('common.amount'), width: 100, editable: false },
+    { key: 'amount', name: 'Amount', width: 100, editable: false },
     { key: 'currency', name: 'Currency', width: 80, editable: false },
     {
       key: 'status',
-      name: t('common.status'),
+      name: 'Status',
       width: 120,
       editable: false,
       render: (value: string) => {
@@ -109,7 +108,7 @@ export default function PaymentsPage() {
     },
     {
       key: 'dueDate',
-      name: t('common.dueDate'),
+      name: 'Due Date',
       width: 120,
       editable: false,
       render: (value: Date) =>
@@ -117,31 +116,31 @@ export default function PaymentsPage() {
     },
     {
       key: 'invoiceNumber',
-      name: t('common.invoiceNumber'),
+      name: 'Invoice Number',
       width: 150,
       editable: false,
     },
     {
       key: 'bankInfo.bankName',
-      name: t('common.bankName'),
+      name: 'Bank Name',
       width: 150,
       editable: false,
     },
     {
       key: 'bankInfo.iban',
-      name: t('common.iban'),
+      name: 'IBAN',
       width: 200,
       editable: false,
     },
     {
       key: 'bankInfo.swift',
-      name: t('common.swift'),
+      name: 'SWIFT',
       width: 120,
       editable: false,
     },
     {
       key: 'actions',
-      name: t('common.actions'),
+      name: 'Actions',
       width: 120,
       editable: false,
       render: (value: any, row: any) => {
@@ -152,7 +151,7 @@ export default function PaymentsPage() {
               <button
                 onClick={() => handleMarkAsPaid(row.id)}
                 className="text-green-600 hover:text-green-700"
-                title={t('payments.markAsPaid')}
+                title={'payments.markAsPaid'}
               >
                 <CheckCircle className="h-4 w-4" />
               </button>
@@ -160,7 +159,7 @@ export default function PaymentsPage() {
             <button
               onClick={() => handleSendConfirmation(row.id)}
               className="text-blue-600 hover:text-blue-700"
-              title={t('payments.sendConfirmation')}
+              title={'payments.sendConfirmation'}
             >
               <Send className="h-4 w-4" />
             </button>
@@ -231,7 +230,7 @@ export default function PaymentsPage() {
     // Generate file and download
     XLSX.writeFile(
       wb,
-      `payments-export-${new Date().toISOString().split('T')[0]}.xlsx`,
+      `payments-export-${new Date().toISOString().spli'T'[0]}.xlsx`,
     );
   }, [selectedPayments, payments]);
 
@@ -262,7 +261,7 @@ export default function PaymentsPage() {
     // Generate file and download
     XLSX.writeFile(
       wb,
-      `all-payments-${new Date().toISOString().split('T')[0]}.xlsx`,
+      `all-payments-${new Date().toISOString().spli'T'[0]}.xlsx`,
     );
   }, [payments]);
 
@@ -277,7 +276,7 @@ export default function PaymentsPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">{t('common.loading')}</p>
+          <p className="mt-4 text-gray-600">{'Loading...'}</p>
         </div>
       </div>
     );
@@ -297,7 +296,7 @@ export default function PaymentsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">
-                {t('payments.title')}
+                {'Payment Management'}
               </h1>
               <p className="mt-1 text-sm text-gray-500">
                 Manage payments and export data for accounting
@@ -311,7 +310,7 @@ export default function PaymentsPage() {
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  {t('payments.exportSelected')} ({selectedPayments.length})
+                  {'payments.exportSelected'} ({selectedPayments.length})
                 </button>
               )}
 
@@ -320,7 +319,7 @@ export default function PaymentsPage() {
                 className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <Download className="h-4 w-4 mr-2" />
-                {t('payments.exportPayments')}
+                {'Export Payments'}
               </button>
             </div>
           </div>

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../components/AuthProvider';
 import Navigation from '../../components/Navigation';
 import SpreadsheetGrid from '../../components/DataGrid';
@@ -77,16 +76,16 @@ export default function StockPage() {
   const columns = [
     {
       key: 'productName',
-      name: t('stock.productName'),
+      name: 'stock.productName',
       width: 200,
       editable: true,
     },
-    { key: 'category', name: t('stock.category'), width: 150, editable: true },
-    { key: 'quantity', name: t('common.quantity'), width: 100, editable: true },
-    { key: 'unit', name: t('common.unit'), width: 80, editable: true },
+    { key: 'category', name: 'stock.category', width: 150, editable: true },
+    { key: 'quantity', name: 'Quantity', width: 100, editable: true },
+    { key: 'unit', name: 'Unit', width: 80, editable: true },
     {
       key: 'restockFrequency',
-      name: t('stock.restockFrequency'),
+      name: 'stock.restockFrequency',
       width: 120,
       editable: true,
       render: (value: string) => (
@@ -97,7 +96,7 @@ export default function StockPage() {
     },
     {
       key: 'associatedProviders',
-      name: t('stock.associatedProviders'),
+      name: 'stock.associatedProviders',
       width: 200,
       editable: true,
       render: (value: string[], _row: any) => {
@@ -112,7 +111,7 @@ export default function StockPage() {
     },
     {
       key: 'preferredProvider',
-      name: t('stock.preferredProvider'),
+      name: 'stock.preferredProvider',
       width: 200,
       editable: true,
       render: (value: string, _row: any) => {
@@ -122,7 +121,7 @@ export default function StockPage() {
     },
     {
       key: 'lastOrdered',
-      name: t('stock.lastOrdered'),
+      name: 'stock.lastOrdered',
       width: 120,
       editable: true,
       render: (value: Date) =>
@@ -130,7 +129,7 @@ export default function StockPage() {
     },
     {
       key: 'nextOrder',
-      name: t('stock.nextOrder'),
+      name: 'stock.nextOrder',
       width: 120,
       editable: true,
       render: (value: Date) =>
@@ -138,7 +137,7 @@ export default function StockPage() {
     },
     {
       key: 'status',
-      name: t('common.status'),
+      name: 'Status',
       width: 100,
       editable: false,
       render: (_: any, row: StockItem) => {
@@ -169,13 +168,13 @@ export default function StockPage() {
     },
     {
       key: 'minimumQuantity',
-      name: t('stock.minimumQuantity'),
+      name: 'stock.minimumQuantity',
       width: 120,
       editable: true,
     },
     {
       key: 'currentStock',
-      name: t('stock.currentStock'),
+      name: 'stock.currentStock',
       width: 120,
       editable: true,
     },
@@ -203,7 +202,7 @@ export default function StockPage() {
           ...row,
           associatedProviders:
             typeof row.associatedProviders === 'string'
-              ? row.associatedProviders.split(',').map((p: string) => p.trim())
+              ? row.associatedProviders.spli','.map((p: string) => p.trim())
               : row.associatedProviders || [],
           restockFrequency: rf,
           lastOrdered: row.lastOrdered ? new Date(row.lastOrdered) : undefined,
@@ -272,7 +271,7 @@ export default function StockPage() {
     // Create and download file
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElemen'a';
     a.href = url;
     a.download = 'stock-items.csv';
     a.click();
@@ -284,10 +283,10 @@ export default function StockPage() {
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target?.result as string;
-        const lines = text.split('\n');
+        const lines = text.spli'\n';
 
         const importedItems = lines.slice(1).map((line, index) => {
-          const values = line.split(',');
+          const values = line.spli',';
           const rf = isRestockFrequency(values[4]) ? values[4] : 'weekly';
           return {
             id: (Date.now() + index).toString(),
@@ -299,7 +298,7 @@ export default function StockPage() {
             minimumQuantity: parseInt(values[5]) || 0,
             currentStock: parseInt(values[6]) || 0,
             associatedProviders: values[7]
-              ? values[7].split(';').map((p) => p.trim())
+              ? values[7].spli';'.map((p) => p.trim())
               : [],
             preferredProvider: values[8] || '',
             lastOrdered: values[9] ? new Date(values[9]) : undefined,
@@ -325,7 +324,7 @@ export default function StockPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">{t('common.loading')}</p>
+          <p className="mt-4 text-gray-600">{'Loading...'}</p>
         </div>
       </div>
     );
@@ -345,7 +344,7 @@ export default function StockPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">
-                {t('stock.title')}
+                {'Stock Management'}
               </h1>
               <p className="mt-1 text-sm text-gray-500">
                 Track stock needs and manage inventory levels
@@ -357,7 +356,7 @@ export default function StockPage() {
                 <div className="flex items-center text-red-600">
                   <AlertTriangle className="h-4 w-4 mr-1" />
                   <span className="text-sm font-medium">
-                    {lowStockItems.length} {t('stock.lowStockAlert')}
+                    {lowStockItems.length} {'stock.lowStockAlert'}
                   </span>
                 </div>
               )}
@@ -367,7 +366,7 @@ export default function StockPage() {
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                {t('stock.addItem')}
+                {'Add Item'}
               </button>
             </div>
           </div>

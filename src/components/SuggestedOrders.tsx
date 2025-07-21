@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Clock, AlertTriangle, Plus, Calendar } from 'lucide-react';
 import { StockItem, Provider } from '../types';
 

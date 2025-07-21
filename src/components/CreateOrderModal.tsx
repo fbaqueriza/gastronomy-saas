@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { X, ShoppingCart, AlertTriangle, Clock, RefreshCw } from 'lucide-react';
 import { Provider, OrderItem, StockItem } from '../types';
 
@@ -92,7 +91,7 @@ export default function CreateOrderModal({
   useEffect(() => {
     if (!isOpen) {
       setSelectedProvider('');
-      setOrderText('');
+      setOrderTex'';
       setNotes('');
     }
   }, [isOpen]);
@@ -127,7 +126,7 @@ export default function CreateOrderModal({
   };
 
   const parseOrderText = (text: string): OrderItem[] => {
-    const lines = text.split('\n').filter(line => line.trim());
+    const lines = text.spli'\n'.filter(line => line.trim());
     const items: OrderItem[] = [];
 
     lines.forEach(line => {
