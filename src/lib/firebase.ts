@@ -46,7 +46,7 @@ export const auth = {
     const user = {
       uid: 'mock-user-id',
       email,
-      displayName: email.spli'@'[0],
+      displayName: email.split('@')[0],
       metadata: { creationTime: new Date().toISOString() },
     };
     saveUserToStorage(user);
@@ -56,7 +56,7 @@ export const auth = {
     const user = {
       uid: 'mock-user-id',
       email,
-      displayName: email.spli'@'[0],
+      displayName: email.split('@')[0],
       metadata: { creationTime: new Date().toISOString() },
     };
     saveUserToStorage(user);

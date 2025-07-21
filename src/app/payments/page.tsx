@@ -229,7 +229,7 @@ export default function PaymentsPage() {
     // Generate file and download
     XLSX.writeFile(
       wb,
-      `payments-export-${new Date().toISOString().spli'T'[0]}.xlsx`,
+      `payments-export-${new Date().toISOString().split('T')[0]}.xlsx`,
     );
   }, [selectedPayments, payments]);
 
@@ -260,7 +260,7 @@ export default function PaymentsPage() {
     // Generate file and download
     XLSX.writeFile(
       wb,
-      `all-payments-${new Date().toISOString().spli'T'[0]}.xlsx`,
+      `all-payments-${new Date().toISOString().split('T')[0]}.xlsx`,
     );
   }, [payments]);
 

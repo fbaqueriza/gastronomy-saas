@@ -138,11 +138,11 @@ export default function ProvidersPage() {
           ...row,
           categories:
             typeof row.categories === 'string'
-              ? row.categories.spli','.map((c: string) => c.trim())
+              ? row.categories.split(',').map((c: string) => c.trim())
               : row.categories || [],
           tags:
             typeof row.tags === 'string'
-              ? row.tags.spli','.map((t: string) => t.trim())
+              ? row.tags.split(',').map((t: string) => t.trim())
               : row.tags || [],
           updatedAt: new Date(),
         })),
@@ -198,7 +198,7 @@ export default function ProvidersPage() {
     ].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElemen'a';
+    const a = document.createElement('a');
     a.href = url;
     a.download = 'providers.csv';
     a.click();
@@ -235,7 +235,7 @@ export default function ProvidersPage() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const lines = text.spli'\n'.filter(Boolean);
+      const lines = text.split('\n').filter(Boolean);
       // Normalize headers: remove common. prefix, lowercase, remove spaces
       const headers = parseCsvRow(lines[0]).map((h) =>
         h
@@ -252,25 +252,25 @@ export default function ProvidersPage() {
         };
         return {
           id: (Date.now() + index).toString(),
-          name: ge'name',
-          email: ge'email',
-          phone: ge'phone',
-          address: ge'address',
-          categories: ge'category'
-            ? ge'category'
-              .spli';'
+          name: get('name'),
+          email: get('email'),
+          phone: get('phone'),
+          address: get('address'),
+          categories: get('category')
+            ? get('category')
+              .split(';')
               .map((c) => c.trim())
             : [],
-          tags: ge'tags'
-            ? ge'tags'
-              .spli';'
+          tags: get('tags')
+            ? get('tags')
+              .split(';')
               .map((t) => t.trim())
             : [],
-          notes: ge'notes',
-          cbu: ge'cbu',
-          alias: ge'alias',
-          cuitCuil: ge'cuitcuil',
-          razonSocial: ge'razonsocial',
+          notes: get('notes'),
+          cbu: get('cbu'),
+          alias: get('alias'),
+          cuitCuil: get('cuitcuil'),
+          razonSocial: get('razonsocial'),
           catalogs: [],
           createdAt: new Date(),
           updatedAt: new Date(),
