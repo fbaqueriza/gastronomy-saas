@@ -30,7 +30,6 @@ export default function CreateOrderModal({
   stockItems,
   suggestedOrder,
 }: CreateOrderModalProps) {
-  const { t } = useTranslation();
   const [selectedProvider, setSelectedProvider] = useState<string>('');
   const [orderText, setOrderText] = useState('');
   const [notes, setNotes] = useState('');
@@ -91,7 +90,7 @@ export default function CreateOrderModal({
   useEffect(() => {
     if (!isOpen) {
       setSelectedProvider('');
-      setOrderTex'';
+      setOrderText('');
       setNotes('');
     }
   }, [isOpen]);
@@ -126,7 +125,7 @@ export default function CreateOrderModal({
   };
 
   const parseOrderText = (text: string): OrderItem[] => {
-    const lines = text.spli'\n'.filter(line => line.trim());
+    const lines = text.split('\n').filter(line => line.trim());
     const items: OrderItem[] = [];
 
     lines.forEach(line => {

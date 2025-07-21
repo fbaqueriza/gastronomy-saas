@@ -138,11 +138,11 @@ export default function ProvidersPage() {
           ...row,
           categories:
             typeof row.categories === 'string'
-              ? row.categories.spli','.map((c: string) => c.trim())
+              ? row.categories.split(',').map((c: string) => c.trim())
               : row.categories || [],
           tags:
             typeof row.tags === 'string'
-              ? row.tags.spli','.map((t: string) => t.trim())
+              ? row.tags.split(',').map((t: string) => t.trim())
               : row.tags || [],
           updatedAt: new Date(),
         })),
@@ -198,7 +198,7 @@ export default function ProvidersPage() {
     ].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElemen'a';
+    const a = document.createElement('a');
     a.href = url;
     a.download = 'providers.csv';
     a.click();
