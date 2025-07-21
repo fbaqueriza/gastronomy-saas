@@ -13,6 +13,12 @@ export default function HomePage() {
     console.log('HomePage - User:', user);
     console.log('HomePage - Loading:', loading);
 
+    // IMMEDIATE redirect - no waiting
+    const immediateTimeout = setTimeout(() => {
+      console.log('HomePage - Immediate redirect');
+      router.push('/auth/login');
+    }, 500);
+
     // Force redirect after 1.5 seconds regardless of auth state
     const forceTimeout = setTimeout(() => {
       console.log('HomePage - Force redirect timeout');
@@ -22,6 +28,7 @@ export default function HomePage() {
 
     // Normal auth-based redirect
     if (!loading) {
+      clearTimeout(immediateTimeout);
       clearTimeout(forceTimeout);
       if (user) {
         console.log('HomePage - Redirecting to dashboard');
@@ -32,7 +39,10 @@ export default function HomePage() {
       }
     }
 
-    return () => clearTimeout(forceTimeout);
+    return () => {
+      clearTimeout(immediateTimeout);
+      clearTimeout(forceTimeout);
+    };
   }, [user, loading, router]);
 
   // Show a simple loading state
