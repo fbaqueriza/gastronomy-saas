@@ -6,7 +6,7 @@ import Navigation from '../../components/Navigation';
 import SuggestedOrders from '../../components/SuggestedOrders';
 import CreateOrderModal from '../../components/CreateOrderModal';
 import { Order, OrderItem, Provider, StockItem } from '../../types';
-import {
+import { 
   Plus,
   ShoppingCart,
   Send,
@@ -16,7 +16,7 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  Users,
+  Users, 
   TrendingUp,
   Package,
   CreditCard,
@@ -521,7 +521,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-
+      
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="px-4 py-6 sm:px-0">
@@ -529,11 +529,11 @@ export default function DashboardPage() {
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">
                 Welcome, {user.name}!
-              </h1>
+            </h1>
               <p className="mt-1 text-sm text-gray-500">
                 Overview of your gastronomy business operations
-              </p>
-            </div>
+            </p>
+          </div>
 
             <div className="flex items-center space-x-3">
               <button
@@ -549,7 +549,7 @@ export default function DashboardPage() {
 
         {/* Quick Stats */}
         <div className="px-4 sm:px-0 mb-6">
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-5">
                 <div className="flex items-center">
@@ -596,7 +596,7 @@ export default function DashboardPage() {
 
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-5">
-                <div className="flex items-center">
+                    <div className="flex items-center">
                   <div className="flex-shrink-0">
                     <div className="bg-red-500 rounded-md p-3">
                       <Package className="h-6 w-6 text-white" />
@@ -613,8 +613,8 @@ export default function DashboardPage() {
                     </dl>
                   </div>
                 </div>
-              </div>
-            </div>
+                      </div>
+                      </div>
 
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-5">
@@ -665,9 +665,9 @@ export default function DashboardPage() {
                     <div className="px-4 py-4 sm:px-6">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center flex-1">
-                          <div className="flex-shrink-0">
+                      <div className="flex-shrink-0">
                             {getStatusIcon(order.status)}
-                          </div>
+                      </div>
                           <div className="ml-4 flex-1">
                             <div className="flex items-center">
                               <p className="text-sm font-medium text-gray-900">
@@ -766,7 +766,7 @@ export default function DashboardPage() {
                           >
                             <Plus className="h-4 w-4 mr-1" />
                             Order
-                          </button>
+                  </button>
                         </td>
                       </tr>
                     ))}
@@ -792,4 +792,4 @@ export default function DashboardPage() {
       />
     </div>
   );
-}
+} 
