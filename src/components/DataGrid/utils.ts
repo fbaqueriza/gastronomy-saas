@@ -33,8 +33,8 @@ export const parsePastedData = (
   text: string,
   columns: Column[],
 ): any[] => {
-  return text.spli'\n'.map((row) =>
-    row.spli'\t'.reduce((obj, value, idx) => {
+  return text.split('\n').map((row) =>
+    row.split('\t').reduce((obj, value, idx) => {
       obj[columns[idx]?.key || `col${idx}`] = value;
       return obj;
     }, {} as any),
