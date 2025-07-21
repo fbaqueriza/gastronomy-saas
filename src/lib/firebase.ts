@@ -18,6 +18,7 @@ const firebaseConfig = {
 const USER_KEY = 'mock_firebase_user';
 
 function saveUserToStorage(user: any) {
+  if (typeof window === 'undefined') return;
   if (user) {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   } else {
@@ -26,6 +27,7 @@ function saveUserToStorage(user: any) {
 }
 
 function loadUserFromStorage() {
+  if (typeof window === 'undefined') return null;
   const data = localStorage.getItem(USER_KEY);
   return data ? JSON.parse(data) : null;
 }

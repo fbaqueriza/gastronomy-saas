@@ -110,11 +110,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     }, 1500);
 
+    // Add a hard fallback to always clear loading after 3 seconds
+    const hardFallback = setTimeout(() => {
+      console.log('AuthProvider - Hard fallback, forcing loading=false');
+      setLoading(false);
+    }, 3000);
+
     return () => {
       clearTimeout(timeout);
       clearTimeout(immediateTimeout);
       clearTimeout(emergencyTimeout);
       clearTimeout(fallbackTimeout);
+      clearTimeout(hardFallback);
       unsubscribe();
     };
   }, [loading]);
