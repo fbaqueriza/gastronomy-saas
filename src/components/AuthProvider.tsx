@@ -32,6 +32,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      setLoading(false);
+      console.log('AuthProvider - SSR detected, set loading to false');
+      return;
+    }
     console.log('AuthProvider - Initializing auth state');
 
     // EMERGENCY FIX: Force completion immediately
