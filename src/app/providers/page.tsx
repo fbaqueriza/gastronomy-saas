@@ -267,7 +267,7 @@ function ProvidersPage() {
       setProviders(
         newData.map((row) => ({
           ...row,
-          user_id: row.user_id || user.id,
+          user_id: row.user_id || user.uid,
           categories:
             typeof row.categories === 'string'
               ? row.categories.split(',').map((c: string) => c.trim())
@@ -286,7 +286,7 @@ function ProvidersPage() {
   const handleAddRow = useCallback(() => {
     if (!user) return;
     const newProvider = createNewProvider();
-    newProvider.user_id = user.id;
+    newProvider.user_id = user.uid;
     setProviders([newProvider, ...providers]);
   }, [providers, setProviders, user]);
 
