@@ -40,12 +40,13 @@ export default function OrdersPageWrapper() {
   }
   return (
     <DataProvider userEmail={user?.email}>
-      <OrdersPage />
+      {user && <OrdersPage user={user} />}
     </DataProvider>
   );
 }
 
-function OrdersPage() {
+type OrdersPageProps = { user: import('@supabase/supabase-js').User };
+function OrdersPage({ user }: OrdersPageProps) {
   // user y authLoading ya están definidos arriba
   const { orders, setOrders, providers, setProviders, stockItems, setStockItems } = useData();
   const isSeedUser = user?.email === 'test@test.com';
