@@ -429,7 +429,7 @@ function ProvidersPage() {
   // Importación masiva de providers (ejemplo CSV)
   const handleImportProviders = useCallback((importedProviders: any[]) => {
     if (!user) return;
-    setProviders((prev) => [...prev, ...processProviderData(importedProviders, user.id)]);
+    setProviders((prev) => [...prev, ...processProviderData(importedProviders, user.uid)]);
   }, [setProviders, user]);
 
   if (authLoading) {
