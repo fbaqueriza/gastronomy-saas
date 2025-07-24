@@ -71,7 +71,7 @@ export default function Navigation() {
               >
                 <User className="h-5 w-5" />
                 <span className="text-sm font-medium text-gray-700">
-                  {user?.name || 'Usuario'}
+                  {user?.email || 'Usuario'}
                 </span>
               </button>
 
@@ -134,7 +134,7 @@ export default function Navigation() {
               </div>
               <div className="ml-3">
                 <div className="text-base font-medium text-gray-800">
-                  {user?.name || 'Usuario'}
+                  {user?.email || 'Usuario'}
                 </div>
                 <div className="text-sm font-medium text-gray-500">
                   {user?.email}
