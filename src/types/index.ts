@@ -11,8 +11,10 @@ export interface User {
 // Provider types
 export interface Provider {
   id: string;
+  user_id: string;
   name: string;
   email: string;
+  contactName?: string;
   phone: string;
   address?: string;
   categories: string[];
@@ -41,24 +43,25 @@ export interface Catalog {
 // Stock types
 export interface StockItem {
   id: string;
+  user_id: string;
   productName: string;
   category: string;
   quantity: number;
   unit: string;
   restockFrequency: 'daily' | 'weekly' | 'monthly' | 'custom';
-  minimumQuantity: number;
-  currentStock: number;
   associatedProviders: string[]; // Provider IDs
   preferredProvider?: string; // Provider ID
   lastOrdered?: Date;
   nextOrder?: Date;
   createdAt: Date;
   updatedAt: Date;
+  consumptionHistory?: number[];
 }
 
 // Order types
 export interface Order {
   id: string;
+  user_id: string;
   orderNumber: string;
   providerId: string;
   items: OrderItem[];
@@ -215,4 +218,4 @@ export interface FileUpload {
   status: 'uploading' | 'success' | 'error';
   url?: string;
   error?: string;
-}
+} 

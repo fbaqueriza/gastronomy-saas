@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Clock, AlertTriangle, Plus, Calendar } from 'lucide-react';
 import { StockItem, Provider } from '../types';
+import es from '../locales/es';
 
 interface SuggestedOrder {
   id: string;
@@ -34,54 +35,36 @@ export default function SuggestedOrders({
   // Generate suggested orders based on stock data
   const generateSuggestedOrders = (): SuggestedOrder[] => {
     const suggestions: SuggestedOrder[] = [];
-
+    const now = new Date();
     stockItems.forEach((item) => {
-      // Check for low stock
-      if (item.currentStock < item.minimumQuantity) {
-        const neededQuantity = item.minimumQuantity - item.currentStock;
-        const suggestedProviders = providers.filter((p) =>
-          item.associatedProviders.includes(p.id),
-        );
-
-        if (suggestedProviders.length > 0) {
-          suggestions.push({
-            id: `low-stock-${item.id}`,
-            productName: item.productName,
-            category: item.category,
-            suggestedQuantity: neededQuantity,
-            unit: item.unit,
-            reason: 'low_stock',
-            urgency: 'high',
-            suggestedProviders,
-            estimatedCost: neededQuantity * 2.5, // Mock price
-            currency: 'EUR',
-          });
-        }
+      // Calculate average consumption per period (last 3 completed orders)
+      // This is a mock: in real use, you would fetch real consumption data
+      let avgConsumption = undefined;
+      if (item.consumptionHistory && item.consumptionHistory.length >= 3) {
+        const lastThree = item.consumptionHistory.slice(-3);
+        avgConsumption = lastThree.reduce((a, b) => a + b, 0) / lastThree.length;
       }
-
-      // Check for restock due
-      if (item.nextOrder && new Date(item.nextOrder) <= new Date()) {
+      // Suggest restock if today is near or past próxima orden
+      if (item.nextOrder && new Date(item.nextOrder) <= now) {
         const suggestedProviders = providers.filter((p) =>
           item.associatedProviders.includes(p.id),
         );
-
         if (suggestedProviders.length > 0) {
           suggestions.push({
             id: `restock-${item.id}`,
             productName: item.productName,
             category: item.category,
-            suggestedQuantity: item.quantity,
+            suggestedQuantity: avgConsumption ? Math.ceil(avgConsumption) : item.quantity,
             unit: item.unit,
             reason: 'restock_due',
             urgency: 'medium',
             suggestedProviders,
-            estimatedCost: item.quantity * 2.5, // Mock price
+            estimatedCost: (avgConsumption ? Math.ceil(avgConsumption) : item.quantity) * 2.5, // Mock price
             currency: 'EUR',
           });
         }
       }
     });
-
     return suggestions.sort((a, b) => {
       const urgencyOrder = { high: 3, medium: 2, low: 1 };
       return urgencyOrder[b.urgency] - urgencyOrder[a.urgency];
@@ -119,13 +102,13 @@ export default function SuggestedOrders({
   const getReasonText = (reason: string) => {
     switch (reason) {
       case 'low_stock':
-        return 'Low Stock';
+        return es.stock.lowStockAlert;
       case 'restock_due':
-        return 'Restock Due';
+        return es.stock.useRestockFrequency;
       case 'seasonal':
-        return 'Seasonal';
+        return es.stock.managementTips;
       default:
-        return 'Unknown';
+        return 'Desconocido';
     }
   };
 
@@ -133,13 +116,13 @@ export default function SuggestedOrders({
     return (
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Suggested Orders
+          {es.orders.suggestedOrders}
         </h3>
         <div className="text-center py-8">
           <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">No suggested orders at the moment</p>
+          <p className="text-gray-500">{es.orders.noSuggestedOrders}</p>
           <p className="text-sm text-gray-400 mt-1">
-            All items are well stocked and up to date
+            {es.orders.allItemsStocked}
           </p>
         </div>
       </div>
@@ -150,10 +133,10 @@ export default function SuggestedOrders({
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-semibold text-gray-900">
-          Suggested Orders ({suggestedOrders.length})
+          {es.orders.suggestedOrders} ({suggestedOrders.length})
         </h3>
         <p className="text-sm text-gray-500 mt-1">
-          Based on stock levels and restock schedules
+          {es.orders.basedOnStock}
         </p>
       </div>
 
@@ -178,25 +161,25 @@ export default function SuggestedOrders({
 
                 <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
                   <div>
-                    <span className="font-medium">Category:</span> {order.category}
+                    <span className="font-medium">{es.stock.category}:</span> {order.category}
                   </div>
                   <div>
-                    <span className="font-medium">Quantity:</span>{' '}
+                    <span className="font-medium">{es.stock.quantity}:</span>{' '}
                     {order.suggestedQuantity} {order.unit}
                   </div>
                   <div>
-                    <span className="font-medium">Reason:</span>{' '}
+                    <span className="font-medium">{es.orders.reason}:</span>{' '}
                     {getReasonText(order.reason)}
                   </div>
                   <div>
-                    <span className="font-medium">Est. Cost:</span>{' '}
+                    <span className="font-medium">{es.orders.estimatedCost}:</span>{' '}
                     {order.estimatedCost} {order.currency}
                   </div>
                 </div>
 
                 <div className="mb-3">
                   <span className="text-sm font-medium text-gray-700">
-                    Suggested Providers:
+                    {es.orders.suggestedProviders}:
                   </span>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {order.suggestedProviders.map((provider) => (
@@ -217,7 +200,7 @@ export default function SuggestedOrders({
                   className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   <Plus className="h-4 w-4 mr-1" />
-                  Create Order
+                  {es.orders.createOrder}
                 </button>
               </div>
             </div>

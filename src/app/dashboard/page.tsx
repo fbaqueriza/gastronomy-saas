@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useState, useCallback } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import Navigation from '../../components/Navigation';
-import SuggestedOrders from '../../components/SuggestedOrders';
-import CreateOrderModal from '../../components/CreateOrderModal';
-import { Order, OrderItem, Provider, StockItem } from '../../types';
-import { 
+import { useState, useCallback } from "react";
+import { useSupabaseUser } from '../../hooks/useSupabaseUser';
+import Navigation from "../../components/Navigation";
+import SuggestedOrders from "../../components/SuggestedOrders";
+import CreateOrderModal from "../../components/CreateOrderModal";
+import { Order, OrderItem, Provider, StockItem } from "../../types";
+import {
   Plus,
   ShoppingCart,
   Send,
@@ -16,492 +16,77 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  Users, 
+  Users,
   TrendingUp,
   Package,
   CreditCard,
-} from 'lucide-react';
+  Calendar,
+} from "lucide-react";
+import {
+  DataProvider,
+  useData,
+  ChatProvider,
+  useChat,
+} from "../../components/DataProvider";
+import es from "../../locales/es";
+import WhatsAppChat from "../../components/WhatsAppChat";
+import PendingOrderList from '../../components/PendingOrderList';
+import { Menu } from '@headlessui/react';
+import { useRouter } from 'next/navigation';
 
-export default function DashboardPage() {
-  const { user, loading: authLoading } = useAuth();
+export default function DashboardPageWrapper() {
+  const { user, loading: authLoading } = useSupabaseUser();
+  const router = useRouter();
+  if (!authLoading && !user) {
+    if (typeof window !== 'undefined') router.push('/auth/login');
+    return null;
+  }
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div><p className="mt-4 text-gray-600">Cargando...</p></div></div>;
+  }
+  return (
+    <DataProvider userEmail={user?.email}>
+      <DashboardPage />
+    </DataProvider>
+  );
+}
 
-  // Mock data - same as orders page
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: '1',
-      orderNumber: 'ORD-001',
-      providerId: '2',
-      items: [
-        {
-          productName: 'Bife de Chorizo',
-          quantity: 7,
-          unit: 'kg',
-          price: 8500,
-          total: 59500,
-        },
-        {
-          productName: 'Asado de Tira',
-          quantity: 7,
-          unit: 'kg',
-          price: 7200,
-          total: 50400,
-        },
-      ],
-      status: 'sent',
-      totalAmount: 109900,
-      currency: 'ARS',
-      orderDate: new Date('2024-01-20'),
-      dueDate: new Date('2024-01-25'),
-      invoiceNumber: 'INV-2024-001',
-      bankInfo: {
-        iban: 'AR1234567890123456789012',
-        swift: 'BANCOAR',
-        bankName: 'Banco de la Nación Argentina',
-      },
-      receiptUrl: '',
-      notes: 'Entregar antes de las 10:00 hs',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '2',
-      orderNumber: 'ORD-002',
-      providerId: '5',
-      items: [
-        {
-          productName: 'Leche Entera',
-          quantity: 12,
-          unit: 'L',
-          price: 450,
-          total: 5400,
-        },
-        {
-          productName: 'Queso Cremoso',
-          quantity: 4,
-          unit: 'kg',
-          price: 3200,
-          total: 12800,
-        },
-      ],
-      status: 'pending',
-      totalAmount: 18200,
-      currency: 'ARS',
-      orderDate: new Date('2024-01-21'),
-      dueDate: new Date('2024-01-26'),
-      invoiceNumber: '',
-      bankInfo: {},
-      receiptUrl: '',
-      notes: 'Queso fresco por favor',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ]);
-
-  const [providers] = useState<Provider[]>([
-    {
-      id: '1',
-      name: 'Distribuidora Gastronómica S.A.',
-      email: 'pedidos@distgastronomica.com',
-      phone: '+54 11 4567-8901',
-      address: 'Av. Corrientes 1234, CABA, Buenos Aires',
-      categories: ['Proveeduría General', 'Lácteos', 'Frescos'],
-      tags: ['confiable', 'entrega rápida'],
-      notes: 'Proveedor principal con amplio catálogo y entrega en 24h',
-      cbu: 'ES9121000418450200051332',
-      alias: 'DISTGASTRO',
-      cuitCuil: '30-12345678-9',
-      razonSocial: 'Distribuidora Gastronómica S.A.',
-      catalogs: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '2',
-      name: 'Carnes Premium del Sur',
-      email: 'ventas@carnespremium.com',
-      phone: '+54 11 3456-7890',
-      address: 'Ruta 2 Km 45, La Plata, Buenos Aires',
-      categories: ['Carnes', 'Proteínas', 'Premium'],
-      tags: ['premium', 'calidad superior'],
-      notes: 'Especialistas en carnes premium y cortes especiales',
-      cbu: 'ES9121000418450200051333',
-      alias: 'CARNESUR',
-      cuitCuil: '30-98765432-1',
-      razonSocial: 'Carnes Premium del Sur S.R.L.',
-      catalogs: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '3',
-      name: 'Pescados Frescos Mar del Plata',
-      email: 'pedidos@pescadosfrescos.com',
-      phone: '+54 223 456-7890',
-      address: 'Puerto de Mar del Plata, Buenos Aires',
-      categories: ['Pescados', 'Mariscos', 'Frescos'],
-      tags: ['fresco', 'directo del mar'],
-      notes: 'Pescados y mariscos frescos directo del puerto',
-      cbu: 'ES9121000418450200051334',
-      alias: 'PESCADOSMP',
-      cuitCuil: '30-45678912-3',
-      razonSocial: 'Pescados Frescos MDP S.A.',
-      catalogs: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '4',
-      name: 'Verduras Orgánicas La Huerta',
-      email: 'info@lahuertaorganica.com',
-      phone: '+54 11 2345-6789',
-      address: 'Ruta 8 Km 32, San Vicente, Buenos Aires',
-      categories: ['Verduras', 'Orgánicas', 'Frescos'],
-      tags: ['orgánico', 'sustentable'],
-      notes: 'Verduras orgánicas de producción propia',
-      cbu: 'ES9121000418450200051335',
-      alias: 'HUERTAORG',
-      cuitCuil: '30-78912345-6',
-      razonSocial: 'La Huerta Orgánica S.R.L.',
-      catalogs: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '5',
-      name: 'Lácteos Artesanales El Tambo',
-      email: 'ventas@eltambo.com',
-      phone: '+54 11 1234-5678',
-      address: 'Ruta 6 Km 78, Cañuelas, Buenos Aires',
-      categories: ['Lácteos', 'Artesanal', 'Quesos'],
-      tags: ['artesanal', 'tradicional'],
-      notes: 'Lácteos artesanales y quesos de autor',
-      cbu: 'ES9121000418450200051336',
-      alias: 'ELTAMBO',
-      cuitCuil: '30-32165498-7',
-      razonSocial: 'El Tambo Artesanal S.A.',
-      catalogs: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ]);
-
-  const [stockItems] = useState<StockItem[]>([
-    // Carnes
-    {
-      id: '1',
-      productName: 'Bife de Chorizo',
-      category: 'Carnes',
-      quantity: 50,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 15,
-      currentStock: 8,
-      associatedProviders: ['2'],
-      preferredProvider: '2',
-      lastOrdered: new Date('2024-01-18'),
-      nextOrder: new Date('2024-01-25'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '2',
-      productName: 'Asado de Tira',
-      category: 'Carnes',
-      quantity: 40,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 12,
-      currentStock: 5,
-      associatedProviders: ['2'],
-      preferredProvider: '2',
-      lastOrdered: new Date('2024-01-19'),
-      nextOrder: new Date('2024-01-26'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '3',
-      productName: 'Pollo Entero',
-      category: 'Carnes',
-      quantity: 30,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 10,
-      currentStock: 15,
-      associatedProviders: ['1', '2'],
-      preferredProvider: '1',
-      lastOrdered: new Date('2024-01-20'),
-      nextOrder: new Date('2024-01-27'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    // Pescados
-    {
-      id: '4',
-      productName: 'Merluza Fresca',
-      category: 'Pescados',
-      quantity: 25,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 8,
-      currentStock: 3,
-      associatedProviders: ['3'],
-      preferredProvider: '3',
-      lastOrdered: new Date('2024-01-21'),
-      nextOrder: new Date('2024-01-28'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '5',
-      productName: 'Salmón Rosado',
-      category: 'Pescados',
-      quantity: 20,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 6,
-      currentStock: 12,
-      associatedProviders: ['3'],
-      preferredProvider: '3',
-      lastOrdered: new Date('2024-01-22'),
-      nextOrder: new Date('2024-01-29'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    // Verduras
-    {
-      id: '6',
-      productName: 'Tomates Perita',
-      category: 'Verduras',
-      quantity: 30,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 10,
-      currentStock: 4,
-      associatedProviders: ['1', '4'],
-      preferredProvider: '4',
-      lastOrdered: new Date('2024-01-23'),
-      nextOrder: new Date('2024-01-30'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '7',
-      productName: 'Lechuga Mantecosa',
-      category: 'Verduras',
-      quantity: 20,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 6,
-      currentStock: 2,
-      associatedProviders: ['1', '4'],
-      preferredProvider: '4',
-      lastOrdered: new Date('2024-01-24'),
-      nextOrder: new Date('2024-01-31'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '8',
-      productName: 'Cebolla Blanca',
-      category: 'Verduras',
-      quantity: 25,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 8,
-      currentStock: 18,
-      associatedProviders: ['1', '4'],
-      preferredProvider: '1',
-      lastOrdered: new Date('2024-01-25'),
-      nextOrder: new Date('2024-02-01'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    // Lácteos
-    {
-      id: '9',
-      productName: 'Leche Entera',
-      category: 'Lácteos',
-      quantity: 60,
-      unit: 'L',
-      restockFrequency: 'daily',
-      minimumQuantity: 20,
-      currentStock: 8,
-      associatedProviders: ['1', '5'],
-      preferredProvider: '5',
-      lastOrdered: new Date('2024-01-26'),
-      nextOrder: new Date('2024-01-27'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '10',
-      productName: 'Queso Cremoso',
-      category: 'Lácteos',
-      quantity: 15,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 5,
-      currentStock: 1,
-      associatedProviders: ['1', '5'],
-      preferredProvider: '5',
-      lastOrdered: new Date('2024-01-27'),
-      nextOrder: new Date('2024-02-03'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '11',
-      productName: 'Manteca',
-      category: 'Lácteos',
-      quantity: 10,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 3,
-      currentStock: 6,
-      associatedProviders: ['1', '5'],
-      preferredProvider: '5',
-      lastOrdered: new Date('2024-01-28'),
-      nextOrder: new Date('2024-02-04'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    // Proveeduría General
-    {
-      id: '12',
-      productName: 'Harina 0000',
-      category: 'Proveeduría General',
-      quantity: 50,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 15,
-      currentStock: 22,
-      associatedProviders: ['1'],
-      preferredProvider: '1',
-      lastOrdered: new Date('2024-01-29'),
-      nextOrder: new Date('2024-02-05'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '13',
-      productName: 'Aceite de Oliva',
-      category: 'Proveeduría General',
-      quantity: 20,
-      unit: 'L',
-      restockFrequency: 'weekly',
-      minimumQuantity: 6,
-      currentStock: 3,
-      associatedProviders: ['1'],
-      preferredProvider: '1',
-      lastOrdered: new Date('2024-01-30'),
-      nextOrder: new Date('2024-02-06'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '14',
-      productName: 'Sal Fina',
-      category: 'Proveeduría General',
-      quantity: 10,
-      unit: 'kg',
-      restockFrequency: 'monthly',
-      minimumQuantity: 2,
-      currentStock: 8,
-      associatedProviders: ['1'],
-      preferredProvider: '1',
-      lastOrdered: new Date('2024-01-15'),
-      nextOrder: new Date('2024-02-15'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ]);
-
-  const [loading, setLoading] = useState(false);
+function DashboardPage() {
+  const { user, loading: authLoading } = useSupabaseUser();
+  const {
+    orders,
+    setOrders,
+    providers,
+    setProviders,
+    stockItems,
+    setStockItems,
+  } = useData();
+  const isSeedUser = user?.email === "test@test.com";
+  const mockConversations = isSeedUser
+    ? providers.reduce((acc, provider) => {
+        acc[provider.id] = {
+          providerId: provider.id,
+          messages: [
+            {
+              id: '1',
+              orderId: '',
+              providerId: provider.id,
+              type: 'order',
+              message: `¡Hola ${provider.name}! Este es un mensaje de prueba para ${provider.name}.`,
+              status: 'sent',
+              createdAt: new Date(),
+            },
+          ],
+          unreadCount: 1,
+        };
+        return acc;
+      }, {} as any)
+    : undefined;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [suggestedOrder, setSuggestedOrder] = useState<any>(null);
-
-  // Calculate dashboard stats
-  const pendingOrders = orders.filter(order => order.status === 'pending').length;
-  const lowStockItems = stockItems.filter(item => item.currentStock < item.minimumQuantity).length;
-  const totalProviders = providers.length;
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Clock className="h-4 w-4 text-yellow-500" />;
-      case 'sent':
-        return <Send className="h-4 w-4 text-blue-500" />;
-      case 'confirmed':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'delivered':
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'cancelled':
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return <Clock className="h-4 w-4 text-gray-500" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'sent':
-        return 'bg-blue-100 text-blue-800';
-      case 'confirmed':
-        return 'bg-green-100 text-green-800';
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getProviderName = (providerId: string) => {
-    const provider = providers.find(p => p.id === providerId);
-    return provider?.name || 'Unknown Provider';
-  };
-
-  const handleCreateOrder = (orderData: {
-    providerId: string;
-    items: OrderItem[];
-    notes: string;
-  }) => {
-    const newOrder: Order = {
-      id: Date.now().toString(),
-      orderNumber: `ORD-${String(orders.length + 1).padStart(3, '0')}`,
-      providerId: orderData.providerId,
-      items: orderData.items,
-      status: 'pending',
-      totalAmount: orderData.items.reduce((sum, item) => sum + item.total, 0),
-      currency: 'ARS',
-      orderDate: new Date(),
-      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
-      invoiceNumber: '',
-      bankInfo: {},
-      receiptUrl: '',
-      notes: orderData.notes,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    setOrders((prev) => [...prev, newOrder]);
-    setIsCreateModalOpen(false);
-    setSuggestedOrder(null);
-  };
-
-  const handleSuggestedOrderCreate = (suggestedOrder: any) => {
-    setSuggestedOrder(suggestedOrder);
-    setIsCreateModalOpen(true);
-  };
-
-  const handleProviderOrder = (providerId: string) => {
-    setIsCreateModalOpen(true);
-    // The modal will auto-populate based on the provider
-  };
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [paymentProofs, setPaymentProofs] = useState<{ [orderId: string]: { url: string; name: string } }>({});
 
   if (authLoading) {
     return (
@@ -513,266 +98,449 @@ export default function DashboardPage() {
       </div>
     );
   }
+  if (!user) return null;
+  return (
+    <ChatProvider
+      providers={providers}
+      initialConversations={mockConversations}
+    >
+      <DashboardPageContent
+        orders={orders}
+        setOrders={setOrders}
+        providers={providers}
+        setProviders={setProviders}
+        stockItems={stockItems}
+        setStockItems={setStockItems}
+        isCreateModalOpen={isCreateModalOpen}
+        setIsCreateModalOpen={setIsCreateModalOpen}
+        suggestedOrder={suggestedOrder}
+        setSuggestedOrder={setSuggestedOrder}
+        isChatOpen={isChatOpen}
+        setIsChatOpen={setIsChatOpen}
+        user={user}
+        selectedProviderId={typeof selectedProviderId === 'string' ? selectedProviderId : null}
+        setSelectedProviderId={setSelectedProviderId}
+        paymentProofs={paymentProofs}
+        setPaymentProofs={setPaymentProofs}
+      />
+    </ChatProvider>
+  );
+}
 
-  if (!user) {
-    return null;
+function DashboardPageContent({
+  orders,
+  setOrders,
+  providers,
+  setProviders,
+  stockItems,
+  setStockItems,
+  isCreateModalOpen,
+  setIsCreateModalOpen,
+  suggestedOrder,
+  setSuggestedOrder,
+  isChatOpen,
+  setIsChatOpen,
+  user,
+  selectedProviderId,
+  setSelectedProviderId,
+  paymentProofs,
+  setPaymentProofs,
+}: {
+  orders: Order[];
+  setOrders: (orders: Order[]) => void;
+  providers: Provider[];
+  setProviders: (providers: Provider[]) => void;
+  stockItems: StockItem[];
+  setStockItems: (stockItems: StockItem[]) => void;
+  isCreateModalOpen: boolean;
+  setIsCreateModalOpen: (open: boolean) => void;
+  suggestedOrder: any;
+  setSuggestedOrder: (order: any) => void;
+  isChatOpen: boolean;
+  setIsChatOpen: (open: boolean) => void;
+  user: any;
+  selectedProviderId: string | null;
+  setSelectedProviderId: (id: string | null) => void;
+  paymentProofs: { [orderId: string]: { url: string; name: string } };
+  setPaymentProofs: (proofs: { [orderId: string]: { url: string; name: string } }) => void;
+}) {
+  const { conversations, openProviderId, setOpenProviderId, markAsRead } =
+    useChat();
+  // Calculate pending orders (not delivered)
+  const pendingOrders = orders.filter((order: Order) => order.status !== 'delivered').length;
+  // Calculate upcoming orders (stock items with próxima orden within 7 days)
+  const upcomingOrders = stockItems.filter((item: StockItem) => {
+    if (!item.nextOrder) return false;
+    const nextOrder = new Date(item.nextOrder);
+    const weekFromNow = new Date();
+    weekFromNow.setDate(weekFromNow.getDate() + 7);
+    return nextOrder <= weekFromNow;
+  });
+  const totalProviders = providers.length;
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Clock className="h-4 w-4 text-yellow-500" />;
+      case "sent":
+        return <Send className="h-4 w-4 text-blue-500" />;
+      case "confirmed":
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case "delivered":
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case "cancelled":
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return <Clock className="h-4 w-4 text-gray-500" />;
+    }
+  };
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "sent":
+        return "bg-blue-100 text-blue-800";
+      case "confirmed":
+        return "bg-green-100 text-green-800";
+      case "delivered":
+        return "bg-green-100 text-green-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+  const getProviderName = (providerId: string) => {
+    const provider = providers.find((p: Provider) => p.id === providerId);
+    return provider?.name || "Unknown Provider";
+  };
+  const handleCreateOrder = (orderData: {
+    providerId: string;
+    items: OrderItem[];
+    notes: string;
+  }) => {
+    if (!user) return;
+    const newOrder: Order = {
+      id: Date.now().toString(),
+      user_id: user.id,
+      orderNumber: `ORD-${String(orders.length + 1).padStart(3, "0")}`,
+      providerId: orderData.providerId,
+      items: orderData.items,
+      status: "pending",
+      totalAmount: orderData.items.reduce((sum, item) => sum + item.total, 0),
+      currency: "ARS",
+      orderDate: new Date(),
+      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      invoiceNumber: "",
+      bankInfo: {},
+      receiptUrl: "",
+      notes: orderData.notes,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    setOrders([...orders, newOrder]);
+    setIsCreateModalOpen(false);
+    setSuggestedOrder(null);
+    setSelectedProviderId(null);
+  };
+  const handleSuggestedOrderCreate = (suggestedOrder: any) => {
+    setSuggestedOrder(suggestedOrder);
+    setSelectedProviderId((suggestedOrder?.suggestedProviders?.[0]?.id as string) ?? null);
+    setIsCreateModalOpen(true);
+  };
+  const handleProviderOrder = (providerId: string) => {
+    setSelectedProviderId(providerId ?? null);
+    setIsCreateModalOpen(true);
+  };
+  // Helper: get last order date for a provider
+  function getProviderLastOrderDate(providerId: string): Date | null {
+    const providerOrders = orders.filter((o: any) => o.providerId === providerId);
+    if (providerOrders.length === 0) return null;
+    return new Date(Math.max(...providerOrders.map((o: any) => new Date(o.orderDate).getTime())));
   }
-
+  // Helper: check if provider has active/pending orders
+  function providerHasActiveOrder(providerId: string): boolean {
+    return orders.some((o: any) => o.providerId === providerId && ['pending', 'sent', 'confirmed'].includes(o.status));
+  }
+  // Helper: check if provider has imminent order (next order for any of their products within 7 days)
+  function providerHasImminentOrder(providerId: string): boolean {
+    const now = new Date();
+    const weekFromNow = new Date();
+    weekFromNow.setDate(now.getDate() + 7);
+    return stockItems.some((item: any) => item.associatedProviders.includes(providerId) && item.nextOrder && new Date(item.nextOrder) <= weekFromNow);
+  }
+  // Sort providers
+  const sortedProviders = [...providers].sort((a, b) => {
+    // 1. Active/pending orders
+    const aActive = providerHasActiveOrder(a.id);
+    const bActive = providerHasActiveOrder(b.id);
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+    // 2. Imminent order
+    const aImminent = providerHasImminentOrder(a.id);
+    const bImminent = providerHasImminentOrder(b.id);
+    if (aImminent && !bImminent) return -1;
+    if (!aImminent && bImminent) return 1;
+    // 3. Most recent order date
+    const aLast = getProviderLastOrderDate(a.id);
+    const bLast = getProviderLastOrderDate(b.id);
+    if (aLast && bLast) return bLast.getTime() - aLast.getTime();
+    if (aLast) return -1;
+    if (bLast) return 1;
+    return 0;
+  });
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-      
+      {/* Remove floating chat button */}
+      {/* Header */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="px-4 py-6 sm:px-0">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">
-                Welcome, {user.name}!
-            </h1>
-              <p className="mt-1 text-sm text-gray-500">
-                Overview of your gastronomy business operations
-            </p>
-          </div>
-
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setIsCreateModalOpen(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                New Order
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="px-4 sm:px-0 mb-6">
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="bg-blue-500 rounded-md p-3">
-                      <Users className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">
-                        Total Providers
-                      </dt>
-                      <dd className="text-lg font-medium text-gray-900">
-                        {totalProviders}
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="bg-yellow-500 rounded-md p-3">
-                      <ShoppingCart className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">
-                        Pending Orders
-                      </dt>
-                      <dd className="text-lg font-medium text-gray-900">
-                        {pendingOrders}
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                    <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="bg-red-500 rounded-md p-3">
-                      <Package className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">
-                        Low Stock Items
-                      </dt>
-                      <dd className="text-lg font-medium text-gray-900">
-                        {lowStockItems}
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-x-8 gap-y-8">
+          {/* Left Section: Pedidos pendientes + Pedidos recientes */}
+          <div className="w-full">
+            {/* Pedidos pendientes */}
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-6 mb-6 shadow">
+              <h2 className="text-xl font-bold text-yellow-800 mb-4">Pedidos pendientes</h2>
+              {orders.filter((o: Order) => o.status === 'pending' || o.status === 'sent' || o.status === 'confirmed').length === 0 ? (
+                <ul className="divide-y divide-yellow-100">
+                  {/* Mock pending order for visual testing */}
+                  <li className="py-3 flex flex-col gap-1 opacity-60">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-medium text-gray-900">Proveedor Demo</span>
+                        <span className="ml-2 text-gray-500 text-sm">{new Date().toLocaleDateString()}</span>
+                        <span className="ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-200 text-yellow-800">En curso</span>
                       </div>
-                      </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="bg-green-500 rounded-md p-3">
-                      <TrendingUp className="h-6 w-6 text-white" />
+                      <button className="text-blue-600 hover:underline text-sm flex items-center cursor-not-allowed" title="Ver chat">
+                        Ver más
+                        <svg className="ml-1 h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                      </button>
                     </div>
+                    <div className="text-xs text-gray-400 mt-1">Sin mensajes</div>
+                  </li>
+                </ul>
+              ) : (
+                <PendingOrderList
+                  orders={orders.filter((o: Order) => o.status === 'pending' || o.status === 'sent' || o.status === 'confirmed')}
+                  providers={providers}
+                  onViewChat={(order) => setOpenProviderId(order.providerId)}
+                  onUploadReceipt={(order, file) => {
+                    const url = URL.createObjectURL(file);
+                    setPaymentProofs({ ...paymentProofs, [order.id]: { url, name: file.name } });
+                    setOrders(orders.map((o: Order) => {
+                      if (o.id === order.id) {
+                        if (o.status === 'sent') {
+                          return { ...o, status: 'confirmed', updatedAt: new Date() };
+                        }
+                        return { ...o };
+                      }
+                      return o;
+                    }));
+                  }}
+                  onSendOrder={(order) => {
+                    setOrders(orders.map((o: Order) =>
+                      o.id === order.id ? { ...o, status: 'sent', updatedAt: new Date() } : o
+                    ));
+                  }}
+                  paymentProofs={paymentProofs}
+                  onConfirmReception={(order) => {
+                    setOrders(orders.map((o: Order) =>
+                      o.id === order.id ? { ...o, status: 'delivered', updatedAt: new Date() } : o
+                    ));
+                  }}
+                />
+              )}
+            </div>
+            {/* Divider */}
+            <div className="my-6 border-t border-gray-200" />
+            {/* Pedidos recientes */}
+            <div className="bg-white rounded-lg p-6 shadow">
+              <h2 className="text-lg font-bold text-gray-800 mb-4">Pedidos recientes</h2>
+              {(orders.filter((o: any) => (o.status === 'delivered' || o.status === 'confirmed') && new Date(o.orderDate) > new Date(Date.now() - 30*24*60*60*1000)).length === 0) ? (
+                <ul className="divide-y divide-gray-100">
+                  {/* Mock recent order for visual testing */}
+                  <li className="py-3 flex flex-col gap-1 opacity-60">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-medium text-gray-900">Proveedor Demo</span>
+                        <span className="ml-2 text-gray-500 text-sm">{new Date().toLocaleDateString()}</span>
+                        <span className="ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Completado</span>
+                    </div>
+                      <button className="text-blue-600 hover:underline text-sm flex items-center cursor-not-allowed" title="Ver chat">
+                        Ver más
+                        <svg className="ml-1 h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                      </button>
+                    </div>
+                    <div className="text-xs text-gray-300 mt-1">Sin mensajes</div>
+                  </li>
+                </ul>
+              ) : (
+                <ul className="divide-y divide-gray-100">
+                  {orders.filter((o: any) => (o.status === 'delivered' || o.status === 'confirmed') && new Date(o.orderDate) > new Date(Date.now() - 30*24*60*60*1000))
+                    .sort((a: any, b: any) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime())
+                    .map((order: any) => {
+                      const provider = providers.find((p: any) => p.id === order.providerId);
+                      const conv = conversations?.[provider?.id ?? ''];
+                      const lastMsg = conv?.messages[conv.messages.length - 1]?.message || 'Sin mensajes';
+                      return (
+                        <li key={order.id} className="py-3 flex flex-col gap-1">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-medium text-gray-900">{provider?.name || 'Proveedor'}</span>
+                              <span className="ml-2 text-gray-500 text-sm">{new Date(order.orderDate).toLocaleDateString()}</span>
+                              <span className="ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Completado</span>
                   </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">
-                        Total Orders
-                      </dt>
-                      <dd className="text-lg font-medium text-gray-900">
-                        {orders.length}
-                      </dd>
-                    </dl>
+                            <Menu as="div" className="relative inline-block text-left">
+  <Menu.Button className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400">
+    Ver documentos
+  </Menu.Button>
+  <Menu.Items className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+    <div className="py-1 flex flex-col gap-1">
+      <button
+        className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={!order.receiptUrl}
+        onClick={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
+      >
+        {order.receiptUrl ? 'Descargar pedido' : 'Pedido no disponible'}
+      </button>
+      <button
+        className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={!order.invoiceNumber}
+        onClick={() => { if(order.invoiceNumber) window.open('/mock-factura.pdf', '_blank'); }}
+      >
+        {order.invoiceNumber ? 'Descargar factura' : 'Factura no disponible'}
+      </button>
+      <button
+        className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={!paymentProofs[order.id]}
+        onClick={() => { if(paymentProofs[order.id]) window.open(paymentProofs[order.id].url, '_blank'); }}
+      >
+        {paymentProofs[order.id] ? 'Descargar comprobante' : 'Comprobante no disponible'}
+      </button>
+    </div>
+  </Menu.Items>
+</Menu>
                   </div>
-                </div>
-              </div>
+                          <div className="text-xs text-gray-400 mt-1 truncate max-w-full" title={lastMsg}>{lastMsg.length > 80 ? lastMsg.slice(0, 80) + '…' : lastMsg}</div>
+                        </li>
+                      );
+                    })}
+                </ul>
+              )}
             </div>
           </div>
+          {/* Right Section: Próximos pedidos + Providers table */}
+          <div className="w-full">
+            {/* Próximos pedidos */}
+            <div className="bg-blue-100 border-l-8 border-blue-400 rounded-xl p-5 mb-6 shadow-lg">
+              <h2 className="text-xl font-bold text-blue-900 mb-4">Próximos pedidos</h2>
+              {user?.email === 'test@test.com' ? (
+                <div className="flex flex-col gap-3 max-h-64 overflow-y-auto">
+                  {[
+                    {
+                      providerName: "Panadería Los Hermanos",
+                      frecuenciaDias: 7,
+                      ultimaOrden: "2025-07-15",
+                      proximaOrden: "2025-07-22",
+                      diasRestantes: 1,
+                      lastMessage: "¿Van a necesitar el pan integral esta semana?"
+                    },
+                    {
+                      providerName: "Distribuciones Verduras Martínez",
+                      frecuenciaDias: 7,
+                      ultimaOrden: "2025-07-14",
+                      proximaOrden: "2025-07-21",
+                      diasRestantes: 0,
+                      lastMessage: "La última entrega fue el lunes. ¿Confirmamos para mañana?"
+                    }
+                  ]
+                    .sort((a, b) => new Date(a.proximaOrden).getTime() - new Date(b.proximaOrden).getTime())
+                    .map((item, idx) => (
+                      <div
+                        key={idx}
+                        className={`bg-white rounded-lg p-4 flex flex-col gap-1 shadow-sm border-l-4 ${item.diasRestantes <= 1 ? 'border-blue-500' : 'border-transparent'}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-gray-900">{item.providerName}</span>
+                          <span className={`ml-2 text-sm ${item.diasRestantes <= 1 ? 'text-blue-700 font-bold' : 'text-gray-500'}`}>{new Date(item.proximaOrden).toLocaleDateString()} ({item.diasRestantes === 0 ? 'Hoy' : `En ${item.diasRestantes} día${item.diasRestantes > 1 ? 's' : ''}`})</span>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-4 sm:px-0">
-          {/* Suggested Orders */}
-          <div className="lg:col-span-1">
-            <SuggestedOrders
-              stockItems={stockItems}
-              providers={providers}
-              onCreateOrder={handleSuggestedOrderCreate}
-            />
+                        <div className="text-xs text-gray-500 mt-1 truncate max-w-full" title={item.lastMessage}>{item.lastMessage.length > 80 ? item.lastMessage.slice(0, 80) + '…' : item.lastMessage}</div>
           </div>
-
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Current Orders */}
-            <div className="bg-white shadow overflow-hidden sm:rounded-md">
-              <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Recent Orders ({orders.length})
-                </h3>
+                    ))}
               </div>
-              <ul className="divide-y divide-gray-200">
-                {orders.slice(0, 3).map((order) => (
-                  <li key={order.id}>
-                    <div className="px-4 py-4 sm:px-6">
+              ) : (
+                (() => {
+                  // Real upcoming orders for real users
+                  const now = new Date();
+                  const weekFromNow = new Date();
+                  weekFromNow.setDate(now.getDate() + 7);
+                  // Find providers with next order due in 7 days
+                  const providerUpcoming = providers
+                    .map((provider: Provider) => {
+                      const nextOrderDates = stockItems
+                        .filter((item: StockItem) => item.associatedProviders.includes(provider.id) && item.nextOrder)
+                        .map((item: StockItem) => item.nextOrder ? new Date(item.nextOrder as string | number | Date) : null)
+                        .filter((d): d is Date => d !== null);
+                      const nextExpectedOrderDate = nextOrderDates.length > 0 ? new Date(Math.min(...nextOrderDates.map((d: Date) => d.getTime()))) : null;
+                      return { provider, nextExpectedOrderDate };
+                    })
+                    .filter(({ nextExpectedOrderDate }: { nextExpectedOrderDate: Date | null }) => nextExpectedOrderDate && nextExpectedOrderDate <= weekFromNow)
+                    .sort((a: { nextExpectedOrderDate: Date | null }, b: { nextExpectedOrderDate: Date | null }) => (a.nextExpectedOrderDate as Date).getTime() - (b.nextExpectedOrderDate as Date).getTime());
+                  if (providerUpcoming.length === 0) {
+                    return <div className="text-gray-500 text-sm">No hay próximos pedidos en los próximos 7 días.</div>;
+                  }
+                  return (
+                    <div className="flex flex-col gap-3 max-h-64 overflow-y-auto">
+                      {providerUpcoming.map(({ provider, nextExpectedOrderDate }: { provider: Provider, nextExpectedOrderDate: Date | null }, idx: number) => (
+                        <div
+                          key={provider.id}
+                          className={`bg-white rounded-lg p-4 flex flex-col gap-1 shadow-sm border-l-4 ${(nextExpectedOrderDate && (nextExpectedOrderDate.getTime() - now.getTime()) < 2*24*60*60*1000) ? 'border-blue-500' : 'border-transparent'}`}
+                        >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center flex-1">
-                      <div className="flex-shrink-0">
-                            {getStatusIcon(order.status)}
-                      </div>
-                          <div className="ml-4 flex-1">
-                            <div className="flex items-center">
-                              <p className="text-sm font-medium text-gray-900">
-                                {order.orderNumber}
-                              </p>
-                              <span
-                                className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
-                              >
-                                {order.status}
-                              </span>
-                            </div>
-                            <div className="mt-1 flex items-center text-sm text-gray-500">
-                              <span>{getProviderName(order.providerId)}</span>
-                              <span className="mx-2">•</span>
-                              <span>{order.items.length} items</span>
-                              <span className="mx-2">•</span>
-                              <span>
-                                {order.totalAmount} {order.currency}
-                              </span>
-                              <span className="mx-2">•</span>
-                              <span>
-                                {new Date(order.orderDate).toLocaleDateString()}
-                              </span>
-                            </div>
+                            <span className="font-semibold text-gray-900">{provider.name}</span>
+                            <span className={`ml-2 text-sm ${(nextExpectedOrderDate && (nextExpectedOrderDate.getTime() - now.getTime()) < 2*24*60*60*1000) ? 'text-blue-700 font-bold' : 'text-gray-500'}`}>{nextExpectedOrderDate ? nextExpectedOrderDate.toLocaleDateString() : '-'}</span>
                           </div>
                         </div>
-                      </div>
+                      ))}
                     </div>
-                  </li>
-                ))}
-              </ul>
+                  );
+                })()
+              )}
             </div>
-
             {/* Providers Table */}
-            <div className="bg-white shadow overflow-hidden sm:rounded-md">
-              <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Quick Order from Providers
-                </h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Provider
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Categories
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Contact
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
+            <div className="bg-white rounded-lg p-4 shadow max-h-96 overflow-y-auto">
+              <h2 className="text-md font-bold text-gray-800 mb-2">Proveedores</h2>
+              <table className="min-w-full">
+                <thead>
+                  <tr>
+                    <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                    <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Última orden</th>
+                    <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {providers.map((provider) => (
-                      <tr key={provider.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {provider.name}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {provider.email}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex flex-wrap gap-1">
-                            {provider.categories.slice(0, 2).map((category) => (
-                              <span
-                                key={category}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                              >
-                                {category}
-                              </span>
-                            ))}
-                            {provider.categories.length > 2 && (
-                              <span className="text-xs text-gray-500">
-                                +{provider.categories.length - 2} more
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {provider.phone}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <tbody>
+                  {providers.map((provider: any) => {
+                    // Find most recent order for this provider
+                    const providerOrders = orders.filter((o: any) => o.providerId === provider.id);
+                    const mostRecentOrder = providerOrders.length > 0 ? providerOrders.reduce((a: any, b: any) => new Date(a.orderDate) > new Date(b.orderDate) ? a : b) : null;
+                    const lastOrderDate = mostRecentOrder ? new Date(mostRecentOrder.orderDate) : null;
+                      return (
+                        <tr key={provider.id} className="hover:bg-gray-50">
+                        <td className="py-2 font-medium text-gray-900">{provider.name}</td>
+                        <td className="py-2 text-xs text-gray-500">{lastOrderDate ? lastOrderDate.toLocaleDateString() : '-'}</td>
+                        <td className="py-2 text-right">
                           <button
                             onClick={() => handleProviderOrder(provider.id)}
-                            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            title="Nuevo pedido"
                           >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Order
-                  </button>
-                        </td>
-                      </tr>
-                    ))}
+                            <Plus className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
-              </div>
             </div>
           </div>
         </div>
@@ -784,12 +552,32 @@ export default function DashboardPage() {
         onClose={() => {
           setIsCreateModalOpen(false);
           setSuggestedOrder(null);
+          setSelectedProviderId(null);
         }}
         onCreateOrder={handleCreateOrder}
         providers={providers}
         stockItems={stockItems}
         suggestedOrder={suggestedOrder}
+        selectedProviderId={typeof selectedProviderId === 'string' ? selectedProviderId : null}
       />
+      {/* Split-pane chat UI */}
+      {openProviderId && (
+        <div className="fixed top-0 right-0 h-full w-full md:w-1/2 lg:w-1/3 z-40 bg-white shadow-xl flex flex-col">
+          <WhatsAppChat
+            orderId={orders[0]?.id || ""}
+            providerName={
+              providers.find((p: Provider) => p.id === openProviderId)?.name ||
+              "Proveedor"
+            }
+            providerPhone={
+              providers.find((p: Provider) => p.id === openProviderId)?.phone || ""
+            }
+            isOpen={!!openProviderId}
+            onClose={() => setOpenProviderId(null)}
+          />
+        </div>
+      )}
     </div>
   );
-} 
+}
+

@@ -2,6 +2,7 @@ import { Provider } from '../../types';
 
 export const createNewProvider = (): Provider => ({
   id: Date.now().toString(),
+  user_id: '', // Debe ser completado por el llamador
   name: '',
   email: '',
   phone: '',
@@ -18,9 +19,10 @@ export const createNewProvider = (): Provider => ({
   updatedAt: new Date(),
 });
 
-export const processProviderData = (data: any[]): Provider[] => {
+export const processProviderData = (data: any[], user_id: string): Provider[] => {
   return data.map((row) => ({
     ...row,
+    user_id,
     categories:
       typeof row.categories === 'string'
         ? row.categories.split(',').map((c: string) => c.trim())

@@ -67,6 +67,17 @@ The app is automatically deployed to Vercel on every push to the master branch.
 
 Copy `env.example` to `.env.local` and configure your Firebase settings (optional for demo).
 
+## Variables de entorno necesarias
+
+Crea un archivo `.env.local` (no lo subas a git) y define:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=tu_url_supabase
+NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key_supabase
+```
+
+Estas variables también deben configurarse en Vercel para producción.
+
 ## Contributing
 
 This is a demo application showcasing a complete SaaS solution for gastronomy management.

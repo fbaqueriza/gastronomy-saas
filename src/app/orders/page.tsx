@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useAuth } from '../../hooks/useAuth';
+import { useState, useCallback, useEffect } from 'react';
+import { useSupabaseUser } from '../../hooks/useSupabaseUser';
 import Navigation from '../../components/Navigation';
 import WhatsAppChat from '../../components/WhatsAppChat';
 import SuggestedOrders from '../../components/SuggestedOrders';
 import CreateOrderModal from '../../components/CreateOrderModal';
+import ComprobanteButton from '../../components/ComprobanteButton';
 import { Order, OrderItem, Provider, StockItem } from '../../types';
 import {
   Plus,
@@ -18,444 +19,122 @@ import {
   Clock,
   AlertCircle,
   X,
+  Clipboard,
+  Check,
+  Download,
 } from 'lucide-react';
+import { DataProvider, useData } from '../../components/DataProvider';
+import es from '../../locales/es';
+import { Menu } from '@headlessui/react';
+import { useRouter } from 'next/navigation';
 
-export default function OrdersPage() {
-  const { user, loading: authLoading } = useAuth();
-  
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: '1',
-      orderNumber: 'ORD-001',
-      providerId: '2',
-      items: [
-        {
-          productName: 'Bife de Chorizo',
-          quantity: 7,
-          unit: 'kg',
-          price: 8500,
-          total: 59500,
-        },
-        {
-          productName: 'Asado de Tira',
-          quantity: 7,
-          unit: 'kg',
-          price: 7200,
-          total: 50400,
-        },
-      ],
-      status: 'sent',
-      totalAmount: 109900,
-      currency: 'ARS',
-      orderDate: new Date('2024-01-20'),
-      dueDate: new Date('2024-01-25'),
-      invoiceNumber: 'INV-2024-001',
-      bankInfo: {
-        iban: 'AR1234567890123456789012',
-        swift: 'BANCOAR',
-        bankName: 'Banco de la Nación Argentina',
-      },
-      receiptUrl: '',
-      notes: 'Entregar antes de las 10:00 hs',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '2',
-      orderNumber: 'ORD-002',
-      providerId: '5',
-      items: [
-        {
-          productName: 'Leche Entera',
-          quantity: 12,
-          unit: 'L',
-          price: 450,
-          total: 5400,
-        },
-        {
-          productName: 'Queso Cremoso',
-          quantity: 4,
-          unit: 'kg',
-          price: 3200,
-          total: 12800,
-        },
-      ],
-      status: 'pending',
-      totalAmount: 18200,
-      currency: 'ARS',
-      orderDate: new Date('2024-01-21'),
-      dueDate: new Date('2024-01-26'),
-      invoiceNumber: '',
-      bankInfo: {},
-      receiptUrl: '',
-      notes: 'Queso fresco por favor',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '3',
-      orderNumber: 'ORD-003',
-      providerId: '4',
-      items: [
-        {
-          productName: 'Tomates Perita',
-          quantity: 6,
-          unit: 'kg',
-          price: 1200,
-          total: 7200,
-        },
-        {
-          productName: 'Lechuga Mantecosa',
-          quantity: 4,
-          unit: 'kg',
-          price: 800,
-          total: 3200,
-        },
-      ],
-      status: 'confirmed',
-      totalAmount: 10400,
-      currency: 'ARS',
-      orderDate: new Date('2024-01-22'),
-      dueDate: new Date('2024-01-27'),
-      invoiceNumber: 'INV-2024-003',
-      bankInfo: {
-        iban: 'AR9876543210987654321098',
-        swift: 'BANCOAR',
-        bankName: 'Banco Santander Argentina',
-      },
-      receiptUrl: '',
-      notes: 'Verduras orgánicas únicamente',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ]);
+export default function OrdersPageWrapper() {
+  const { user, loading: authLoading } = useSupabaseUser();
+  const router = useRouter();
+  if (!authLoading && !user) {
+    if (typeof window !== 'undefined') router.push('/auth/login');
+    return null;
+  }
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div><p className="mt-4 text-gray-600">Cargando...</p></div></div>;
+  }
+  return (
+    <DataProvider userEmail={user?.email}>
+      <OrdersPage />
+    </DataProvider>
+  );
+}
 
-  // Mock providers and stock data for suggested orders
-  const [providers] = useState<Provider[]>([
-    {
-      id: '1',
-      name: 'Distribuidora Gastronómica S.A.',
-      email: 'pedidos@distgastronomica.com',
-      phone: '+54 11 4567-8901',
-      address: 'Av. Corrientes 1234, CABA, Buenos Aires',
-      categories: ['Proveeduría General', 'Lácteos', 'Frescos'],
-      tags: ['confiable', 'entrega rápida'],
-      notes: 'Proveedor principal con amplio catálogo y entrega en 24h',
-      cbu: 'ES9121000418450200051332',
-      alias: 'DISTGASTRO',
-      cuitCuil: '30-12345678-9',
-      razonSocial: 'Distribuidora Gastronómica S.A.',
-      catalogs: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '2',
-      name: 'Carnes Premium del Sur',
-      email: 'ventas@carnespremium.com',
-      phone: '+54 11 3456-7890',
-      address: 'Ruta 2 Km 45, La Plata, Buenos Aires',
-      categories: ['Carnes', 'Proteínas', 'Premium'],
-      tags: ['premium', 'calidad superior'],
-      notes: 'Especialistas en carnes premium y cortes especiales',
-      cbu: 'ES9121000418450200051333',
-      alias: 'CARNESUR',
-      cuitCuil: '30-98765432-1',
-      razonSocial: 'Carnes Premium del Sur S.R.L.',
-      catalogs: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '3',
-      name: 'Pescados Frescos Mar del Plata',
-      email: 'pedidos@pescadosfrescos.com',
-      phone: '+54 223 456-7890',
-      address: 'Puerto de Mar del Plata, Buenos Aires',
-      categories: ['Pescados', 'Mariscos', 'Frescos'],
-      tags: ['fresco', 'directo del mar'],
-      notes: 'Pescados y mariscos frescos directo del puerto',
-      cbu: 'ES9121000418450200051334',
-      alias: 'PESCADOSMP',
-      cuitCuil: '30-45678912-3',
-      razonSocial: 'Pescados Frescos MDP S.A.',
-      catalogs: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '4',
-      name: 'Verduras Orgánicas La Huerta',
-      email: 'info@lahuertaorganica.com',
-      phone: '+54 11 2345-6789',
-      address: 'Ruta 8 Km 32, San Vicente, Buenos Aires',
-      categories: ['Verduras', 'Orgánicas', 'Frescos'],
-      tags: ['orgánico', 'sustentable'],
-      notes: 'Verduras orgánicas de producción propia',
-      cbu: 'ES9121000418450200051335',
-      alias: 'HUERTAORG',
-      cuitCuil: '30-78912345-6',
-      razonSocial: 'La Huerta Orgánica S.R.L.',
-      catalogs: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '5',
-      name: 'Lácteos Artesanales El Tambo',
-      email: 'ventas@eltambo.com',
-      phone: '+54 11 1234-5678',
-      address: 'Ruta 6 Km 78, Cañuelas, Buenos Aires',
-      categories: ['Lácteos', 'Artesanal', 'Quesos'],
-      tags: ['artesanal', 'tradicional'],
-      notes: 'Lácteos artesanales y quesos de autor',
-      cbu: 'ES9121000418450200051336',
-      alias: 'ELTAMBO',
-      cuitCuil: '30-32165498-7',
-      razonSocial: 'El Tambo Artesanal S.A.',
-      catalogs: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ]);
-
-  const [stockItems] = useState<StockItem[]>([
-    // Carnes
-    {
-      id: '1',
-      productName: 'Bife de Chorizo',
-      category: 'Carnes',
-      quantity: 50,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 15,
-      currentStock: 8,
-      associatedProviders: ['2'],
-      preferredProvider: '2',
-      lastOrdered: new Date('2024-01-18'),
-      nextOrder: new Date('2024-01-25'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '2',
-      productName: 'Asado de Tira',
-      category: 'Carnes',
-      quantity: 40,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 12,
-      currentStock: 5,
-      associatedProviders: ['2'],
-      preferredProvider: '2',
-      lastOrdered: new Date('2024-01-19'),
-      nextOrder: new Date('2024-01-26'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '3',
-      productName: 'Pollo Entero',
-      category: 'Carnes',
-      quantity: 30,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 10,
-      currentStock: 15,
-      associatedProviders: ['1', '2'],
-      preferredProvider: '1',
-      lastOrdered: new Date('2024-01-20'),
-      nextOrder: new Date('2024-01-27'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    // Pescados
-    {
-      id: '4',
-      productName: 'Merluza Fresca',
-      category: 'Pescados',
-      quantity: 25,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 8,
-      currentStock: 3,
-      associatedProviders: ['3'],
-      preferredProvider: '3',
-      lastOrdered: new Date('2024-01-21'),
-      nextOrder: new Date('2024-01-28'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '5',
-      productName: 'Salmón Rosado',
-      category: 'Pescados',
-      quantity: 20,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 6,
-      currentStock: 12,
-      associatedProviders: ['3'],
-      preferredProvider: '3',
-      lastOrdered: new Date('2024-01-22'),
-      nextOrder: new Date('2024-01-29'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    // Verduras
-    {
-      id: '6',
-      productName: 'Tomates Perita',
-      category: 'Verduras',
-      quantity: 30,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 10,
-      currentStock: 4,
-      associatedProviders: ['1', '4'],
-      preferredProvider: '4',
-      lastOrdered: new Date('2024-01-23'),
-      nextOrder: new Date('2024-01-30'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '7',
-      productName: 'Lechuga Mantecosa',
-      category: 'Verduras',
-      quantity: 20,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 6,
-      currentStock: 2,
-      associatedProviders: ['1', '4'],
-      preferredProvider: '4',
-      lastOrdered: new Date('2024-01-24'),
-      nextOrder: new Date('2024-01-31'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '8',
-      productName: 'Cebolla Blanca',
-      category: 'Verduras',
-      quantity: 25,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 8,
-      currentStock: 18,
-      associatedProviders: ['1', '4'],
-      preferredProvider: '1',
-      lastOrdered: new Date('2024-01-25'),
-      nextOrder: new Date('2024-02-01'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    // Lácteos
-    {
-      id: '9',
-      productName: 'Leche Entera',
-      category: 'Lácteos',
-      quantity: 60,
-      unit: 'L',
-      restockFrequency: 'daily',
-      minimumQuantity: 20,
-      currentStock: 8,
-      associatedProviders: ['1', '5'],
-      preferredProvider: '5',
-      lastOrdered: new Date('2024-01-26'),
-      nextOrder: new Date('2024-01-27'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '10',
-      productName: 'Queso Cremoso',
-      category: 'Lácteos',
-      quantity: 15,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 5,
-      currentStock: 1,
-      associatedProviders: ['1', '5'],
-      preferredProvider: '5',
-      lastOrdered: new Date('2024-01-27'),
-      nextOrder: new Date('2024-02-03'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '11',
-      productName: 'Manteca',
-      category: 'Lácteos',
-      quantity: 10,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 3,
-      currentStock: 6,
-      associatedProviders: ['1', '5'],
-      preferredProvider: '5',
-      lastOrdered: new Date('2024-01-28'),
-      nextOrder: new Date('2024-02-04'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    // Proveeduría General
-    {
-      id: '12',
-      productName: 'Harina 0000',
-      category: 'Proveeduría General',
-      quantity: 50,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 15,
-      currentStock: 22,
-      associatedProviders: ['1'],
-      preferredProvider: '1',
-      lastOrdered: new Date('2024-01-29'),
-      nextOrder: new Date('2024-02-05'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '13',
-      productName: 'Aceite de Oliva',
-      category: 'Proveeduría General',
-      quantity: 20,
-      unit: 'L',
-      restockFrequency: 'weekly',
-      minimumQuantity: 6,
-      currentStock: 3,
-      associatedProviders: ['1'],
-      preferredProvider: '1',
-      lastOrdered: new Date('2024-01-30'),
-      nextOrder: new Date('2024-02-06'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '14',
-      productName: 'Sal Fina',
-      category: 'Proveeduría General',
-      quantity: 10,
-      unit: 'kg',
-      restockFrequency: 'monthly',
-      minimumQuantity: 2,
-      currentStock: 8,
-      associatedProviders: ['1'],
-      preferredProvider: '1',
-      lastOrdered: new Date('2024-01-15'),
-      nextOrder: new Date('2024-02-15'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ]);
+function OrdersPage() {
+  // user y authLoading ya están definidos arriba
+  const { orders, setOrders, providers, setProviders, stockItems, setStockItems } = useData();
+  const isSeedUser = user?.email === 'test@test.com';
 
   const [loading, setLoading] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [suggestedOrder, setSuggestedOrder] = useState<any>(null);
+  const [bulkReceipts, setBulkReceipts] = useState<File[]>([]);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkAssignments, setBulkAssignments] = useState<any[]>([]);
+  const [paymentOrders, setPaymentOrders] = useState<any[]>([]);
+  const [paymentProofs, setPaymentProofs] = useState<{ [orderId: string]: { url: string; name: string } }>(
+    {}
+  );
+  const [transferSent, setTransferSent] = useState<{ [orderId: string]: boolean }>({});
+  // Estado para feedback de copia
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [filterProvider, setFilterProvider] = useState<string>('');
+  const [filterStartDate, setFilterStartDate] = useState<string>('');
+  const [filterEndDate, setFilterEndDate] = useState<string>('');
+
+  // Generar automáticamente la Orden de Pago mock cuando el pedido esté en 'sent' y no tenga orden de pago
+  useEffect(() => {
+    const newPaymentOrders = [...paymentOrders];
+    orders.forEach(order => {
+      if (
+        order.status === 'sent' &&
+        !newPaymentOrders.some(po => po.orderId === order.id)
+      ) {
+        const provider = providers.find(p => p.id === order.providerId);
+        if (provider) {
+          newPaymentOrders.push({
+            orderId: order.id,
+            providerName: provider.name,
+            amount: 12345, // mock, igual que la factura
+            currency: 'ARS',
+            cbu: provider.cbu || '1230001123000112300011',
+            alias: provider.alias || 'PROVEEDOR.DEMO',
+            bank: provider.razonSocial || provider.notes || 'Banco Mock',
+            dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+            status: 'pending',
+          });
+        }
+      }
+    });
+    if (JSON.stringify(newPaymentOrders) !== JSON.stringify(paymentOrders)) {
+      setPaymentOrders(newPaymentOrders);
+    }
+  }, [orders, providers]);
+
+  // Simulación de procesamiento y asignación mock
+  useEffect(() => {
+    if (isBulkModalOpen && bulkReceipts.length > 0) {
+      // Simular procesamiento y asignación
+      const assignments = bulkReceipts.map((file, idx) => {
+        // Datos mock extraídos
+        const mockAmount = 100 + idx * 10;
+        const mockDate = new Date(Date.now() - idx * 86400000); // días atrás
+        const mockProvider = providers[idx % providers.length];
+        // Buscar pedido pendiente con proveedor y monto similar
+        const matchedOrder = orders.find(
+          o => o.status === 'pending' &&
+            o.providerId === mockProvider?.id &&
+            Math.abs(o.totalAmount - mockAmount) < 20 &&
+            Math.abs(new Date(o.orderDate).getTime() - mockDate.getTime()) < 3 * 86400000
+        );
+        return {
+          file,
+          extracted: {
+            totalAmount: mockAmount,
+            date: mockDate,
+            providerName: mockProvider?.name || 'Desconocido',
+          },
+          assignedOrder: matchedOrder || null,
+        };
+      });
+      setBulkAssignments(assignments);
+    } else if (!isBulkModalOpen) {
+      setBulkAssignments([]);
+    }
+  }, [isBulkModalOpen, bulkReceipts, providers, orders]);
+
+  const handleCopyField = (field: string, value: string) => {
+    navigator.clipboard.writeText(value);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 1200);
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -493,7 +172,7 @@ export default function OrdersPage() {
 
   const getProviderName = (providerId: string) => {
     const provider = providers.find(p => p.id === providerId);
-    return provider?.name || 'Unknown Provider';
+    return provider?.name || providerId;
   };
 
   const getProviderPhone = (providerId: string) => {
@@ -582,10 +261,12 @@ export default function OrdersPage() {
     items: OrderItem[];
     notes: string;
   }) => {
+    if (!user) return;
     const newOrder: Order = {
       id: Date.now().toString(),
+      user_id: user.id,
       orderNumber: `ORD-${String(orders.length + 1).padStart(3, '0')}`,
-      providerId: orderData.providerId,
+      providerId: orderData.providerId, // Debe ser ID
       items: orderData.items,
       status: 'pending',
       totalAmount: orderData.items.reduce((sum, item) => sum + item.total, 0),
@@ -610,7 +291,38 @@ export default function OrdersPage() {
     setIsCreateModalOpen(true);
   };
 
-  if (authLoading) {
+  // Handler para subir comprobante de pago
+  const handleUploadPaymentProof = (orderId: string, file: File) => {
+    const url = URL.createObjectURL(file);
+    setPaymentProofs((prev) => ({ ...prev, [orderId]: { url, name: file.name } }));
+    // Marcar la orden como pagada (confirmed) al subir comprobante
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id === orderId && (order.status === 'sent' || order.status === 'confirmed')
+          ? { ...order, status: 'confirmed' } : order
+      )
+    );
+    setPaymentOrders((prev) =>
+      prev.map((po) =>
+        po.orderId === orderId ? { ...po, status: 'confirmed' } : po
+      )
+    );
+  };
+
+  // Handler para confirmar recepción
+  const handleConfirmReception = (orderId: string) => {
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id === orderId ? { ...order, status: 'delivered' } : order
+      )
+    );
+  };
+
+  const handleSendTransfer = (orderId: string) => {
+    setTransferSent((prev) => ({ ...prev, [orderId]: true }));
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -625,35 +337,58 @@ export default function OrdersPage() {
     return null;
   }
 
+  // Ordenar órdenes por fecha descendente
+  const sortedOrders = [...orders].sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+  const currentOrders = sortedOrders.filter(order => !['delivered', 'cancelled'].includes(order.status));
+  let finishedOrders = sortedOrders.filter(order => order.status === 'delivered');
+  // Filtros
+  if (filterProvider) finishedOrders = finishedOrders.filter(o => o.providerId === filterProvider);
+  if (filterStartDate) finishedOrders = finishedOrders.filter(o => new Date(o.orderDate) >= new Date(filterStartDate));
+  if (filterEndDate) finishedOrders = finishedOrders.filter(o => new Date(o.orderDate) <= new Date(filterEndDate));
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="px-4 py-6 sm:px-0">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">
-                {'Orders'}
+                {es.orders.title}
               </h1>
               <p className="mt-1 text-sm text-gray-500">
-                Manage orders and communicate with providers via WhatsApp
+                {es.orders.description}
               </p>
             </div>
-
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => setIsCreateModalOpen(true)}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                {'orders.newOrder'}
+                {es.orders.newOrder}
               </button>
+              {/* Botón para carga masiva de comprobantes */}
+              <label className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 cursor-pointer">
+                <Upload className="h-4 w-4 mr-2" />
+                Subir comprobantes
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  multiple
+                  className="hidden"
+                  onChange={e => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      setBulkReceipts(Array.from(e.target.files));
+                      setIsBulkModalOpen(true);
+                    }
+                  }}
+                />
+              </label>
             </div>
           </div>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-4 sm:px-0">
           {/* Suggested Orders */}
           <div className="lg:col-span-1">
@@ -663,153 +398,194 @@ export default function OrdersPage() {
               onCreateOrder={handleSuggestedOrderCreate}
             />
           </div>
-
           {/* Orders List */}
           <div className="lg:col-span-2">
             <div className="bg-white shadow overflow-hidden sm:rounded-md">
               <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
                 <h3 className="text-lg font-medium text-gray-900">
-                  Current Orders ({orders.length})
+                  {es.orders.currentOrdersTitle} ({currentOrders.length})
                 </h3>
               </div>
               <ul className="divide-y divide-gray-200">
-                {orders.map((order) => (
-                  <li key={order.id}>
-                    <div className="px-4 py-4 sm:px-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center flex-1">
-                          <div className="flex-shrink-0">
-                            {getStatusIcon(order.status)}
-                          </div>
-                          <div className="ml-4 flex-1">
-                            <div className="flex items-center">
-                              <p className="text-sm font-medium text-gray-900">
-                                {order.orderNumber}
-                              </p>
-                              <span
-                                className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
-                              >
-                                {order.status === 'pending' ? 'Pendiente' : 
-                                 order.status === 'sent' ? 'Enviado' : 
-                                 order.status === 'delivered' ? 'Entregado' : 
-                                 order.status === 'cancelled' ? 'Cancelado' : order.status}
-                              </span>
-                            </div>
-                            <div className="mt-1 flex items-center text-sm text-gray-500">
-                              <span>{getProviderName(order.providerId)}</span>
-                              <span className="mx-2">•</span>
-                              <span>{order.items.length} items</span>
-                              <span className="mx-2">•</span>
-                              <span>
-                                {order.totalAmount} {order.currency}
-                              </span>
-                              <span className="mx-2">•</span>
-                              <span>
-                                {new Date(order.orderDate).toLocaleDateString()}
-                              </span>
-                            </div>
-                          </div>
+                {currentOrders.map((order) => (
+                  <li key={order.id} className="py-3 px-2 flex flex-col gap-1 bg-white rounded-lg shadow mb-3">
+                    <div className="flex flex-col sm:flex-row justify-between gap-4 w-full">
+                      {/* Lado izquierdo: info del pedido */}
+                      <div className="flex-1 min-w-0 sm:w-7/12">
+                        <div className="flex items-center gap-2 mb-1">
+                          {getStatusIcon(order.status)}
+                          <span className="font-medium text-gray-900">{order.orderNumber}</span>
+                          <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>{order.status === 'pending' ? 'Pendiente' : order.status === 'sent' ? 'Enviado' : order.status === 'confirmed' ? 'Pagado' : order.status === 'delivered' ? 'Finalizado' : order.status === 'cancelled' ? 'Cancelado' : order.status}</span>
                         </div>
-
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-wrap gap-2 text-xs text-gray-500 mb-1">
+                          <span>{getProviderName(order.providerId)}</span>
+                          <span>•</span>
+                          <span>{order.items.length} ítems</span>
+                          <span>•</span>
+                          <span>{order.totalAmount} {order.currency}</span>
+                          <span>•</span>
+                          <span>{new Date(order.orderDate).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex flex-col gap-1 mt-1 text-xs text-gray-600">
+                          {order.items.slice(0, 2).map((item, index) => (
+                            <span key={index}>{item.productName} - {item.quantity} {item.unit}</span>
+                          ))}
+                          {order.items.length > 2 && (
+                            <span className="text-gray-400">+{order.items.length - 2} más</span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Lado derecho: botones de acción */}
+                      <div className="flex flex-col items-end gap-1 sm:w-5/12 min-w-[160px]">
+                        <div className="flex flex-row flex-wrap gap-2 justify-end">
                           <button
                             onClick={() => handleOrderClick(order)}
-                            className="inline-flex items-center px-3 py-1 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                           >
-                            <MessageSquare className="h-4 w-4 mr-1" />
-                            Chat
+                            <MessageSquare className="h-4 w-4 mr-1" /> Chat
                           </button>
-
                           {order.status === 'pending' && (
                             <button
                               onClick={() => handleSendOrder(order.id)}
                               disabled={loading}
-                              className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
                             >
                               <Send className="h-4 w-4 mr-1" />
-                              Send
+                              {es.orders.sendOrder}
                             </button>
                           )}
-
-                          {order.status === 'sent' && !order.receiptUrl && (
-                            <label className="inline-flex items-center px-3 py-1 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer">
-                              <Upload className="h-4 w-4 mr-1" />
-                              Receipt
-                              <input
-                                type="file"
-                                accept=".pdf,.jpg,.jpeg,.png"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleUploadReceipt(order.id, file);
-                                }}
-                                className="hidden"
-                              />
-                            </label>
-                          )}
-
-                          {order.receiptUrl && !order.invoiceNumber && (
-                            <button
-                              onClick={() => handleExtractData(order.id)}
-                              disabled={loading}
-                              className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                          {['sent','confirmed','delivered'].includes(order.status) && (
+                            <a
+                              href={order.receiptUrl || '/mock-factura.pdf'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
                             >
-                              <FileText className="h-4 w-4 mr-1" />
-                              Extract
+                              <Download className="h-4 w-4 mr-1" />
+                              Descargar factura
+                            </a>
+                          )}
+                          {['sent','confirmed','delivered'].includes(order.status) && (
+                            <ComprobanteButton
+                              comprobante={paymentProofs[order.id] || null}
+                              onUpload={(file) => handleUploadPaymentProof(order.id, file)}
+                              onView={() => {
+                                if (paymentProofs[order.id]) {
+                                  window.open(paymentProofs[order.id].url, '_blank');
+                                }
+                              }}
+                            />
+                          )}
+                          {order.status === 'confirmed' && (
+                            <button
+                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-blue-200 text-white bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
+                              onClick={() => handleConfirmReception(order.id)}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" /> Confirmar recepción
                             </button>
                           )}
                         </div>
                       </div>
-
-                      {/* Order Items Preview */}
-                      <div className="mt-4">
-                        <div className="text-sm text-gray-500 mb-2">Items:</div>
-                        <div className="space-y-1">
-                          {order.items.slice(0, 3).map((item, index) => (
-                            <div key={index} className="flex justify-between text-sm">
-                              <span>
-                                {item.productName} - {item.quantity} {item.unit}
-                              </span>
-                              <span>
-                                {item.total} {order.currency}
-                              </span>
-                            </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {/* Tabla de Órdenes Finalizadas mejorada */}
+            <div className="bg-gray-50 shadow overflow-hidden sm:rounded-md mt-8">
+              <div className="px-4 py-5 sm:px-6 border-b border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <h3 className="text-lg font-medium text-gray-800">
+                  Órdenes finalizadas ({finishedOrders.length})
+                </h3>
+                <div className="flex flex-col md:flex-row gap-2 items-start md:items-center">
+                  <select
+                    className="border rounded px-2 py-1 text-xs"
+                    value={filterProvider}
+                    onChange={e => setFilterProvider(e.target.value)}
+                  >
+                    <option value="">Todos los proveedores</option>
+                    {providers.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="date"
+                    className="border rounded px-2 py-1 text-xs"
+                    value={filterStartDate}
+                    onChange={e => setFilterStartDate(e.target.value)}
+                  />
+                  <input
+                    type="date"
+                    className="border rounded px-2 py-1 text-xs"
+                    value={filterEndDate}
+                    onChange={e => setFilterEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+              <ul className="divide-y divide-gray-200">
+                {finishedOrders.map((order) => (
+                  <li key={order.id} className="py-3 px-2 flex flex-col gap-1 bg-white rounded-lg shadow mb-3">
+                    <div className="flex flex-col sm:flex-row justify-between gap-4 w-full">
+                      {/* Lado izquierdo: info del pedido */}
+                      <div className="flex-1 min-w-0 sm:w-7/12">
+                        <div className="flex items-center gap-2 mb-1">
+                          {getStatusIcon(order.status)}
+                          <span className="font-medium text-gray-900">{order.orderNumber}</span>
+                          <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800`}>
+                            Finalizada
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs text-gray-500 mb-1">
+                          <span>{getProviderName(order.providerId)}</span>
+                          <span>•</span>
+                          <span>{order.items.length} ítems</span>
+                          <span>•</span>
+                          <span>{order.totalAmount} {order.currency}</span>
+                          <span>•</span>
+                          <span>{new Date(order.orderDate).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex flex-col gap-1 mt-1 text-xs text-gray-600">
+                          {order.items.slice(0, 2).map((item, index) => (
+                            <span key={index}>{item.productName} - {item.quantity} {item.unit}</span>
                           ))}
-                          {order.items.length > 3 && (
-                            <div className="text-sm text-gray-400">
-                              +{order.items.length - 3} more items
-                            </div>
+                          {order.items.length > 2 && (
+                            <span className="text-gray-400">+{order.items.length - 2} más</span>
                           )}
                         </div>
                       </div>
-
-                      {/* Extracted Data Preview */}
-                      {order.invoiceNumber && (
-                        <div className="mt-4 p-3 bg-green-50 rounded-md">
-                          <div className="text-sm font-medium text-green-800 mb-2">
-                            Extracted Data:
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <span className="text-gray-500">Invoice:</span>{' '}
-                              {order.invoiceNumber}
+                      {/* Lado derecho: botón de documentos */}
+                      <div className="flex flex-col items-end gap-1 sm:w-5/12 min-w-[160px] justify-center">
+                        <Menu as="div" className="relative inline-block text-left">
+                          <Menu.Button className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400">
+                            Ver documentos
+                          </Menu.Button>
+                          <Menu.Items className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                            <div className="py-1 flex flex-col gap-1">
+                              <button
+                                className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!order.receiptUrl}
+                                onClick={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
+                              >
+                                {order.receiptUrl ? 'Descargar pedido' : 'Pedido no disponible'}
+                              </button>
+                              <button
+                                className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!order.invoiceNumber}
+                                onClick={() => { if(order.invoiceNumber) window.open('/mock-factura.pdf', '_blank'); }}
+                              >
+                                {order.invoiceNumber ? 'Descargar factura' : 'Factura no disponible'}
+                              </button>
+                              <button
+                                className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!paymentProofs[order.id]}
+                                onClick={() => { if(paymentProofs[order.id]) window.open(paymentProofs[order.id].url, '_blank'); }}
+                              >
+                                {paymentProofs[order.id] ? 'Descargar comprobante' : 'Comprobante no disponible'}
+                              </button>
                             </div>
-                            <div>
-                              <span className="text-gray-500">Due Date:</span>{' '}
-                              {order.dueDate
-                                ? new Date(order.dueDate).toLocaleDateString()
-                                : ''}
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Bank:</span>{' '}
-                              {order.bankInfo?.bankName}
-                            </div>
-                            <div>
-                              <span className="text-gray-500">IBAN:</span>{' '}
-                              {order.bankInfo?.iban}
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                          </Menu.Items>
+                        </Menu>
+                      </div>
                     </div>
                   </li>
                 ))}
@@ -817,7 +593,6 @@ export default function OrdersPage() {
             </div>
           </div>
         </div>
-
         {/* Instructions */}
         <div className="mt-8 px-4 sm:px-0">
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
@@ -827,17 +602,17 @@ export default function OrdersPage() {
               </div>
               <div className="ml-3">
                 <h3 className="text-sm font-medium text-blue-800">
-                  WhatsApp Order Workflow
+                  {es.orders.whatsAppFlowTitle}
                 </h3>
                 <div className="mt-2 text-sm text-blue-700">
                   <ol className="list-decimal list-inside space-y-1">
-                    <li>Create order from stock needs or manually</li>
-                    <li>Click "Chat" to open WhatsApp conversation</li>
-                    <li>Send order via WhatsApp to provider</li>
-                    <li>Provider sends PDF receipt</li>
-                    <li>Upload receipt to extract payment details</li>
-                    <li>Review and confirm extracted data</li>
-                    <li>Process payment and send confirmation</li>
+                    <li>{es.orders.createOrderStep}</li>
+                    <li>{es.orders.sendWhatsAppStep}</li>
+                    <li>{es.orders.sendOrderStep}</li>
+                    <li>{es.orders.sendReceiptStep}</li>
+                    <li>{es.orders.uploadReceiptStep}</li>
+                    <li>{es.orders.reviewDataStep}</li>
+                    <li>{es.orders.processPaymentStep}</li>
                   </ol>
                 </div>
               </div>
@@ -845,21 +620,22 @@ export default function OrdersPage() {
           </div>
         </div>
       </main>
-
-      {/* WhatsApp Chat Modal */}
+      {/* WhatsApp Chat Split Panel */}
       {selectedOrder && (
-        <WhatsAppChat
-          orderId={selectedOrder.id}
-          providerName={getProviderName(selectedOrder.providerId)}
-          providerPhone={getProviderPhone(selectedOrder.providerId)}
-          isOpen={isWhatsAppOpen}
-          onClose={() => {
-            setIsWhatsAppOpen(false);
-            setSelectedOrder(null);
-          }}
-        />
+        <div className={`fixed top-0 right-0 h-full w-full md:w-1/2 lg:w-1/3 z-40 transition-transform duration-300 ${isWhatsAppOpen ? 'translate-x-0' : 'translate-x-full'} bg-white shadow-xl flex flex-col`}>
+          <WhatsAppChat
+            orderId={selectedOrder.id}
+            providerName={getProviderName(selectedOrder.providerId)}
+            providerPhone={getProviderPhone(selectedOrder.providerId)}
+            isOpen={isWhatsAppOpen}
+            onClose={() => {
+              setIsWhatsAppOpen(false);
+              setSelectedOrder(null);
+            }}
+            orderStatus={selectedOrder.status}
+          />
+        </div>
       )}
-
       {/* Create Order Modal */}
       <CreateOrderModal
         isOpen={isCreateModalOpen}
@@ -872,6 +648,63 @@ export default function OrdersPage() {
         stockItems={stockItems}
         suggestedOrder={suggestedOrder}
       />
+      {/* Modal de resumen de carga masiva (estructura base) */}
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl relative">
+            <button
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+              onClick={() => setIsBulkModalOpen(false)}
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h2 className="text-lg font-semibold mb-4">Resumen de comprobantes cargados</h2>
+            <ul className="divide-y divide-gray-200 mb-4">
+              {bulkAssignments.map((a, idx) => (
+                <li key={idx} className="py-2 flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{a.file.name}</span>
+                    <span className="text-xs text-gray-400">{a.assignedOrder ? `Asignado a: ${a.assignedOrder.orderNumber}` : 'No asignado'}</span>
+                  </div>
+                  <div className="text-xs text-gray-500 flex gap-4">
+                    <span>Monto: {a.extracted.totalAmount}</span>
+                    <span>Fecha: {a.extracted.date.toLocaleDateString()}</span>
+                    <span>Proveedor: {a.extracted.providerName}</span>
+                  </div>
+                  <div className="mt-1">
+                    <label className="text-xs mr-2">Editar asignación:</label>
+                    <select
+                      className="border rounded px-2 py-1 text-xs"
+                      value={a.assignedOrder?.id || ''}
+                      onChange={e => {
+                        const newAssignments = [...bulkAssignments];
+                        const newOrder = orders.find(o => o.id === e.target.value) || null;
+                        newAssignments[idx] = { ...a, assignedOrder: newOrder };
+                        setBulkAssignments(newAssignments);
+                      }}
+                    >
+                      <option value="">No asignado</option>
+                      {orders.filter(o => o.status === 'pending').map(o => (
+                        <option key={o.id} value={o.id}>
+                          {o.orderNumber} - {getProviderName(o.providerId)} - {o.totalAmount}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end">
+              <button
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                onClick={() => setIsBulkModalOpen(false)}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

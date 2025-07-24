@@ -17,6 +17,7 @@ interface WhatsAppChatProps {
   providerPhone: string;
   isOpen: boolean;
   onClose: () => void;
+  orderStatus?: string; // Nuevo prop opcional para saber el estado del pedido
 }
 
 export default function WhatsAppChat({
@@ -25,6 +26,7 @@ export default function WhatsAppChat({
   providerPhone,
   isOpen,
   onClose,
+  orderStatus, // Nuevo prop
 }: WhatsAppChatProps) {
   
   const [messages, setMessages] = useState<WhatsAppMessage[]>([
@@ -72,6 +74,25 @@ export default function WhatsAppChat({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    // Si el chat está abierto y el pedido está en estado 'sent', agregar mensaje de factura mock si no existe
+    if (isOpen && orderStatus === 'sent') {
+      setMessages((prev) => {
+        const alreadySent = prev.some(m => m.type === 'received' && m.content.includes('Descargar factura'));
+        if (alreadySent) return prev;
+        return [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'received',
+            content: 'Adjunto la factura correspondiente a tu pedido. Puedes descargarla aquí: [Descargar factura](/mock-factura.pdf)',
+            timestamp: new Date(),
+          },
+        ];
+      });
+    }
+  }, [isOpen, orderStatus]);
 
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;
@@ -162,7 +183,16 @@ export default function WhatsAppChat({
                       : 'bg-white text-gray-800'
                   }`}
                 >
-                  <div className="whitespace-pre-line">{message.content}</div>
+                  <div className="whitespace-pre-line">
+                    {/* Renderizar enlaces en el mensaje */}
+                    {message.content.includes('[Descargar factura]') ? (
+                      <span>
+                        Adjunto la factura correspondiente a tu pedido. Puedes descargarla aquí: <a href="/mock-factura.pdf" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Descargar factura</a>
+                      </span>
+                    ) : (
+                      message.content
+                    )}
+                  </div>
                   <div
                     className={`text-xs mt-1 ${
                       message.type === 'sent' ? 'text-green-100' : 'text-gray-500'

@@ -58,6 +58,28 @@ export default function DataGrid({
             editingCell?.columnKey === column.id;
           const value = rowData[column.id];
 
+          // If custom render exists, use it for both view and edit mode
+          const colDef = columns.find((c) => c.key === column.id);
+          if (colDef && typeof colDef.render === 'function') {
+            // Support both (value, rowData) and (value, rowData, extra)
+            if (colDef.render.length === 3) {
+              return colDef.render(
+                value,
+                rowData,
+                {
+                  editing: isEditing,
+                  setEditingValue: (v: any) => setEditingValue(v),
+                  providers: (typeof window !== 'undefined' && (window as any).__GLOBAL_PROVIDERS__) || [],
+                  editingCell,
+                  setEditingCell,
+                  editingValue: isEditing ? editingValue : undefined,
+                }
+              );
+            } else {
+              return colDef.render(value, rowData);
+            }
+          }
+
           if (isEditing) {
             return (
               <input
@@ -99,15 +121,16 @@ export default function DataGrid({
 
           return (
             <div
-              className={`px-2 py-1 ${col.editable !== false ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+              className={`px-2 py-1 ${colDef?.editable !== false ? 'cursor-pointer hover:bg-gray-100' : ''}`}
               onClick={() => {
-                if (col.editable !== false) {
+                console.log('DEBUG: DataGrid cell click', { colDef, value, rowId: row.id, columnId: column.id });
+                if (colDef?.editable !== false) {
                   setEditingCell({ rowId: row.id, columnKey: column.id });
                   setEditingValue(String(value || ''));
                 }
               }}
             >
-              {col.render ? col.render(value, rowData) : String(value || '')}
+              {String(value || '')}
             </div>
           );
         },
@@ -120,36 +143,40 @@ export default function DataGrid({
         columnHelper.accessor('id', {
           id: 'select',
           header: () => (
-            <input
-              type="checkbox"
-              checked={selectedRows.size === data.length && data.length > 0}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setSelectedRows(
-                    new Set(data.map((row) => row.id || row.toString())),
-                  );
-                } else {
-                  setSelectedRows(new Set());
-                }
-              }}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
+            <div className="flex items-center justify-center h-full">
+              <input
+                type="checkbox"
+                checked={selectedRows.size === data.length && data.length > 0}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedRows(
+                      new Set(data.map((row) => row.id || row.toString())),
+                    );
+                  } else {
+                    setSelectedRows(new Set());
+                  }
+                }}
+                className="h-5 w-5 text-blue-600 align-middle m-0"
+              />
+            </div>
           ),
           cell: ({ row }) => (
-            <input
-              type="checkbox"
-              checked={selectedRows.has(row.original.id)}
-              onChange={(e) => {
-                const newSelectedRows = new Set(selectedRows);
-                if (e.target.checked) {
-                  newSelectedRows.add(row.original.id);
-                } else {
-                  newSelectedRows.delete(row.original.id);
-                }
-                setSelectedRows(newSelectedRows);
-              }}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
+            <div className="flex items-center justify-center h-full">
+              <input
+                type="checkbox"
+                checked={selectedRows.has(row.original.id)}
+                onChange={(e) => {
+                  const newSelectedRows = new Set(selectedRows);
+                  if (e.target.checked) {
+                    newSelectedRows.add(row.original.id);
+                  } else {
+                    newSelectedRows.delete(row.original.id);
+                  }
+                  setSelectedRows(newSelectedRows);
+                }}
+                className="h-5 w-5 text-blue-600 align-middle m-0"
+              />
+            </div>
           ),
           size: 50,
         }),
@@ -243,7 +270,7 @@ export default function DataGrid({
                 className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <Plus className="h-4 w-4 mr-1" />
-                {'Add'}
+                {'Agregar'}
               </button>
             )}
 
@@ -253,7 +280,7 @@ export default function DataGrid({
                 className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
-                {'Delete'} ({selectedRows.size})
+                {'Eliminar'} ({selectedRows.size})
               </button>
             )}
           </div>
@@ -317,38 +344,79 @@ export default function DataGrid({
 
       {/* Table */}
       <div className="overflow-auto">
-        <table className="min-w-full divide-y divide-gray-200">
+        <colgroup>
+          {table.getAllColumns().map((col, idx) => {
+            let width = 150;
+            if (col.id === 'select') width = 50;
+            else if (col.id === 'acciones') width = 120;
+            else if (col.id === 'notes') width = 250;
+            else if ((col.columnDef as any).width) width = (col.columnDef as any).width;
+            return <col key={col.id} style={{ width }} />;
+          })}
+        </colgroup>
+        <table className="min-w-full divide-y divide-gray-200" style={{ tableLayout: 'fixed' }}>
           <thead className="bg-gray-50">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    style={{ width: header.getSize() }}
-                  >
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                  </th>
-                ))}
+                {headerGroup.headers.map((header, index) => {
+                  // Calculate sticky left offset and width
+                  let stickyClass = '';
+                  let width = 150;
+                  if (header.column.id === 'select') width = 50;
+                  else if (header.column.id === 'acciones') width = 120;
+                  else if (header.column.id === 'notes') width = 250;
+                  else if ((header.column.columnDef as any).width) width = (header.column.columnDef as any).width;
+                  // Calculate left offset for sticky columns
+                  let left = 0;
+                  if (index === 0) { stickyClass = 'sticky left-0 z-20 bg-white'; left = 0; }
+                  else if (index === 1) { stickyClass = 'sticky z-10 bg-white'; left = 50; }
+                  else if (index === 2) { stickyClass = 'sticky z-10 bg-white'; left = 170; }
+                  if (index <= 2) stickyClass += ``;
+                  return (
+                    <th
+                      key={header.id}
+                      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${stickyClass}`}
+                      style={{ width, left: index <= 2 ? left : undefined }}
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
+                    </th>
+                  );
+                })}
               </tr>
             ))}
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {table.getRowModel().rows.map((row) => (
               <tr key={row.id} className="hover:bg-gray-50">
-                {row.getVisibleCells().map((cell) => (
-                  <td
-                    key={cell.id}
-                    className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
+                {row.getVisibleCells().map((cell, index) => {
+                  // Calculate sticky left offset and width
+                  let stickyClass = '';
+                  let width = 150;
+                  if (cell.column.id === 'select') width = 50;
+                  else if (cell.column.id === 'acciones') width = 120;
+                  else if (cell.column.id === 'notes') width = 250;
+                  else if ((cell.column.columnDef as any).width) width = (cell.column.columnDef as any).width;
+                  // Calculate left offset for sticky columns
+                  let left = 0;
+                  if (index === 0) { stickyClass = 'sticky left-0 z-20 bg-white'; left = 0; }
+                  else if (index === 1) { stickyClass = 'sticky z-10 bg-white'; left = 50; }
+                  else if (index === 2) { stickyClass = 'sticky z-10 bg-white'; left = 170; }
+                  if (index <= 2) stickyClass += ``;
+                  return (
+                    <td
+                      key={cell.id}
+                      className={`px-0.5 py-0 whitespace-normal text-sm text-gray-900 align-middle ${stickyClass}`}
+                      style={{ width, left: index <= 2 ? left : undefined }}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>

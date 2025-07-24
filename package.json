@@ -10,11 +10,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.5",
     "@hookform/resolvers": "^3.3.2",
+    "@supabase/supabase-js": "^2.52.1",
     "@tanstack/react-table": "^8.10.7",
     "clsx": "^2.0.0",
     "date-fns": "^2.30.0",
-    "firebase": "^10.7.1",
+    "firebase": "9.22.2",
     "lucide-react": "^0.294.0",
     "next": "14.0.4",
     "react": "^18",

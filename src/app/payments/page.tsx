@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useAuth } from '../../components/AuthProvider';
+import { useSupabaseUser } from '../../hooks/useSupabaseUser';
 import Navigation from '../../components/Navigation';
 import SpreadsheetGrid from '../../components/DataGrid';
 import { Payment } from '../../types';
@@ -15,10 +15,15 @@ import {
   Send,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import es from '../../locales/es';
+import { useRouter } from 'next/navigation';
 
 export default function PaymentsPage() {
-  const { user, loading: authLoading } = useAuth();
-  const [payments, setPayments] = useState<Payment[]>([
+  const { user, loading: authLoading } = useSupabaseUser();
+  const router = useRouter();
+  const isSeedUser = user?.email === 'test@test.com';
+
+  const [payments, setPayments] = useState<Payment[]>(isSeedUser ? [
     {
       id: '1',
       orderId: 'ORD-001',
@@ -71,18 +76,18 @@ export default function PaymentsPage() {
       createdAt: new Date(),
       updatedAt: new Date(),
     },
-  ]);
+  ] : []);
   const [loading, setLoading] = useState(false);
   const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
 
   const columns = [
-    { key: 'orderId', name: 'Order ID', width: 120, editable: false },
-    { key: 'providerId', name: 'Provider', width: 150, editable: false },
-    { key: 'amount', name: 'Amount', width: 100, editable: false },
-    { key: 'currency', name: 'Currency', width: 80, editable: false },
+    { key: 'orderId', name: es.payments.orderId, width: 120, editable: false },
+    { key: 'providerId', name: es.payments.provider, width: 150, editable: false },
+    { key: 'amount', name: es.payments.amount, width: 100, editable: false },
+    { key: 'currency', name: es.payments.currency, width: 80, editable: false },
     {
       key: 'status',
-      name: 'Status',
+      name: es.payments.status,
       width: 120,
       editable: false,
       render: (value: string) => {
@@ -107,7 +112,7 @@ export default function PaymentsPage() {
     },
     {
       key: 'dueDate',
-      name: 'Due Date',
+      name: es.payments.dueDate,
       width: 120,
       editable: false,
       render: (value: Date) =>
@@ -115,31 +120,31 @@ export default function PaymentsPage() {
     },
     {
       key: 'invoiceNumber',
-      name: 'Invoice Number',
+      name: es.payments.invoiceNumber,
       width: 150,
       editable: false,
     },
     {
       key: 'bankInfo.bankName',
-      name: 'Bank Name',
+      name: es.payments.bankName,
       width: 150,
       editable: false,
     },
     {
       key: 'bankInfo.iban',
-      name: 'IBAN',
+      name: es.payments.iban,
       width: 200,
       editable: false,
     },
     {
       key: 'bankInfo.swift',
-      name: 'SWIFT',
+      name: es.payments.swift,
       width: 120,
       editable: false,
     },
     {
       key: 'actions',
-      name: 'Actions',
+      name: es.payments.actions,
       width: 120,
       editable: false,
       render: (value: any, row: any) => {
@@ -150,7 +155,7 @@ export default function PaymentsPage() {
               <button
                 onClick={() => handleMarkAsPaid(row.id)}
                 className="text-green-600 hover:text-green-700"
-                title={'payments.markAsPaid'}
+                title={es.payments.markAsPaid}
               >
                 <CheckCircle className="h-4 w-4" />
               </button>
@@ -158,7 +163,7 @@ export default function PaymentsPage() {
             <button
               onClick={() => handleSendConfirmation(row.id)}
               className="text-blue-600 hover:text-blue-700"
-              title={'payments.sendConfirmation'}
+              title={es.payments.sendConfirmation}
             >
               <Send className="h-4 w-4" />
             </button>
@@ -205,18 +210,18 @@ export default function PaymentsPage() {
 
     // Prepare data for export
     const exportData = selectedData.map((payment) => ({
-      'Provider Name': `Provider ${payment.providerId}`,
-      'Order ID': payment.orderId,
-      Amount: payment.amount,
-      Currency: payment.currency,
-      'Invoice Number': payment.invoiceNumber,
-      'Due Date': payment.dueDate
+      [es.payments.providerName]: `Provider ${payment.providerId}`,
+      [es.payments.orderId]: payment.orderId,
+      [es.payments.amount]: payment.amount,
+      [es.payments.currency]: payment.currency,
+      [es.payments.invoiceNumber]: payment.invoiceNumber,
+      [es.payments.dueDate]: payment.dueDate
         ? new Date(payment.dueDate).toLocaleDateString()
         : '',
-      'Bank Name': payment.bankInfo?.bankName || '',
-      IBAN: payment.bankInfo?.iban || '',
-      SWIFT: payment.bankInfo?.swift || '',
-      Status: payment.status,
+      [es.payments.bankName]: payment.bankInfo?.bankName || '',
+      [es.payments.iban]: payment.bankInfo?.iban || '',
+      [es.payments.swift]: payment.bankInfo?.swift || '',
+      [es.payments.status]: payment.status,
     }));
 
     // Create workbook and worksheet
@@ -236,18 +241,18 @@ export default function PaymentsPage() {
   const handleExportAll = useCallback(() => {
     // Prepare data for export
     const exportData = payments.map((payment) => ({
-      'Provider Name': `Provider ${payment.providerId}`,
-      'Order ID': payment.orderId,
-      Amount: payment.amount,
-      Currency: payment.currency,
-      'Invoice Number': payment.invoiceNumber,
-      'Due Date': payment.dueDate
+      [es.payments.providerName]: `Provider ${payment.providerId}`,
+      [es.payments.orderId]: payment.orderId,
+      [es.payments.amount]: payment.amount,
+      [es.payments.currency]: payment.currency,
+      [es.payments.invoiceNumber]: payment.invoiceNumber,
+      [es.payments.dueDate]: payment.dueDate
         ? new Date(payment.dueDate).toLocaleDateString()
         : '',
-      'Bank Name': payment.bankInfo?.bankName || '',
-      IBAN: payment.bankInfo?.iban || '',
-      SWIFT: payment.bankInfo?.swift || '',
-      Status: payment.status,
+      [es.payments.bankName]: payment.bankInfo?.bankName || '',
+      [es.payments.iban]: payment.bankInfo?.iban || '',
+      [es.payments.swift]: payment.bankInfo?.swift || '',
+      [es.payments.status]: payment.status,
     }));
 
     // Create workbook and worksheet
@@ -270,15 +275,12 @@ export default function PaymentsPage() {
     return p.dueDate && new Date(p.dueDate) < new Date();
   });
 
+  if (!authLoading && !user) {
+    if (typeof window !== 'undefined') router.push('/auth/login');
+    return null;
+  }
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">{'Loading...'}</p>
-        </div>
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div><p className="mt-4 text-gray-600">Cargando...</p></div></div>;
   }
 
   if (!user) {
@@ -295,10 +297,10 @@ export default function PaymentsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">
-                {'Payment Management'}
+                {es.payments.title}
               </h1>
               <p className="mt-1 text-sm text-gray-500">
-                Manage payments and export data for accounting
+                {es.payments.managePayments}
               </p>
             </div>
 
@@ -309,7 +311,7 @@ export default function PaymentsPage() {
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  {'payments.exportSelected'} ({selectedPayments.length})
+                  {es.payments.exportSelected} ({selectedPayments.length})
                 </button>
               )}
 
@@ -318,7 +320,7 @@ export default function PaymentsPage() {
                 className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <Download className="h-4 w-4 mr-2" />
-                {'Export Payments'}
+                {es.payments.exportPayments}
               </button>
             </div>
           </div>
@@ -336,7 +338,7 @@ export default function PaymentsPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">
-                        Pending Payments
+                        {es.payments.pendingPayments}
                       </dt>
                       <dd className="text-lg font-medium text-yellow-600">
                         {pendingPayments.length}
@@ -356,7 +358,7 @@ export default function PaymentsPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">
-                        Overdue Payments
+                        {es.payments.overduePayments}
                       </dt>
                       <dd className="text-lg font-medium text-red-600">
                         {overduePayments.length}
@@ -376,7 +378,7 @@ export default function PaymentsPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">
-                        Total Amount Pending
+                        {es.payments.totalAmountPending}
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
                         {pendingPayments.reduce((sum, p) => sum + p.amount, 0)}{' '}
@@ -412,20 +414,20 @@ export default function PaymentsPage() {
               </div>
               <div className="ml-3">
                 <h3 className="text-sm font-medium text-blue-800">
-                  Payment Management Tips
+                  {es.payments.paymentManagementTips}
                 </h3>
                 <div className="mt-2 text-sm text-blue-700">
                   <ul className="list-disc list-inside space-y-1">
                     <li>
-                      Select payments to export specific data for accounting
+                      {es.payments.selectPaymentsForExport}
                     </li>
-                    <li>Export all payments for comprehensive reporting</li>
-                    <li>Mark payments as paid when transfers are completed</li>
+                    <li>{es.payments.exportAllPayments}</li>
+                    <li>{es.payments.markAsPaid}</li>
                     <li>
-                      Send confirmation messages to providers via WhatsApp
+                      {es.payments.sendConfirmationViaWhatsApp}
                     </li>
                     <li>
-                      Track overdue payments to maintain good relationships
+                      {es.payments.trackOverduePayments}
                     </li>
                   </ul>
                 </div>
@@ -437,3 +439,4 @@ export default function PaymentsPage() {
     </div>
   );
 }
+ 

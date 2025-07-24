@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useAuth } from '../../components/AuthProvider';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useSupabaseUser } from '../../hooks/useSupabaseUser';
 import Navigation from '../../components/Navigation';
 import SpreadsheetGrid from '../../components/DataGrid';
 import { StockItem } from '../../types';
@@ -12,172 +12,240 @@ import {
   TrendingUp,
   Calendar,
 } from 'lucide-react';
+import { DataProvider, useData } from '../../components/DataProvider';
+import es from '../../locales/es';
+import { useRouter } from 'next/navigation';
 
-export default function StockPage() {
-  const { user, loading: authLoading } = useAuth();
-  
-  // Add a mock providers array for name lookup
-  const providers = [
-    { id: '1', name: 'Fresh Foods Inc.' },
-    { id: '2', name: 'Organic Valley Co.' },
-  ];
-  const [stockItems, setStockItems] = useState<StockItem[]>([
-    {
-      id: '1',
-      productName: 'Tomatoes',
-      category: 'Produce',
-      quantity: 50,
-      unit: 'kg',
-      restockFrequency: 'weekly',
-      minimumQuantity: 10,
-      currentStock: 15,
-      associatedProviders: ['1', '2'],
-      preferredProvider: '1',
-      lastOrdered: new Date('2024-01-15'),
-      nextOrder: new Date('2024-01-22'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '2',
-      productName: 'Milk',
-      category: 'Dairy',
-      quantity: 100,
-      unit: 'L',
-      restockFrequency: 'daily',
-      minimumQuantity: 20,
-      currentStock: 25,
-      associatedProviders: ['2'],
-      preferredProvider: '2',
-      lastOrdered: new Date('2024-01-20'),
-      nextOrder: new Date('2024-01-21'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    {
-      id: '3',
-      productName: 'Cheese',
-      category: 'Dairy',
-      quantity: 30,
-      unit: 'kg',
-      restockFrequency: 'monthly',
-      minimumQuantity: 5,
-      currentStock: 3,
-      associatedProviders: ['2'],
-      preferredProvider: '2',
-      lastOrdered: new Date('2024-01-10'),
-      nextOrder: new Date('2024-02-10'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-  ]);
-  const [loading, setLoading] = useState(false);
+function addDays(date: Date, days: number) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
 
+function getRestockDays(frequency: string) {
+  switch (frequency) {
+    case 'daily': return 1;
+    case 'weekly': return 7;
+    case 'monthly': return 30;
+    default: return 7;
+  }
+}
+
+export default function StockPageWrapper() {
+  const { user, loading: authLoading } = useSupabaseUser();
+  const router = useRouter();
+  if (!authLoading && !user) {
+    if (typeof window !== 'undefined') router.push('/auth/login');
+    return null;
+  }
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div><p className="mt-4 text-gray-600">Cargando...</p></div></div>;
+  }
+  return (
+    <DataProvider userEmail={user?.email}>
+      <StockPage />
+    </DataProvider>
+  );
+}
+
+function StockPage() {
+  // user y authLoading ya están definidos arriba
+  const { stockItems, setStockItems, providers, setProviders, orders } = useData();
+  const isSeedUser = user?.email === 'test@test.com';
+
+  // Remove minimumQuantity and currentStock columns
   const columns = [
-    {
-      key: 'productName',
-      name: 'stock.productName',
-      width: 200,
-      editable: true,
-    },
-    { key: 'category', name: 'stock.category', width: 150, editable: true },
-    { key: 'quantity', name: 'Quantity', width: 100, editable: true },
-    { key: 'unit', name: 'Unit', width: 80, editable: true },
+    { key: 'productName', name: 'Producto', width: 180, editable: true, render: (value: any) => (
+      <div style={{ wordBreak: 'break-word', whiteSpace: 'normal', maxWidth: 170 }}>{value}</div>
+    )},
+    { key: 'category', name: 'Categoría', width: 150, editable: true },
+    { key: 'quantity', name: 'Cantidad', width: 100, editable: true },
+    { key: 'unit', name: 'Unidad', width: 100, editable: true },
     {
       key: 'restockFrequency',
-      name: 'stock.restockFrequency',
-      width: 120,
+      name: 'Frecuencia de reposición',
+      width: 180,
       editable: true,
-      render: (value: string) => (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-          {value}
-        </span>
-      ),
-    },
-    {
-      key: 'associatedProviders',
-      name: 'stock.associatedProviders',
-      width: 200,
-      editable: true,
-      render: (value: string[], _row: any) => {
-        if (!Array.isArray(value)) {return '';}
-        return value
-          .map((id) => {
-            const provider = providers.find((p) => p.id === id);
-            return provider ? provider.name : id;
-          })
-          .join(', ');
+      render: (value: any, rowData: any, extra: { editing: boolean; setEditingValue: (v: any) => void; providers: any[]; editingCell?: any; setEditingCell?: any }) => {
+        const freqMap: Record<string, string> = {
+          daily: 'Diario',
+          weekly: 'Semanal',
+          monthly: 'Mensual',
+          custom: 'Personalizado',
+        };
+        return freqMap[value] || value;
       },
     },
     {
       key: 'preferredProvider',
-      name: 'stock.preferredProvider',
+      name: 'Proveedor preferido',
       width: 200,
       editable: true,
-      render: (value: string, _row: any) => {
-        const provider = providers.find((p) => p.id === value);
-        return provider ? provider.name : value;
-      },
-    },
-    {
-      key: 'lastOrdered',
-      name: 'stock.lastOrdered',
-      width: 120,
-      editable: true,
-      render: (value: Date) =>
-        value ? new Date(value).toLocaleDateString() : '',
-    },
-    {
-      key: 'nextOrder',
-      name: 'stock.nextOrder',
-      width: 120,
-      editable: true,
-      render: (value: Date) =>
-        value ? new Date(value).toLocaleDateString() : '',
-    },
-    {
-      key: 'status',
-      name: 'Status',
-      width: 100,
-      editable: false,
-      render: (_: any, row: StockItem) => {
-        if (!row) {return null;}
-        const currentStock = row.currentStock || 0;
-        const minimumQuantity = row.minimumQuantity || 0;
-        if (currentStock <= minimumQuantity) {
+      render: (value: any, rowData: any, extra: { providers: any[] }) => {
+        const { providers } = extra;
+        const [editing, setEditing] = React.useState(false);
+        const [current, setCurrent] = React.useState(value);
+        React.useEffect(() => { setCurrent(value); }, [value]);
+        const getProviderById = (id: string) => providers.find((p: any) => p.id === id);
+        const prov = getProviderById(current);
+        const handleChange = (selected: string) => {
+          setCurrent(selected);
+          setEditing(false);
+          if (typeof window !== 'undefined') {
+            const event = new CustomEvent('stock-edit', { detail: { id: rowData.id, key: 'preferredProvider', value: selected } });
+            window.dispatchEvent(event);
+          }
+        };
+        if (!editing) {
+          if (prov) {
+            return (
+              <div className="w-full h-full" onClick={() => setEditing(true)} style={{ cursor: 'pointer' }}>
+                <span
+                  className="flex items-center bg-green-100 text-green-800 rounded px-2 py-0.5 text-sm font-medium"
+                  title={prov.name}
+                >
+                  {prov.name}
+                  <button
+                    type="button"
+                    className="ml-1 text-green-700 hover:text-red-600 focus:outline-none"
+                    title="Quitar proveedor"
+                    onClick={e => { e.stopPropagation(); handleChange(''); }}
+                  >
+                    ×
+                  </button>
+                </span>
+              </div>
+            );
+          } else if (current) {
+            return (
+              <div className="w-full h-full" onClick={() => setEditing(true)} style={{ cursor: 'pointer' }}>
+                <span
+                  className="flex items-center bg-red-100 text-red-800 rounded px-2 py-0.5 text-sm font-medium"
+                  title="Proveedor no existe"
+                >
+                  {current}
+                  <button
+                    type="button"
+                    className="ml-1 text-red-700 hover:text-red-900 focus:outline-none"
+                    title="Quitar proveedor"
+                    onClick={e => { e.stopPropagation(); handleChange(''); }}
+                  >
+                    ×
+                  </button>
+                </span>
+              </div>
+            );
+          }
           return (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-              <AlertTriangle className="h-3 w-3 mr-1" />
-              Low
-            </span>
-          );
-        } else if (currentStock <= minimumQuantity * 1.5) {
-          return (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-              Medium
-            </span>
-          );
-        } else {
-          return (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              Good
-            </span>
+            <div className="w-full h-full" onClick={() => setEditing(true)} style={{ cursor: 'pointer' }}>
+              <span className="text-gray-400 px-2 py-0.5 rounded">Sin preferido</span>
+            </div>
           );
         }
+        // editing
+        return (
+          <div className="relative z-10 w-full" tabIndex={0} onBlur={() => setEditing(false)}>
+            <div className="border border-gray-400 bg-white rounded px-2 py-1 min-w-[8rem] shadow-lg">
+              <div className="text-xs text-gray-500 mb-1">Seleccionar proveedor preferido:</div>
+              <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+                {providers.map((prov: any) => (
+                  <label key={prov.id} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`preferredProvider-${rowData.id}`}
+                      checked={current === prov.id}
+                      onChange={() => handleChange(prov.id)}
+                    />
+                    <span>{prov.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
       },
     },
     {
-      key: 'minimumQuantity',
-      name: 'stock.minimumQuantity',
-      width: 120,
+      key: 'associatedProviders',
+      name: 'Proveedores asociados',
+      width: 200,
       editable: true,
+      render: (value: any, rowData: any, extra: { providers: any[] }) => {
+        const { providers } = extra;
+        const [editing, setEditing] = React.useState(false);
+        const [current, setCurrent] = React.useState(Array.isArray(value) ? value : []);
+        React.useEffect(() => { setCurrent(Array.isArray(value) ? value : []); }, [value]);
+        const getProviderById = (id: string) => providers.find((p: any) => p.id === id);
+        const handleChange = (selected: string[]) => {
+          setCurrent(selected);
+          if (typeof window !== 'undefined') {
+            const event = new CustomEvent('stock-edit', { detail: { id: rowData.id, key: 'associatedProviders', value: selected } });
+            window.dispatchEvent(event);
+          }
+        };
+        return (
+          <div className="w-full h-full" onClick={() => setEditing(true)} style={{ cursor: editing ? 'default' : 'pointer', width: 200, minWidth: 200, maxWidth: 200 }}>
+            <div className="flex flex-col gap-1">
+              <div className="flex flex-wrap gap-1 mb-1">
+                {(current.length === 0 && !editing) && (
+                  <span className="text-gray-400 px-2 py-0.5 rounded">Sin proveedores</span>
+                )}
+                {current.map((provId: string) => {
+                  const prov = getProviderById(provId);
+                  return (
+                    <span
+                      key={provId}
+                      className={`flex items-center rounded px-2 py-0.5 text-sm font-medium ${prov ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
+                      title={prov ? prov.name : 'Proveedor no existe'}
+                      style={{ width: '100%', minWidth: 0, maxWidth: 200, overflowWrap: 'break-word', wordBreak: 'break-word' }}
+                    >
+                      {prov ? prov.name : provId}
+                      <button
+                        type="button"
+                        className={`ml-1 ${prov ? 'text-green-700 hover:text-red-600' : 'text-red-700 hover:text-red-900'} focus:outline-none`}
+                        title="Quitar proveedor"
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleChange(current.filter((n: string) => n !== provId));
+                        }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+              {editing && (
+                <div className="relative z-10 w-full" tabIndex={0} onBlur={() => setEditing(false)}>
+                  <div className="border border-gray-400 bg-white rounded px-2 py-1 min-w-[8rem] shadow-lg">
+                    <div className="text-xs text-gray-500 mb-1">Seleccionar proveedores:</div>
+                    <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+                      {providers.map((prov: any) => (
+                        <label key={prov.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={current.includes(prov.id)}
+                            onChange={e => {
+                              const selected = e.target.checked
+                                ? [...current, prov.id]
+                                : current.filter((n: string) => n !== prov.id);
+                              handleChange(selected);
+                            }}
+                          />
+                          <span>{prov.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      },
     },
-    {
-      key: 'currentStock',
-      name: 'stock.currentStock',
-      width: 120,
-      editable: true,
-    },
+    { key: 'lastOrdered', name: 'Última orden', width: 150, editable: false },
+    { key: 'nextOrder', name: 'Próxima orden', width: 150, editable: false },
   ];
 
   const allowedRestockFrequencies = [
@@ -198,12 +266,21 @@ export default function StockPage() {
         const rf = isRestockFrequency(row.restockFrequency)
           ? row.restockFrequency
           : 'weekly';
+        let associatedProviders = Array.isArray(row.associatedProviders)
+          ? row.associatedProviders
+          : typeof row.associatedProviders === 'string'
+          ? row.associatedProviders.split(',').map((p: string) => p.trim())
+          : [];
+        // Remove empty strings
+        associatedProviders = associatedProviders.filter((name: string) => name);
+        let preferredProvider = row.preferredProvider;
+        if (preferredProvider && !associatedProviders.includes(preferredProvider)) {
+          preferredProvider = '';
+        }
         const item = {
           ...row,
-          associatedProviders:
-            typeof row.associatedProviders === 'string'
-              ? row.associatedProviders.split(',').map((p: string) => p.trim())
-              : row.associatedProviders || [],
+          associatedProviders,
+          preferredProvider,
           restockFrequency: rf,
           lastOrdered: row.lastOrdered ? new Date(row.lastOrdered) : undefined,
           nextOrder: row.nextOrder ? new Date(row.nextOrder) : undefined,
@@ -218,22 +295,23 @@ export default function StockPage() {
   }, []);
 
   const handleAddRow = useCallback(() => {
+    if (!user) return;
     const newStockItem: StockItem = {
       id: Date.now().toString(),
+      user_id: user.id,
       productName: '',
-      category: 'Other', // Default category for new items
+      category: 'Other',
       quantity: 0,
       unit: '',
       restockFrequency: 'weekly',
-      minimumQuantity: 0,
-      currentStock: 0,
       associatedProviders: [],
       preferredProvider: '',
       createdAt: new Date(),
       updatedAt: new Date(),
+      // Removed minimumQuantity and currentStock for type compatibility
     };
-    setStockItems([...stockItems, newStockItem]);
-  }, [stockItems]);
+    setStockItems([newStockItem, ...stockItems]);
+  }, [stockItems, setStockItems, user]);
 
   const handleDeleteRows = useCallback(
     (rowsToDelete: any[]) => {
@@ -242,82 +320,202 @@ export default function StockPage() {
         stockItems.filter((item) => !idsToDelete.includes(item.id)),
       );
     },
-    [stockItems],
+    [stockItems, setStockItems],
   );
 
   const handleExport = useCallback(() => {
-    // Convert data to CSV format
+    const headers = [
+      'Producto',
+      'Categoría',
+      'Cantidad',
+      'Unidad',
+      'Frecuencia de reposición',
+      'Proveedores asociados',
+      'Proveedor preferido',
+      'Última orden',
+      'Próxima orden',
+    ];
     const csvContent = [
-      columns.map((col) => col.name).join(','),
+      headers.join(','),
       ...stockItems.map((item) =>
         [
-          item.productName,
-          item.category, // Add category to CSV
-          item.quantity,
-          item.unit,
-          item.restockFrequency,
-          item.minimumQuantity,
-          item.currentStock,
-          item.associatedProviders.join(';'),
-          item.preferredProvider,
-          item.lastOrdered
-            ? new Date(item.lastOrdered).toLocaleDateString()
-            : '',
+          item.productName ?? '',
+          item.category ?? '',
+          item.quantity ?? '',
+          item.unit ?? '',
+          item.restockFrequency ?? '',
+          (item.associatedProviders ?? []).join(';'),
+          item.preferredProvider ?? '',
+          item.lastOrdered ? new Date(item.lastOrdered).toLocaleDateString() : '',
           item.nextOrder ? new Date(item.nextOrder).toLocaleDateString() : '',
-        ].join(','),
+        ].map(v => `"${String(v).replace(/"/g, '""')}` ).join(',')
       ),
     ].join('\n');
-
-    // Create and download file
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'stock-items.csv';
+    a.download = 'stock.csv';
     a.click();
     window.URL.revokeObjectURL(url);
-  }, [stockItems, columns]);
+  }, [stockItems]);
 
-  const handleImport = useCallback(
-    (file: File) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
-        const lines = text.split('\n');
-
-        const importedItems = lines.slice(1).map((line, index) => {
-          const values = line.split(',');
-          const rf = isRestockFrequency(values[4]) ? values[4] : 'weekly';
-          return {
-            id: (Date.now() + index).toString(),
-            productName: values[0] || '',
-            category: values[1] || 'Other', // Default category for imported items
-            quantity: parseInt(values[2]) || 0,
-            unit: values[3] || '',
-            restockFrequency: rf,
-            minimumQuantity: parseInt(values[5]) || 0,
-            currentStock: parseInt(values[6]) || 0,
-            associatedProviders: values[7]
-              ? values[7].split(';').map((p) => p.trim())
-              : [],
-            preferredProvider: values[8] || '',
-            lastOrdered: values[9] ? new Date(values[9]) : undefined,
-            nextOrder: values[10] ? new Date(values[10]) : undefined,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          } as StockItem;
-        });
-
-        setStockItems([...stockItems, ...importedItems]);
+  const handleImport = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split('\n').filter(Boolean);
+      const normalize = (str: string) => str
+        .trim()
+        .toLowerCase()
+        .replace(/^common\./, '')
+        .replace(/[áàäâ]/g, 'a')
+        .replace(/[éèëê]/g, 'e')
+        .replace(/[íìïî]/g, 'i')
+        .replace(/[óòöô]/g, 'o')
+        .replace(/[úùüû]/g, 'u')
+        .replace(/ñ/g, 'n')
+        .replace(/\s+/g, '');
+      const headers = parseCsvRow(lines[0]).map(normalize);
+      const findHeader = (candidates: string[]) => {
+        for (const candidate of candidates) {
+          const idx = headers.findIndex(h => h.startsWith(normalize(candidate)));
+          if (idx !== -1) return idx;
+        }
+        return -1;
       };
-      reader.readAsText(file);
-    },
-    [stockItems],
-  );
+      const importedStock = lines.slice(1).map((line: string, index: number) => {
+        const values = parseCsvRow(line).map((v: string) => v.trim());
+        const get = (candidates: string | string[]) => {
+          const keys = Array.isArray(candidates) ? candidates : [candidates];
+          const idx = findHeader(keys);
+          return idx !== -1 ? String(values[idx] ?? '') : '';
+        };
+        const rf = get(['restockfrequency', 'frecuencia de reposicion', 'frecuencia de reposición']);
+        const validRF = ['daily', 'weekly', 'monthly', 'custom'];
+        const restockFrequency = validRF.includes(rf) ? rf as StockItem['restockFrequency'] : 'weekly';
+        return {
+          id: (Date.now() + index).toString(),
+          productName: get(['productname', 'producto']),
+          category: (() => {
+            const val = get(['category', 'categoria', 'categoría']);
+            if (!val) return '';
+            return val.trim();
+          })(),
+          quantity: Number(get(['quantity', 'cantidad'])) || 0,
+          unit: get(['unit', 'unidad']),
+          restockFrequency,
+          associatedProviders: get(['associatedproviders', 'proveedores asociados'])
+            ? get(['associatedproviders', 'proveedores asociados']).split(';').map((p: string) => p.trim())
+            : [],
+          preferredProvider: get(['preferredprovider', 'proveedor preferido']),
+          lastOrdered: get(['lastordered', 'ultima orden']) ? new Date(get(['lastordered', 'ultima orden'])) : undefined,
+          nextOrder: get(['nextorder', 'proxima orden']) ? new Date(get(['nextorder', 'proxima orden'])) : undefined,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as StockItem;
+      });
+      setStockItems((prev) => [...prev, ...importedStock]);
+    };
+    reader.readAsText(file);
+  }, []);
 
-  const lowStockItems = stockItems.filter(
-    (item) => (item.currentStock || 0) <= (item.minimumQuantity || 0),
-  );
+  // Remove lowStockItems and quick stats that depend on removed columns
+
+  // Dynamically calculate lastOrdered and nextOrder for each stock item
+  const stockWithDates = stockItems.map((item) => {
+    // Find all completed orders for this item
+    const completedOrders = orders.filter((order) =>
+      (order.status === 'confirmed' || order.status === 'delivered') &&
+      order.items.some((orderItem) => orderItem.productName === item.productName)
+    );
+    let lastOrdered: Date | undefined = undefined;
+    if (completedOrders.length > 0) {
+      lastOrdered = new Date(Math.max(...completedOrders.map((o) => new Date(o.orderDate).getTime())));
+    }
+    // Calculate nextOrder
+    let nextOrder: Date | undefined = undefined;
+    if (lastOrdered) {
+      nextOrder = addDays(lastOrdered, getRestockDays(item.restockFrequency));
+    }
+    return {
+      ...item,
+      lastOrdered,
+      nextOrder,
+    };
+  });
+
+  // Add a migration useEffect to convert provider names to IDs in stockItems
+  useEffect(() => {
+    if (!providers || providers.length === 0) return;
+    let changed = false;
+    // Normaliza para comparar
+    const normalize = (str: string) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const migrated = stockItems.map(item => {
+      // Migrate associatedProviders: if value is an ID, replace with provider name
+      let newAssociated = Array.isArray(item.associatedProviders) ? item.associatedProviders.map(val => {
+        // If it's a name, keep it
+        if (providers.some(p => normalize(p.name) === normalize(val || ''))) return val;
+        // If it's an ID, find the provider and use its name
+        const found = providers.find(p => String(p.id) === String(val));
+        if (found) { changed = true; return found.name; }
+        return val;
+      }) : [];
+      newAssociated = Array.from(new Set(newAssociated));
+      // Migrate preferredProvider
+      let newPreferred = item.preferredProvider;
+      if (newPreferred && !providers.some(p => normalize(p.name) === normalize(newPreferred || ''))) {
+        const found = providers.find(p => String(p.id) === String(newPreferred));
+        if (found) { changed = true; newPreferred = found.name; }
+      }
+      return { ...item, associatedProviders: newAssociated, preferredProvider: newPreferred };
+    });
+    if (changed) setStockItems(migrated);
+  }, [providers]);
+
+  // MIGRACIÓN: Al cargar stockItems o providers, convierte nombres a IDs
+  React.useEffect(() => {
+    if (!providers || providers.length === 0 || !stockItems || stockItems.length === 0) return;
+    let changed = false;
+    const getIdByName = (name: string) => {
+      const prov = providers.find(p => p.name === name);
+      return prov ? prov.id : name;
+    };
+    const migrated = stockItems.map(item => {
+      let newAssociated = Array.isArray(item.associatedProviders)
+        ? item.associatedProviders.map(val => providers.some(p => p.id === val) ? val : getIdByName(val))
+        : [];
+      newAssociated = Array.from(new Set(newAssociated));
+      let newPreferred = item.preferredProvider;
+      if (newPreferred && !providers.some(p => p.id === newPreferred)) {
+        newPreferred = getIdByName(newPreferred);
+      }
+      if (
+        JSON.stringify(newAssociated) !== JSON.stringify(item.associatedProviders) ||
+        newPreferred !== item.preferredProvider
+      ) {
+        changed = true;
+        return { ...item, associatedProviders: newAssociated, preferredProvider: newPreferred };
+      }
+      return item;
+    });
+    if (changed) setStockItems(migrated);
+  }, [providers, stockItems, setStockItems]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__GLOBAL_PROVIDERS__ = providers;
+    }
+  }, [providers]);
+
+  useEffect(() => {
+    function handleStockEdit(e: any) {
+      const { id, key, value } = e.detail;
+      setStockItems(prev => prev.map(item => item.id === id ? { ...item, [key]: value } : item));
+    }
+    window.addEventListener('stock-edit', handleStockEdit);
+    return () => window.removeEventListener('stock-edit', handleStockEdit);
+  }, [setStockItems]);
 
   if (authLoading) {
     return (
@@ -344,30 +542,15 @@ export default function StockPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">
-                {'Stock Management'}
+                {es.stock.title}
               </h1>
               <p className="mt-1 text-sm text-gray-500">
-                Track stock needs and manage inventory levels
+                {es.stock.description}
               </p>
             </div>
 
             <div className="flex items-center space-x-3">
-              {lowStockItems.length > 0 && (
-                <div className="flex items-center text-red-600">
-                  <AlertTriangle className="h-4 w-4 mr-1" />
-                  <span className="text-sm font-medium">
-                    {lowStockItems.length} {'stock.lowStockAlert'}
-                  </span>
-                </div>
-              )}
-
-              <button
-                onClick={handleAddRow}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                {'Add Item'}
-              </button>
+              {/* Removed add button */}
             </div>
           </div>
         </div>
@@ -384,30 +567,10 @@ export default function StockPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">
-                        Total Items
+                        {es.stock.totalItems}
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
                         {stockItems.length}
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-5">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <AlertTriangle className="h-6 w-6 text-red-400" />
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">
-                        Low Stock Items
-                      </dt>
-                      <dd className="text-lg font-medium text-red-600">
-                        {lowStockItems.length}
                       </dd>
                     </dl>
                   </div>
@@ -424,7 +587,7 @@ export default function StockPage() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">
-                        Due This Week
+                        {es.stock.expiresThisWeek}
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
                         {
@@ -449,7 +612,7 @@ export default function StockPage() {
         <div className="px-4 sm:px-0">
           <SpreadsheetGrid
             columns={columns}
-            data={stockItems}
+            data={stockWithDates.map(row => ({ ...row, providers }))}
             onDataChange={handleDataChange}
             onAddRow={handleAddRow}
             onDeleteRows={handleDeleteRows}
@@ -457,7 +620,7 @@ export default function StockPage() {
             onImport={handleImport}
             searchable={true}
             selectable={true}
-            loading={loading}
+            loading={false} // Loading state is handled by DataProvider
           />
         </div>
 
@@ -470,17 +633,17 @@ export default function StockPage() {
               </div>
               <div className="ml-3">
                 <h3 className="text-sm font-medium text-blue-800">
-                  Stock Management Tips
+                  {es.stock.managementTips}
                 </h3>
                 <div className="mt-2 text-sm text-blue-700">
                   <ul className="list-disc list-inside space-y-1">
-                    <li>Set minimum quantities to trigger low stock alerts</li>
-                    <li>Update current stock levels regularly</li>
+                    <li>{es.stock.setMinQuantities}</li>
+                    <li>{es.stock.updateStockLevels}</li>
                     <li>
-                      Link products to multiple providers for backup options
+                      {es.stock.associateProducts}
                     </li>
-                    <li>Use restock frequency to plan ordering schedules</li>
-                    <li>Export data to generate order lists for providers</li>
+                    <li>{es.stock.useRestockFrequency}</li>
+                    <li>{es.stock.exportData}</li>
                   </ul>
                 </div>
               </div>
@@ -490,4 +653,28 @@ export default function StockPage() {
       </main>
     </div>
   );
+}
+
+function parseCsvRow(row: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < row.length; i++) {
+    const char = row[i];
+    if (char === '"') {
+      if (inQuotes && row[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
 }

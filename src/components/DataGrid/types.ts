@@ -3,7 +3,7 @@ export interface Column {
   name: string;
   width?: number;
   editable?: boolean;
-  render?: (value: any, rowData: any) => React.ReactNode;
+  render?: (value: any, rowData: any, extra?: any) => React.ReactNode;
 }
 
 export interface DataGridProps {
