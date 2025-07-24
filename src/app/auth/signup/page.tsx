@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../../../lib/supabaseClient';
+import { useAuth } from '../../../hooks/useAuth';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -12,6 +12,7 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
+  const { signUp } = useAuth();
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -22,13 +23,10 @@ export default function SignupPage() {
       return;
     }
     try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
-      if (data.user) {
-        router.push('/dashboard');
-      }
+      await signUp(email, password);
+      router.push('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Error al registrarse.');
+      setError(err.message || JSON.stringify(err) || 'Error al registrarse.');
     } finally {
       setLoading(false);
     }

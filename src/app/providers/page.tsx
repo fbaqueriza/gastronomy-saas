@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { useSupabaseUser } from '../../hooks/useSupabaseUser';
+import { useAuth } from '../../hooks/useAuth';
 import Navigation from '../../components/Navigation';
 import DataGrid from '../../components/DataGrid';
 import { Provider } from '../../types';
@@ -21,7 +21,7 @@ import es from '../../locales/es';
 import { useRouter } from 'next/navigation';
 
 export default function ProvidersPageWrapper() {
-  const { user, loading: authLoading } = useSupabaseUser();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   if (!authLoading && !user) {
     if (typeof window !== 'undefined') router.push('/auth/login');
@@ -31,14 +31,14 @@ export default function ProvidersPageWrapper() {
     return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div><p className="mt-4 text-gray-600">Cargando...</p></div></div>;
   }
   return (
-    <DataProvider userEmail={user?.email}>
+    <DataProvider userEmail={user?.email ?? undefined}>
       <ProvidersPage />
     </DataProvider>
   );
 }
 
 function ProvidersPage() {
-  const { user, loading: authLoading } = useSupabaseUser();
+  const { user, loading: authLoading } = useAuth();
   const { providers, setProviders } = useData();
   const isSeedUser = user?.email === 'test@test.com';
 

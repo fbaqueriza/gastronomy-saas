@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useSupabaseUser } from '../../hooks/useSupabaseUser';
+import { useAuth } from '../../hooks/useAuth';
 import Navigation from '../../components/Navigation';
 import SpreadsheetGrid from '../../components/DataGrid';
 import { StockItem } from '../../types';
@@ -32,7 +32,7 @@ function getRestockDays(frequency: string) {
 }
 
 export default function StockPageWrapper() {
-  const { user, loading: authLoading } = useSupabaseUser();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   if (!authLoading && !user) {
     if (typeof window !== 'undefined') router.push('/auth/login');
@@ -42,13 +42,13 @@ export default function StockPageWrapper() {
     return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div><p className="mt-4 text-gray-600">Cargando...</p></div></div>;
   }
   return (
-    <DataProvider userEmail={user?.email}>
+    <DataProvider userEmail={user?.email ?? undefined}>
       {user && <StockPage user={user} />}
     </DataProvider>
   );
 }
 
-type StockPageProps = { user: import('@supabase/supabase-js').User };
+type StockPageProps = { user: import('firebase/auth').User };
 function StockPage({ user }: StockPageProps) {
   // user y authLoading ya están definidos arriba
   const { stockItems, setStockItems, providers, setProviders, orders } = useData();
@@ -299,7 +299,7 @@ function StockPage({ user }: StockPageProps) {
     if (!user) return;
     const newStockItem: StockItem = {
       id: Date.now().toString(),
-      user_id: user.id,
+      user_id: user.uid,
       productName: '',
       category: 'Other',
       quantity: 0,

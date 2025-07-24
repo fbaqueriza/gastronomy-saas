@@ -1,12 +1,4 @@
-// User types
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: 'admin' | 'editor' | 'viewer';
-  createdAt: Date;
-  updatedAt: Date;
-}
+// Use Firebase Auth User type directly in the app, no need to redefine here.
 
 // Provider types
 export interface Provider {

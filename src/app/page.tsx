@@ -1,11 +1,11 @@
 'use client';
 
-import { useSupabaseUser } from '../hooks/useSupabaseUser';
+import { useAuth } from '../hooks/useAuth';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
-  const { user, loading } = useSupabaseUser();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const [forceRedirect, setForceRedirect] = useState(false);
 

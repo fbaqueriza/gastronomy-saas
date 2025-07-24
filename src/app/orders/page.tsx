@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { useSupabaseUser } from '../../hooks/useSupabaseUser';
+import { useAuth } from '../../hooks/useAuth';
 import Navigation from '../../components/Navigation';
 import WhatsAppChat from '../../components/WhatsAppChat';
 import SuggestedOrders from '../../components/SuggestedOrders';
@@ -29,7 +29,7 @@ import { Menu } from '@headlessui/react';
 import { useRouter } from 'next/navigation';
 
 export default function OrdersPageWrapper() {
-  const { user, loading: authLoading } = useSupabaseUser();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   if (!authLoading && !user) {
     if (typeof window !== 'undefined') router.push('/auth/login');
@@ -39,13 +39,13 @@ export default function OrdersPageWrapper() {
     return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div><p className="mt-4 text-gray-600">Cargando...</p></div></div>;
   }
   return (
-    <DataProvider userEmail={user?.email}>
+    <DataProvider userEmail={user?.email ?? undefined}>
       {user && <OrdersPage user={user} />}
     </DataProvider>
   );
 }
 
-type OrdersPageProps = { user: import('@supabase/supabase-js').User };
+type OrdersPageProps = { user: import('firebase/auth').User };
 function OrdersPage({ user }: OrdersPageProps) {
   // user y authLoading ya están definidos arriba
   const { orders, setOrders, providers, setProviders, stockItems, setStockItems } = useData();
@@ -265,7 +265,7 @@ function OrdersPage({ user }: OrdersPageProps) {
     if (!user) return;
     const newOrder: Order = {
       id: Date.now().toString(),
-      user_id: user.id,
+      user_id: user.uid,
       orderNumber: `ORD-${String(orders.length + 1).padStart(3, '0')}`,
       providerId: orderData.providerId, // Debe ser ID
       items: orderData.items,

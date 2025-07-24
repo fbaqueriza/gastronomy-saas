@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../../../lib/supabaseClient';
+import { useAuth } from '../../../hooks/useAuth';
 import { Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
@@ -22,6 +22,7 @@ export default function LoginPage() {
     }
   }, []);
 
+  const { signIn } = useAuth();
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -32,11 +33,8 @@ export default function LoginPage() {
       localStorage.removeItem('rememberedEmail');
     }
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      if (data.user) {
-        router.push('/dashboard');
-      }
+      await signIn(email, password);
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Error de inicio de sesión.');
     } finally {

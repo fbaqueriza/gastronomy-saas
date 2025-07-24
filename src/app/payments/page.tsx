@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useSupabaseUser } from '../../hooks/useSupabaseUser';
+import { useAuth } from '../../hooks/useAuth';
 import Navigation from '../../components/Navigation';
 import SpreadsheetGrid from '../../components/DataGrid';
 import { Payment } from '../../types';
@@ -19,7 +19,7 @@ import es from '../../locales/es';
 import { useRouter } from 'next/navigation';
 
 export default function PaymentsPage() {
-  const { user, loading: authLoading } = useSupabaseUser();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const isSeedUser = user?.email === 'test@test.com';
 

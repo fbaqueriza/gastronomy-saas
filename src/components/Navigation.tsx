@@ -1,21 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { useSupabaseUser } from '../hooks/useSupabaseUser';
-import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../hooks/useAuth';
 import { Menu, X, User, LogOut, Settings, Bell } from 'lucide-react';
 import es from '../locales/es';
 
 export default function Navigation() {
-  const { user } = useSupabaseUser();
+  const { user, signOut } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut();
+      await signOut();
       setIsUserMenuOpen(false);
-      // Redirect to login after logout
       window.location.href = '/auth/login';
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
