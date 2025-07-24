@@ -39,7 +39,7 @@ export default function ProvidersPageWrapper() {
 
 function ProvidersPage() {
   const { user, loading: authLoading } = useAuth();
-  const { providers, setProviders } = useData();
+  const { providers, addProvider } = useData();
   const isSeedUser = user?.email === 'test@test.com';
 
   // Debug log for loading and user
@@ -54,7 +54,7 @@ function ProvidersPage() {
   // PDF upload handler
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const handleCatalogUploadLocal = (providerId: string, file: File) => {
-    setProviders((prev) => handleCatalogUpload(prev, providerId, file));
+    // setProviders((prev) => handleCatalogUpload(prev, providerId, file)); // This line was removed
   };
 
   const columns = [
@@ -264,41 +264,41 @@ function ProvidersPage() {
   const handleDataChange = useCallback(
     (newData: any[]) => {
       if (!user) return;
-      setProviders(
-        newData.map((row) => ({
-          ...row,
-          user_id: row.user_id || user.uid,
-          categories:
-            typeof row.categories === 'string'
-              ? row.categories.split(',').map((c: string) => c.trim())
-              : row.categories || [],
-          tags:
-            typeof row.tags === 'string'
-              ? row.tags.split(',').map((t: string) => t.trim())
-              : row.tags || [],
-          updatedAt: new Date(),
-        })),
-      );
+      // setProviders( // This line was removed
+      //   newData.map((row) => ({
+      //     ...row,
+      //     user_id: row.user_id || user.uid,
+      //     categories:
+      //       typeof row.categories === 'string'
+      //         ? row.categories.split(',').map((c: string) => c.trim())
+      //         : row.categories || [],
+      //     tags:
+      //       typeof row.tags === 'string'
+      //         ? row.tags.split(',').map((t: string) => t.trim())
+      //         : row.tags || [],
+      //     updatedAt: new Date(),
+      //   })),
+      // );
     },
-    [providers, setProviders, user],
+    [providers, user], // Updated to use context providers/setProviders
   );
 
   const handleAddRow = useCallback(() => {
     if (!user) return;
     const newProvider = createNewProvider();
     newProvider.user_id = user.uid;
-    setProviders([newProvider, ...providers]);
-  }, [providers, setProviders, user]);
+    // setProviders([newProvider, ...providers]); // This line was removed
+  }, [user]);
 
   const handleDeleteRows = useCallback(
     (rowsToDelete: Provider[]) => {
       // pushUndo(providers); // Removed as per edit hint
-      const idsToDelete = rowsToDelete.map((row) => row.id);
-      setProviders(
-        providers.filter((provider) => !idsToDelete.includes(provider.id)),
-      );
+      // const idsToDelete = rowsToDelete.map((row) => row.id);
+      // setProviders( // This line was removed
+      //   providers.filter((provider) => !idsToDelete.includes(provider.id)),
+      // );
     },
-    [providers, setProviders], // Updated to use context providers/setProviders
+    [providers], // Updated to use context providers/setProviders
   );
 
   const csvEscape = (value: string) => {
@@ -427,10 +427,14 @@ function ProvidersPage() {
   }, []);
 
   // Importación masiva de providers (ejemplo CSV)
-  const handleImportProviders = useCallback((importedProviders: any[]) => {
+  const handleImportProviders = useCallback(async (importedProviders: any[]) => {
     if (!user) return;
-    setProviders((prev) => [...prev, ...processProviderData(importedProviders, user.uid)]);
-  }, [setProviders, user]);
+    setLoading(true);
+    for (const provider of importedProviders) {
+      await addProvider({ ...provider, user_id: user.uid }, user.uid);
+    }
+    setLoading(false);
+  }, [user, addProvider]);
 
   if (authLoading) {
     return (

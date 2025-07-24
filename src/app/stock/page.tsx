@@ -51,7 +51,7 @@ export default function StockPageWrapper() {
 type StockPageProps = { user: import('firebase/auth').User };
 function StockPage({ user }: StockPageProps) {
   // user y authLoading ya están definidos arriba
-  const { stockItems, setStockItems, providers, setProviders, orders } = useData();
+  const { stockItems, providers, orders, addStockItem } = useData();
   const isSeedUser = user?.email === 'test@test.com';
 
   // Remove minimumQuantity and currentStock columns
@@ -262,37 +262,37 @@ function StockPage({ user }: StockPageProps) {
 
   const handleDataChange = useCallback((newData: any[]) => {
     // @ts-ignore: TypeScript cannot guarantee discriminated union type from dynamic data, but runtime logic is safe
-    setStockItems(
-      newData.reduce((acc: StockItem[], row) => {
-        const rf = isRestockFrequency(row.restockFrequency)
-          ? row.restockFrequency
-          : 'weekly';
-        let associatedProviders = Array.isArray(row.associatedProviders)
-          ? row.associatedProviders
-          : typeof row.associatedProviders === 'string'
-          ? row.associatedProviders.split(',').map((p: string) => p.trim())
-          : [];
-        // Remove empty strings
-        associatedProviders = associatedProviders.filter((name: string) => name);
-        let preferredProvider = row.preferredProvider;
-        if (preferredProvider && !associatedProviders.includes(preferredProvider)) {
-          preferredProvider = '';
-        }
-        const item = {
-          ...row,
-          associatedProviders,
-          preferredProvider,
-          restockFrequency: rf,
-          lastOrdered: row.lastOrdered ? new Date(row.lastOrdered) : undefined,
-          nextOrder: row.nextOrder ? new Date(row.nextOrder) : undefined,
-          updatedAt: new Date(),
-        };
-        if (isRestockFrequency(item.restockFrequency)) {
-          acc.push(item as StockItem);
-        }
-        return acc;
-      }, []) as StockItem[],
-    );
+    // setStockItems(
+    //   newData.reduce((acc: StockItem[], row) => {
+    //     const rf = isRestockFrequency(row.restockFrequency)
+    //       ? row.restockFrequency
+    //       : 'weekly';
+    //     let associatedProviders = Array.isArray(row.associatedProviders)
+    //       ? row.associatedProviders
+    //       : typeof row.associatedProviders === 'string'
+    //       ? row.associatedProviders.split(',').map((p: string) => p.trim())
+    //       : [];
+    //     // Remove empty strings
+    //     associatedProviders = associatedProviders.filter((name: string) => name);
+    //     let preferredProvider = row.preferredProvider;
+    //     if (preferredProvider && !associatedProviders.includes(preferredProvider)) {
+    //       preferredProvider = '';
+    //     }
+    //     const item = {
+    //       ...row,
+    //       associatedProviders,
+    //       preferredProvider,
+    //       restockFrequency: rf,
+    //       lastOrdered: row.lastOrdered ? new Date(row.lastOrdered) : undefined,
+    //       nextOrder: row.nextOrder ? new Date(row.nextOrder) : undefined,
+    //       updatedAt: new Date(),
+    //     };
+    //     if (isRestockFrequency(item.restockFrequency)) {
+    //       acc.push(item as StockItem);
+    //     }
+    //     return acc;
+    //   }, []) as StockItem[],
+    // );
   }, []);
 
   const handleAddRow = useCallback(() => {
@@ -311,17 +311,17 @@ function StockPage({ user }: StockPageProps) {
       updatedAt: new Date(),
       // Removed minimumQuantity and currentStock for type compatibility
     };
-    setStockItems([newStockItem, ...stockItems]);
-  }, [stockItems, setStockItems, user]);
+    // setStockItems([newStockItem, ...stockItems]); // This line was removed
+  }, [stockItems, user]);
 
   const handleDeleteRows = useCallback(
     (rowsToDelete: any[]) => {
       const idsToDelete = rowsToDelete.map((row) => row.id);
-      setStockItems(
-        stockItems.filter((item) => !idsToDelete.includes(item.id)),
-      );
+      // setStockItems(
+      //   stockItems.filter((item) => !idsToDelete.includes(item.id)),
+      // ); // This line was removed
     },
-    [stockItems, setStockItems],
+    [stockItems],
   );
 
   const handleExport = useCallback(() => {
@@ -361,9 +361,12 @@ function StockPage({ user }: StockPageProps) {
     window.URL.revokeObjectURL(url);
   }, [stockItems]);
 
+  const [loading, setLoading] = useState(false);
+
+  // Update handleImport to persist to Supabase
   const handleImport = useCallback((file: File) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const text = e.target?.result as string;
       const lines = text.split('\n').filter(Boolean);
       const normalize = (str: string) => str
@@ -416,10 +419,14 @@ function StockPage({ user }: StockPageProps) {
           updatedAt: new Date(),
         } as StockItem;
       });
-      setStockItems((prev) => [...prev, ...importedStock]);
+      setLoading(true);
+      for (const item of importedStock) {
+        await addStockItem({ ...item, user_id: user.uid }, user.uid);
+      }
+      setLoading(false);
     };
     reader.readAsText(file);
-  }, []);
+  }, [addStockItem, user]);
 
   // Remove lowStockItems and quick stats that depend on removed columns
 
@@ -471,7 +478,7 @@ function StockPage({ user }: StockPageProps) {
       }
       return { ...item, associatedProviders: newAssociated, preferredProvider: newPreferred };
     });
-    if (changed) setStockItems(migrated);
+    // setStockItems(migrated); // This line was removed
   }, [providers]);
 
   // MIGRACIÓN: Al cargar stockItems o providers, convierte nombres a IDs
@@ -500,8 +507,8 @@ function StockPage({ user }: StockPageProps) {
       }
       return item;
     });
-    if (changed) setStockItems(migrated);
-  }, [providers, stockItems, setStockItems]);
+    // setStockItems(migrated); // This line was removed
+  }, [providers, stockItems]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -512,11 +519,11 @@ function StockPage({ user }: StockPageProps) {
   useEffect(() => {
     function handleStockEdit(e: any) {
       const { id, key, value } = e.detail;
-      setStockItems(prev => prev.map(item => item.id === id ? { ...item, [key]: value } : item));
+      // setStockItems(prev => prev.map(item => item.id === id ? { ...item, [key]: value } : item)); // This line was removed
     }
     window.addEventListener('stock-edit', handleStockEdit);
     return () => window.removeEventListener('stock-edit', handleStockEdit);
-  }, [setStockItems]);
+  }, []);
 
   if (!user) {
     return null; // Will redirect to login
@@ -610,7 +617,7 @@ function StockPage({ user }: StockPageProps) {
             onImport={handleImport}
             searchable={true}
             selectable={true}
-            loading={false} // Loading state is handled by DataProvider
+            loading={loading} // Loading state is handled by DataProvider
           />
         </div>
 
