@@ -43,12 +43,13 @@ export default function StockPageWrapper() {
   }
   return (
     <DataProvider userEmail={user?.email}>
-      <StockPage />
+      {user && <StockPage user={user} />}
     </DataProvider>
   );
 }
 
-function StockPage() {
+type StockPageProps = { user: import('@supabase/supabase-js').User };
+function StockPage({ user }: StockPageProps) {
   // user y authLoading ya están definidos arriba
   const { stockItems, setStockItems, providers, setProviders, orders } = useData();
   const isSeedUser = user?.email === 'test@test.com';
