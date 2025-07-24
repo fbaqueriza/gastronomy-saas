@@ -47,233 +47,27 @@ export default function OrdersPageWrapper() {
 
 type OrdersPageProps = { user: import('firebase/auth').User };
 function OrdersPage({ user }: OrdersPageProps) {
-  // user y authLoading ya están definidos arriba
-  const { orders, setOrders, providers, setProviders, stockItems, setStockItems } = useData();
-  const isSeedUser = user?.email === 'test@test.com';
-
-  const [loading, setLoading] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);
+  const { orders, providers, stockItems, addOrder, updateOrder, deleteOrder, fetchAll } = useData();
+  // Only keep local state for modal and suggestedOrder
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [suggestedOrder, setSuggestedOrder] = useState<any>(null);
-  const [bulkReceipts, setBulkReceipts] = useState<File[]>([]);
-  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
-  const [bulkAssignments, setBulkAssignments] = useState<any[]>([]);
-  const [paymentOrders, setPaymentOrders] = useState<any[]>([]);
-  const [paymentProofs, setPaymentProofs] = useState<{ [orderId: string]: { url: string; name: string } }>(
-    {}
-  );
-  const [transferSent, setTransferSent] = useState<{ [orderId: string]: boolean }>({});
-  // Estado para feedback de copia
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [filterProvider, setFilterProvider] = useState<string>('');
-  const [filterStartDate, setFilterStartDate] = useState<string>('');
-  const [filterEndDate, setFilterEndDate] = useState<string>('');
-
-  // Generar automáticamente la Orden de Pago mock cuando el pedido esté en 'sent' y no tenga orden de pago
-  useEffect(() => {
-    const newPaymentOrders = [...paymentOrders];
-    orders.forEach(order => {
-      if (
-        order.status === 'sent' &&
-        !newPaymentOrders.some(po => po.orderId === order.id)
-      ) {
-        const provider = providers.find(p => p.id === order.providerId);
-        if (provider) {
-          newPaymentOrders.push({
-            orderId: order.id,
-            providerName: provider.name,
-            amount: 12345, // mock, igual que la factura
-            currency: 'ARS',
-            cbu: provider.cbu || '1230001123000112300011',
-            alias: provider.alias || 'PROVEEDOR.DEMO',
-            bank: provider.razonSocial || provider.notes || 'Banco Mock',
-            dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-            status: 'pending',
-          });
-        }
-      }
-    });
-    if (JSON.stringify(newPaymentOrders) !== JSON.stringify(paymentOrders)) {
-      setPaymentOrders(newPaymentOrders);
-    }
-  }, [orders, providers]);
-
-  // Simulación de procesamiento y asignación mock
-  useEffect(() => {
-    if (isBulkModalOpen && bulkReceipts.length > 0) {
-      // Simular procesamiento y asignación
-      const assignments = bulkReceipts.map((file, idx) => {
-        // Datos mock extraídos
-        const mockAmount = 100 + idx * 10;
-        const mockDate = new Date(Date.now() - idx * 86400000); // días atrás
-        const mockProvider = providers[idx % providers.length];
-        // Buscar pedido pendiente con proveedor y monto similar
-        const matchedOrder = orders.find(
-          o => o.status === 'pending' &&
-            o.providerId === mockProvider?.id &&
-            Math.abs(o.totalAmount - mockAmount) < 20 &&
-            Math.abs(new Date(o.orderDate).getTime() - mockDate.getTime()) < 3 * 86400000
-        );
-        return {
-          file,
-          extracted: {
-            totalAmount: mockAmount,
-            date: mockDate,
-            providerName: mockProvider?.name || 'Desconocido',
-          },
-          assignedOrder: matchedOrder || null,
-        };
-      });
-      setBulkAssignments(assignments);
-    } else if (!isBulkModalOpen) {
-      setBulkAssignments([]);
-    }
-  }, [isBulkModalOpen, bulkReceipts, providers, orders]);
-
-  const handleCopyField = (field: string, value: string) => {
-    navigator.clipboard.writeText(value);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 1200);
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Clock className="h-4 w-4 text-yellow-500" />;
-      case 'sent':
-        return <Send className="h-4 w-4 text-blue-500" />;
-      case 'confirmed':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'delivered':
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'cancelled':
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return <Clock className="h-4 w-4 text-gray-500" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'sent':
-        return 'bg-blue-100 text-blue-800';
-      case 'confirmed':
-        return 'bg-green-100 text-green-800';
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getProviderName = (providerId: string) => {
-    const provider = providers.find(p => p.id === providerId);
-    return provider?.name || providerId;
-  };
-
-  const getProviderPhone = (providerId: string) => {
-    const provider = providers.find(p => p.id === providerId);
-    return provider?.phone || '';
-  };
-
-  const handleSendOrder = useCallback(async (orderId: string) => {
-    setLoading(true);
-    try {
-      // Simulate WhatsApp API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Update order status
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === orderId
-            ? { ...order, status: 'sent' as const, updatedAt: new Date() }
-            : order,
-        ),
-      );
-
-      console.log('Sending order via WhatsApp:', orderId);
-    } catch (error) {
-      console.error('Failed to send order:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const handleUploadReceipt = useCallback((orderId: string, file: File) => {
-    const receiptUrl = URL.createObjectURL(file);
-
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === orderId
-          ? { ...order, receiptUrl, updatedAt: new Date() }
-          : order,
-      ),
-    );
-  }, []);
-
-  const handleExtractData = useCallback(async (orderId: string) => {
-    setLoading(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const extractedData = {
-        totalAmount: 161,
-        currency: 'EUR',
-        dueDate: new Date('2024-01-25'),
-        invoiceNumber: 'INV-2024-001',
-        bankInfo: {
-          iban: 'ES9121000418450200051332',
-          swift: 'CAIXESBBXXX',
-          bankName: 'CaixaBank',
-        },
-      };
-
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === orderId
-            ? {
-              ...order,
-              ...extractedData,
-              status: 'confirmed' as const,
-              updatedAt: new Date(),
-            }
-            : order,
-        ),
-      );
-    } catch (error) {
-      console.error('Failed to extract data:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const handleOrderClick = (order: Order) => {
-    setSelectedOrder(order);
-    setIsWhatsAppOpen(true);
-  };
-
-  const handleCreateOrder = (orderData: {
+  // Remove all other local state for orders/providers/stockItems
+  // All handlers now use Supabase CRUD only
+  const handleCreateOrder = async (orderData: {
     providerId: string;
     items: OrderItem[];
     notes: string;
   }) => {
     if (!user) return;
-    const newOrder: Order = {
-      id: Date.now().toString(),
-      user_id: user.uid,
+    const newOrder: Partial<Order> = {
       orderNumber: `ORD-${String(orders.length + 1).padStart(3, '0')}`,
-      providerId: orderData.providerId, // Debe ser ID
+      providerId: orderData.providerId,
       items: orderData.items,
       status: 'pending',
       totalAmount: orderData.items.reduce((sum, item) => sum + item.total, 0),
       currency: 'EUR',
       orderDate: new Date(),
-      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
+      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
       invoiceNumber: '',
       bankInfo: {},
       receiptUrl: '',
@@ -281,8 +75,7 @@ function OrdersPage({ user }: OrdersPageProps) {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-
-    setOrders((prev) => [...prev, newOrder]);
+    await addOrder(newOrder, user.uid);
     setIsCreateModalOpen(false);
     setSuggestedOrder(null);
   };
@@ -295,44 +88,26 @@ function OrdersPage({ user }: OrdersPageProps) {
   // Handler para subir comprobante de pago
   const handleUploadPaymentProof = (orderId: string, file: File) => {
     const url = URL.createObjectURL(file);
-    setPaymentProofs((prev) => ({ ...prev, [orderId]: { url, name: file.name } }));
-    // Marcar la orden como pagada (confirmed) al subir comprobante
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === orderId && (order.status === 'sent' || order.status === 'confirmed')
-          ? { ...order, status: 'confirmed' } : order
-      )
-    );
-    setPaymentOrders((prev) =>
-      prev.map((po) =>
-        po.orderId === orderId ? { ...po, status: 'confirmed' } : po
-      )
-    );
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      updateOrder({ ...order, receiptUrl: url, status: 'confirmed' });
+    }
   };
 
   // Handler para confirmar recepción
   const handleConfirmReception = (orderId: string) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === orderId ? { ...order, status: 'delivered' } : order
-      )
-    );
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      updateOrder({ ...order, status: 'delivered' });
+    }
   };
 
   const handleSendTransfer = (orderId: string) => {
-    setTransferSent((prev) => ({ ...prev, [orderId]: true }));
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      updateOrder({ ...order, status: 'sent' });
+    }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">{'Loading...'}</p>
-        </div>
-      </div>
-    );
-  }
 
   if (!user) {
     return null;
@@ -343,9 +118,9 @@ function OrdersPage({ user }: OrdersPageProps) {
   const currentOrders = sortedOrders.filter(order => !['delivered', 'cancelled'].includes(order.status));
   let finishedOrders = sortedOrders.filter(order => order.status === 'delivered');
   // Filtros
-  if (filterProvider) finishedOrders = finishedOrders.filter(o => o.providerId === filterProvider);
-  if (filterStartDate) finishedOrders = finishedOrders.filter(o => new Date(o.orderDate) >= new Date(filterStartDate));
-  if (filterEndDate) finishedOrders = finishedOrders.filter(o => new Date(o.orderDate) <= new Date(filterEndDate));
+  // if (filterProvider) finishedOrders = finishedOrders.filter(o => o.providerId === filterProvider);
+  // if (filterStartDate) finishedOrders = finishedOrders.filter(o => new Date(o.orderDate) >= new Date(filterStartDate));
+  // if (filterEndDate) finishedOrders = finishedOrders.filter(o => new Date(o.orderDate) <= new Date(filterEndDate));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -381,8 +156,8 @@ function OrdersPage({ user }: OrdersPageProps) {
                   className="hidden"
                   onChange={e => {
                     if (e.target.files && e.target.files.length > 0) {
-                      setBulkReceipts(Array.from(e.target.files));
-                      setIsBulkModalOpen(true);
+                      // setBulkReceipts(Array.from(e.target.files)); // This state was removed
+                      // setIsBulkModalOpen(true); // This state was removed
                     }
                   }}
                 />
@@ -448,7 +223,7 @@ function OrdersPage({ user }: OrdersPageProps) {
                           {order.status === 'pending' && (
                             <button
                               onClick={() => handleSendOrder(order.id)}
-                              disabled={loading}
+                              // disabled={loading} // loading was removed
                               className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
                             >
                               <Send className="h-4 w-4 mr-1" />
@@ -468,12 +243,10 @@ function OrdersPage({ user }: OrdersPageProps) {
                           )}
                           {['sent','confirmed','delivered'].includes(order.status) && (
                             <ComprobanteButton
-                              comprobante={paymentProofs[order.id] || null}
+                              comprobante={null} // Removed paymentProofs local state
                               onUpload={(file) => handleUploadPaymentProof(order.id, file)}
                               onView={() => {
-                                if (paymentProofs[order.id]) {
-                                  window.open(paymentProofs[order.id].url, '_blank');
-                                }
+                                // Removed paymentProofs local state
                               }}
                             />
                           )}
@@ -501,8 +274,10 @@ function OrdersPage({ user }: OrdersPageProps) {
                 <div className="flex flex-col md:flex-row gap-2 items-start md:items-center">
                   <select
                     className="border rounded px-2 py-1 text-xs"
-                    value={filterProvider}
-                    onChange={e => setFilterProvider(e.target.value)}
+                    // value={filterProvider} // filterProvider was removed
+                    onChange={e => {
+                      // setFilterProvider(e.target.value); // filterProvider was removed
+                    }}
                   >
                     <option value="">Todos los proveedores</option>
                     {providers.map(p => (
@@ -512,14 +287,18 @@ function OrdersPage({ user }: OrdersPageProps) {
                   <input
                     type="date"
                     className="border rounded px-2 py-1 text-xs"
-                    value={filterStartDate}
-                    onChange={e => setFilterStartDate(e.target.value)}
+                    // value={filterStartDate} // filterStartDate was removed
+                    onChange={e => {
+                      // setFilterStartDate(e.target.value); // filterStartDate was removed
+                    }}
                   />
                   <input
                     type="date"
                     className="border rounded px-2 py-1 text-xs"
-                    value={filterEndDate}
-                    onChange={e => setFilterEndDate(e.target.value)}
+                    // value={filterEndDate} // filterEndDate was removed
+                    onChange={e => {
+                      // setFilterEndDate(e.target.value); // filterEndDate was removed
+                    }}
                   />
                 </div>
               </div>
@@ -578,10 +357,10 @@ function OrdersPage({ user }: OrdersPageProps) {
                               </button>
                               <button
                                 className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={!paymentProofs[order.id]}
-                                onClick={() => { if(paymentProofs[order.id]) window.open(paymentProofs[order.id].url, '_blank'); }}
+                                disabled={!order.receiptUrl} // Changed to order.receiptUrl
+                                onClick={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
                               >
-                                {paymentProofs[order.id] ? 'Descargar comprobante' : 'Comprobante no disponible'}
+                                {order.receiptUrl ? 'Descargar comprobante' : 'Comprobante no disponible'}
                               </button>
                             </div>
                           </Menu.Items>
