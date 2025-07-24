@@ -362,6 +362,7 @@ function StockPage({ user }: StockPageProps) {
   }, [stockItems]);
 
   const [loading, setLoading] = useState(false);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
 
   // Update handleImport to persist to Supabase
   const handleImport = useCallback((file: File) => {
@@ -410,7 +411,7 @@ function StockPage({ user }: StockPageProps) {
           unit: get(['unit', 'unidad']),
           restockFrequency,
           associatedProviders: get(['associatedproviders', 'proveedores asociados'])
-            ? get(['associatedproviders', 'proveedores asociados']).split(';').map((p: string) => p.trim())
+            ? String(get(['associatedproviders', 'proveedores asociados'])).split(';').map((p: string) => p.trim())
             : [],
           preferredProvider: get(['preferredprovider', 'proveedor preferido']),
           lastOrdered: get(['lastordered', 'ultima orden']) ? new Date(get(['lastordered', 'ultima orden'])) : undefined,
@@ -420,10 +421,33 @@ function StockPage({ user }: StockPageProps) {
         } as StockItem;
       });
       setLoading(true);
+      let successCount = 0;
+      let errorCount = 0;
       for (const item of importedStock) {
-        await addStockItem({ ...item, user_id: user.uid }, user.uid);
+        try {
+          const { id, ...itemWithoutId } = item;
+          const safeItem = {
+            ...itemWithoutId,
+            associatedProviders: Array.isArray(itemWithoutId.associatedProviders)
+              ? itemWithoutId.associatedProviders
+              : (typeof itemWithoutId.associatedProviders === 'string' && itemWithoutId.associatedProviders ? String(itemWithoutId.associatedProviders).split(';').map((p: string) => p.trim()) : []),
+            user_id: user.uid,
+          };
+          console.log('Insertando stock item en Supabase:', safeItem);
+          await addStockItem(safeItem, user.uid);
+          successCount++;
+        } catch (err) {
+          errorCount++;
+          console.error('Error importing stock item:', item, err);
+        }
       }
       setLoading(false);
+      if (errorCount === 0) {
+        setImportMessage(`¡Importación exitosa! Se importaron ${successCount} productos de stock.`);
+      } else {
+        setImportMessage(`Importación completada con ${successCount} éxitos y ${errorCount} errores. Revisa la consola para detalles.`);
+      }
+      setTimeout(() => setImportMessage(null), 6000);
     };
     reader.readAsText(file);
   }, [addStockItem, user]);
@@ -648,6 +672,11 @@ function StockPage({ user }: StockPageProps) {
           </div>
         </div>
       </main>
+      {importMessage && (
+        <div className="fixed top-4 right-4 z-50 bg-blue-100 border border-blue-400 text-blue-800 px-4 py-2 rounded shadow">
+          {importMessage}
+        </div>
+      )}
     </div>
   );
 }
