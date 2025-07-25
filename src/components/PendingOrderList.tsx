@@ -50,7 +50,13 @@ const getStatusColor = (status: string) => {
 
 const getProviderName = (providers: Provider[], providerId: string) => {
   const provider = providers.find(p => p.id === providerId);
-  return provider?.name || providerId;
+  if (provider && provider.name) {
+    return provider.name;
+  } else if (providerId) {
+    return `(ID: ${providerId})`;
+  } else {
+    return 'Proveedor desconocido';
+  }
 };
 
 const getStatusLabel = (status: string) => {
@@ -74,7 +80,7 @@ const getStatusLabel = (status: string) => {
 
 const PendingOrderList: React.FC<PendingOrderListProps> = ({ orders, providers, onViewChat, onUploadReceipt, onSendOrder, onConfirmReception, paymentProofs, loadingOrderId }) => {
   // Ordenar por fecha descendente
-  const sortedOrders = [...orders].sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+  const sortedOrders = [...orders].sort((a, b) => new Date(b.createdAt || b.orderDate).getTime() - new Date(a.createdAt || a.orderDate).getTime());
   return (
     <ul className="divide-y divide-gray-200">
       {sortedOrders.map(order => (

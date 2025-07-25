@@ -165,9 +165,16 @@ function DashboardPageContent({
         return "bg-gray-100 text-gray-800";
     }
   };
-  const getProviderName = (providerId: string) => {
-    const provider = providers.find((p: Provider) => p.id === providerId);
-    return provider?.name || "Unknown Provider";
+  // Añadir o reemplazar la función getProviderName para que devuelva siempre un string válido
+  const getProviderName = (providers: Provider[], providerId: string) => {
+    const provider = providers.find(p => p.id === providerId);
+    if (provider && provider.name) {
+      return provider.name;
+    } else if (providerId) {
+      return `(ID: ${providerId})`;
+    } else {
+      return 'Proveedor desconocido';
+    }
   };
   const handleCreateOrder = async (orderData: {
     providerId: string;

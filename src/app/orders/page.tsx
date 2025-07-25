@@ -124,7 +124,13 @@ function OrdersPage({ user }: OrdersPageProps) {
   // Add getProviderName helper
   const getProviderName = (providerId: string) => {
     const provider = providers.find((p: Provider) => p.id === providerId);
-    return provider && provider.name ? provider.name : 'Proveedor desconocido';
+    if (provider && provider.name) {
+      return provider.name;
+    } else if (providerId) {
+      return `(ID: ${providerId})`;
+    } else {
+      return 'Proveedor desconocido';
+    }
   };
   // Add state and handlers for WhatsApp chat
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -134,11 +140,7 @@ function OrdersPage({ user }: OrdersPageProps) {
     setIsWhatsAppOpen(true);
   };
   // Ordenar órdenes por fecha descendente (created_at)
-  const sortedOrders = [...orders].sort((a, b) => {
-    const dateA = new Date(a.createdAt || a.orderDate).getTime();
-    const dateB = new Date(b.createdAt || b.orderDate).getTime();
-    return dateB - dateA;
-  });
+  const sortedOrders = [...orders].sort((a, b) => new Date(b.createdAt || b.orderDate).getTime() - new Date(a.createdAt || a.orderDate).getTime());
   const currentOrders = sortedOrders.filter(order => !['finalizado', 'cancelled', 'delivered'].includes(order.status));
   let finishedOrders = sortedOrders.filter(order => ['finalizado', 'delivered'].includes(order.status));
 

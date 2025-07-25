@@ -29,11 +29,14 @@ export default function WhatsAppChat({
   orderStatus, // Nuevo prop
 }: WhatsAppChatProps) {
   
+  // Asegurar que providerName nunca sea nulo o vacío
+  const safeProviderName = providerName && providerName.trim() ? providerName : 'Proveedor desconocido';
+
   const [messages, setMessages] = useState<WhatsAppMessage[]>([
     {
       id: '1',
       type: 'sent',
-      content: `Hola ${providerName}! Necesito hacer un pedido. ¿Podés confirmar disponibilidad?`,
+      content: `Hola ${safeProviderName}! Necesito hacer un pedido. ¿Podés confirmar disponibilidad?`,
       timestamp: new Date(Date.now() - 3600000),
       status: 'read',
     },
