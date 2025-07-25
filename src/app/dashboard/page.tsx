@@ -287,17 +287,15 @@ function DashboardPageContent({
                   providers={providers}
                   onViewChat={(order) => {}}
                   onUploadReceipt={(order, file) => {
-                    const url = URL.createObjectURL(file);
-                    setPaymentProofs({ ...paymentProofs, [order.id]: { url, name: file.name } });
-                    // setOrders(orders.map((o: Order) => { // This line was removed as per the edit hint
-                    //   if (o.id === order.id) {
-                    //     if (o.status === 'sent') {
-                    //       return { ...o, status: 'confirmed', updatedAt: new Date() };
-                    //     }
-                    //     return { ...o };
-                    //   }
-                    //   return o;
-                    // }));
+                    // Crear una data URL para el comprobante
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                      const dataUrl = e.target?.result as string;
+                      console.log('DEBUG: Comprobante subido en dashboard:', file.name);
+                      console.log('DEBUG: Data URL creada para dashboard');
+                      setPaymentProofs({ ...paymentProofs, [order.id]: { url: dataUrl, name: file.name } });
+                    };
+                    reader.readAsDataURL(file);
                   }}
                   onSendOrder={(order) => {
                     // setOrders(orders.map((o: Order) => // This line was removed as per the edit hint
