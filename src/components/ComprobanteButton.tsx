@@ -43,7 +43,7 @@ const ComprobanteButton: React.FC<ComprobanteButtonProps> = ({ comprobante, onUp
         onChange={handleFileChange}
       />
       {comprobante && menuOpen && (
-        <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded shadow-lg z-50">
+        <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded shadow-lg z-[9999] transform -translate-y-1">
           <button
             className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
             onClick={() => {

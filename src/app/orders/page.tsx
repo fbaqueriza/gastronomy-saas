@@ -403,7 +403,7 @@ function OrdersPage({ user }: OrdersPageProps) {
                         {/* Subir comprobante - solo en estado factura_recibida */}
                         {order.status === 'factura_recibida' && (
                           <ComprobanteButton
-                            comprobante={order.receiptUrl ? { url: order.receiptUrl, name: 'Comprobante' } : null}
+                            comprobante={null}
                             onUpload={(file) => handleUploadPaymentProof(order.id, file)}
                             onView={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
                           />
