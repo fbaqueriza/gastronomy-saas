@@ -66,7 +66,7 @@ function OrdersPage({ user }: OrdersPageProps) {
       items: orderData.items,
       status: 'pending',
       totalAmount: orderData.items.reduce((sum, item) => sum + item.total, 0),
-      currency: 'EUR',
+      currency: 'ARS',
       orderDate: new Date(),
       dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
       invoiceNumber: '',
@@ -197,7 +197,6 @@ function OrdersPage({ user }: OrdersPageProps) {
           // Obtener datos del proveedor para la orden de pago
           const provider = providers.find(p => p.id === order.providerId);
           const bankInfo = {
-            bankName: provider?.name || 'Banco Mock',
             accountNumber: provider?.cbu || '1234567890'
           };
           const totalAmount = 1000; // Monto extraído de la factura PDF
@@ -270,8 +269,7 @@ function OrdersPage({ user }: OrdersPageProps) {
       <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
         <h4 className="text-sm font-medium text-blue-900 mb-2">Orden de Pago</h4>
         <div className="text-xs text-blue-800 space-y-1">
-          <div><strong>Banco:</strong> {order.bankInfo.bankName}</div>
-          <div><strong>Cuenta:</strong> {order.bankInfo.accountNumber}</div>
+          <div><strong>CBU:</strong> {order.bankInfo.accountNumber}</div>
           <div><strong>Monto a pagar:</strong> {order.totalAmount} {order.currency}</div>
         </div>
       </div>
