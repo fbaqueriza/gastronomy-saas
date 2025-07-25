@@ -13,10 +13,10 @@ interface DataContextType {
   deleteOrder: (id: string, user_id: string) => Promise<void>;
   addProvider: (provider: Partial<Provider> | Partial<Provider>[], user_id: string, batch?: boolean) => Promise<any>;
   updateProvider: (provider: Provider) => Promise<void>;
-  deleteProvider: (id: string, user_id: string) => Promise<void>;
+  deleteProvider: (id: string | string[], user_id: string, batch?: boolean) => Promise<void>;
   addStockItem: (item: Partial<StockItem> | Partial<StockItem>[], user_id: string, batch?: boolean) => Promise<void>;
   updateStockItem: (item: StockItem) => Promise<void>;
-  deleteStockItem: (id: string, user_id: string) => Promise<void>;
+  deleteStockItem: (id: string | string[], user_id: string, batch?: boolean) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -135,7 +135,14 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
     await fetchAll();
   }, [fetchAll]);
 
-  const deleteProvider = useCallback(async (id: string, user_id: string) => {
+  // Permitir batch delete
+  const deleteProvider = useCallback(async (idOrIds: string | string[], user_id: string, batch = false) => {
+    if (batch && Array.isArray(idOrIds)) {
+      await supabase.from('providers').delete().in('id', idOrIds).eq('user_id', user_id);
+      await fetchAll();
+      return;
+    }
+    const id = Array.isArray(idOrIds) ? idOrIds[0] : idOrIds;
     await supabase.from('providers').delete().eq('id', id).eq('user_id', user_id);
     await fetchAll();
   }, [fetchAll]);
@@ -184,7 +191,14 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
     await fetchAll();
   }, [fetchAll]);
 
-  const deleteStockItem = useCallback(async (id: string, user_id: string) => {
+  // Permitir batch delete
+  const deleteStockItem = useCallback(async (idOrIds: string | string[], user_id: string, batch = false) => {
+    if (batch && Array.isArray(idOrIds)) {
+      await supabase.from('stock').delete().in('id', idOrIds).eq('user_id', user_id);
+      await fetchAll();
+      return;
+    }
+    const id = Array.isArray(idOrIds) ? idOrIds[0] : idOrIds;
     await supabase.from('stock').delete().eq('id', id).eq('user_id', user_id);
     await fetchAll();
   }, [fetchAll]);
