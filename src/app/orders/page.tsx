@@ -234,13 +234,35 @@ function OrdersPage({ user }: OrdersPageProps) {
     }
   };
   const handleUploadPaymentProof = async (orderId: string, file: File) => {
-    // Crear un nombre único para el archivo
-    const fileName = `comprobante_${orderId}_${Date.now()}.${file.name.split('.').pop()}`;
-    const url = `/uploads/${fileName}`; // URL simulada para el comprobante
-    
-    const order = orders.find(o => o.id === orderId);
-    if (order) {
-      await updateOrder({ ...order, receiptUrl: url, status: 'pagado' });
+    try {
+      // Crear un nombre único para el archivo
+      const fileExt = file.name.split('.').pop();
+      const fileName = `comprobante_${orderId}_${Date.now()}.${fileExt}`;
+      
+      // Subir archivo a Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('comprobantes')
+        .upload(fileName, file);
+      
+      if (error) {
+        console.error('Error subiendo archivo:', error);
+        return;
+      }
+      
+      // Obtener URL pública del archivo
+      const { data: { publicUrl } } = supabase.storage
+        .from('comprobantes')
+        .getPublicUrl(fileName);
+      
+      console.log('DEBUG: Comprobante subido exitosamente:', publicUrl);
+      
+      // Actualizar la orden con la URL del comprobante
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        await updateOrder({ ...order, receiptUrl: publicUrl, status: 'pagado' });
+      }
+    } catch (error) {
+      console.error('Error en handleUploadPaymentProof:', error);
     }
   };
   const handleConfirmReception = async (orderId: string) => {
