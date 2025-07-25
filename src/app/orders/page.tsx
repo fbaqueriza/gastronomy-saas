@@ -27,6 +27,7 @@ import { DataProvider, useData } from '../../components/DataProvider';
 import es from '../../locales/es';
 import { Menu } from '@headlessui/react';
 import { useRouter } from 'next/navigation';
+import supabase from '../../lib/supabaseClient';
 
 export default function OrdersPageWrapper() {
   const { user, loading: authLoading } = useSupabaseAuth();
@@ -124,6 +125,10 @@ function OrdersPage({ user }: OrdersPageProps) {
   // Add getProviderName helper
   const getProviderName = (providerId: string) => {
     if (!providerId) return 'Proveedor desconocido';
+    // Si providers está vacío o no cargado, mostrar el ID temporalmente
+    if (!providers || providers.length === 0) {
+      return `(ID: ${providerId})`;
+    }
     const provider = providers.find((p: Provider) => p.id === providerId);
     if (provider && provider.name) {
       return provider.name;
@@ -170,20 +175,23 @@ function OrdersPage({ user }: OrdersPageProps) {
       
       setTimeout(async () => {
         console.log('DEBUG: Simulando recepción de factura...');
-        const updated = orders.find(o => o.id === orderId);
-        if (updated && updated.status === 'enviado') {
+        // Refetch orders para obtener el estado actualizado
+        await fetchAll();
+        // Buscar el pedido actualizado después del fetchAll
+        const updatedOrders = await supabase.from('orders').select('*').eq('id', orderId).single();
+        if (updatedOrders.data && updatedOrders.data.status === 'enviado') {
           const orderWithInvoice = {
-            ...updated,
+            ...updatedOrders.data,
             status: 'factura_recibida' as 'factura_recibida',
             invoiceNumber: 'INV-MOCK-001',
             receiptUrl: '/mock-factura.pdf',
             bankInfo: { bankName: 'Banco Mock', accountNumber: '1234567890' },
-            totalAmount: updated.totalAmount || 1000,
+            totalAmount: updatedOrders.data.total_amount || 1000,
           } as Order;
           console.log('DEBUG: Actualizando pedido con factura:', orderWithInvoice);
           await updateOrder(orderWithInvoice);
         } else {
-          console.log('DEBUG: Pedido no encontrado o estado incorrecto:', updated?.status);
+          console.log('DEBUG: Pedido no encontrado o estado incorrecto:', updatedOrders.data?.status);
         }
       }, 2000);
     }
@@ -312,7 +320,7 @@ function OrdersPage({ user }: OrdersPageProps) {
                           <span>•</span>
                           {showPrice(order.status) && <span>{order.totalAmount} {order.currency}</span>}
                           <span>•</span>
-                          <span>{formatDate(order.orderDate)}</span>
+                          <span>{formatDate(order.createdAt || order.orderDate)}</span>
                         </div>
                         <div className="flex flex-col gap-1 mt-1 text-xs text-gray-600">
                           {order.items.slice(0, 2).map((item, index) => (
