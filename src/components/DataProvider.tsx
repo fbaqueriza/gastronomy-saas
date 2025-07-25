@@ -27,6 +27,26 @@ export const useData = () => {
   return ctx;
 };
 
+// Función para mapear de snake_case a camelCase
+function mapStockItemFromDb(item: any): StockItem {
+  return {
+    ...item,
+    productName: item.product_name,
+    category: item.category,
+    quantity: item.quantity,
+    unit: item.unit,
+    restockFrequency: item.restock_frequency,
+    associatedProviders: item.associated_providers,
+    preferredProvider: item.preferred_provider,
+    lastOrdered: item.last_ordered,
+    nextOrder: item.next_order,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+    id: item.id,
+    user_id: item.user_id,
+  };
+}
+
 export const DataProvider: React.FC<{ userEmail?: string; userId?: string; children: React.ReactNode }> = ({ userEmail, userId, children }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -92,7 +112,7 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
     ]);
     setProviders(provs || []);
     setOrders(ords || []);
-    setStockItems(stocks || []);
+    setStockItems((stocks || []).map(mapStockItemFromDb));
     setLoading(false);
   }, [currentUserId]);
 
