@@ -456,12 +456,15 @@ function StockPage({ user }: StockPageProps) {
         };
         let restockFrequency = row.restockFrequency?.toLowerCase();
         restockFrequency = freqMap[restockFrequency] || restockFrequency;
+        // Si la frecuencia no es válida, dejarla vacía
+        const allowedFrequencies = ['daily','weekly','monthly','custom'];
+        const finalRestockFrequency = allowedFrequencies.includes(restockFrequency) ? restockFrequency : '';
         return {
           productName: row.productName || '',
           category: row.category || '',
           quantity,
           unit: row.unit || '',
-          restockFrequency: ['daily','weekly','monthly','custom'].includes(restockFrequency) ? restockFrequency : 'weekly',
+          restockFrequency: finalRestockFrequency,
           associatedProviders,
           preferredProvider,
           lastOrdered,
