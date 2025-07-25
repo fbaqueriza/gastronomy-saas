@@ -84,6 +84,9 @@ function StockPage({ user }: StockPageProps) {
       editable: true,
       render: (value: any, rowData: any, extra: { providers: any[] }) => {
         const { providers } = extra;
+        if (!providers || providers.length === 0) {
+          return <span className="text-gray-400">Cargando proveedores...</span>;
+        }
         const [editing, setEditing] = React.useState(false);
         const [current, setCurrent] = React.useState(value);
         React.useEffect(() => { setCurrent(value); }, [value]);
@@ -174,6 +177,9 @@ function StockPage({ user }: StockPageProps) {
       editable: true,
       render: (value: any, rowData: any, extra: { providers: any[] }) => {
         const { providers } = extra;
+        if (!providers || providers.length === 0) {
+          return <span className="text-gray-400">Cargando proveedores...</span>;
+        }
         const [editing, setEditing] = React.useState(false);
         const [current, setCurrent] = React.useState(Array.isArray(value) ? value : []);
         React.useEffect(() => { setCurrent(Array.isArray(value) ? value : []); }, [value]);
