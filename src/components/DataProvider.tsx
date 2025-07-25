@@ -1,10 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Order, Provider, StockItem, WhatsAppMessage } from '../types';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import supabase from '../lib/supabaseClient';
 
 interface DataContextType {
   orders: Order[];
@@ -15,7 +11,7 @@ interface DataContextType {
   addOrder: (order: Partial<Order>, user_id: string) => Promise<void>;
   updateOrder: (order: Order) => Promise<void>;
   deleteOrder: (id: string, user_id: string) => Promise<void>;
-  addProvider: (provider: Partial<Provider>, user_id: string) => Promise<void>;
+  addProvider: (provider: Partial<Provider>, user_id: string) => Promise<any>;
   updateProvider: (provider: Provider) => Promise<void>;
   deleteProvider: (id: string, user_id: string) => Promise<void>;
   addStockItem: (item: Partial<StockItem>, user_id: string) => Promise<void>;
@@ -46,17 +42,44 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
       return;
     }
     const fetchUserId = async () => {
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', userEmail)
-        .single();
-      if (!userError && userData) {
-        setCurrentUserId(userData.id);
+      try {
+        const { data: userData, error: userError, status } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', userEmail)
+          .single();
+        if (!userError && userData) {
+          setCurrentUserId(userData.id);
+        } else if (status === 406 || (userError && userError.code === 'PGRST116')) {
+          // 406 Not Acceptable or not found: create user row
+          const { data: newUser, error: createError } = await supabase
+            .from('users')
+            .insert([{ email: userEmail }])
+            .select('id')
+            .single();
+          if (!createError && newUser) {
+            setCurrentUserId(newUser.id);
+          } else {
+            setCurrentUserId(null);
+            setLoading(false);
+            setErrorMsg('No se pudo crear el usuario en la base de datos.');
+          }
+        } else {
+          setCurrentUserId(null);
+          setLoading(false);
+          setErrorMsg('Error al buscar el usuario en la base de datos.');
+        }
+      } catch (err) {
+        setCurrentUserId(null);
+        setLoading(false);
+        setErrorMsg('Error inesperado al buscar/crear usuario.');
       }
     };
     fetchUserId();
   }, [userEmail, userId]);
+
+  // Error state for user fetch/creation
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Fetch all data for the user
   const fetchAll = useCallback(async () => {
@@ -95,8 +118,9 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
 
   // CRUD: Providers
   const addProvider = useCallback(async (provider: Partial<Provider>, user_id: string) => {
-    await supabase.from('providers').insert([{ ...provider, user_id }]);
+    const result = await supabase.from('providers').insert([{ ...provider, user_id }]);
     await fetchAll();
+    return result;
   }, [fetchAll]);
 
   const updateProvider = useCallback(async (provider: Provider) => {
@@ -110,8 +134,41 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
   }, [fetchAll]);
 
   // CRUD: Stock
-  const addStockItem = useCallback(async (item: Partial<StockItem>, user_id: string) => {
-    await supabase.from('stock').insert([{ ...item, user_id }]);
+  // Permitir batch insert
+  const addStockItem = useCallback(async (itemOrItems: Partial<StockItem>|Partial<StockItem>[], user_id: string, batch = false) => {
+    if (batch && Array.isArray(itemOrItems)) {
+      // Insertar todos los items en un solo llamado
+      const { error } = await supabase.from('stock').insert(itemOrItems);
+      if (error) {
+        console.error('Supabase error al insertar stock (batch):', error, itemOrItems);
+        setErrorMsg('Error al insertar stock: ' + (error.message || error.details || ''));
+        throw error;
+      }
+      await fetchAll();
+      return;
+    }
+    // Comportamiento original: uno por uno
+    const item = Array.isArray(itemOrItems) ? itemOrItems[0] : itemOrItems;
+    const snakeCaseItem = {
+      product_name: item.productName,
+      category: item.category,
+      quantity: item.quantity,
+      unit: item.unit,
+      restock_frequency: item.restockFrequency,
+      associated_providers: item.associatedProviders,
+      preferred_provider: item.preferredProvider,
+      last_ordered: item.lastOrdered,
+      next_order: item.nextOrder,
+      created_at: item.createdAt,
+      updated_at: item.updatedAt,
+      user_id: user_id,
+    };
+    const { error } = await supabase.from('stock').insert([snakeCaseItem]);
+    if (error) {
+      console.error('Supabase error al insertar stock:', error, snakeCaseItem);
+      setErrorMsg('Error al insertar stock: ' + (error.message || error.details || ''));
+      throw error;
+    }
     await fetchAll();
   }, [fetchAll]);
 
@@ -147,6 +204,13 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-4 text-gray-600">Cargando datos...</p>
+            {errorMsg && <div className="mt-4 text-red-500">{errorMsg}</div>}
+          </div>
+        </div>
+      ) : errorMsg ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-500">{errorMsg}</p>
           </div>
         </div>
       ) : (
@@ -154,4 +218,14 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
       )}
     </DataContext.Provider>
   );
-}; 
+};
+
+// ---
+// Recommended RLS policy for users table (add in Supabase SQL editor):
+//
+// alter table users enable row level security;
+// create policy "Allow select and insert for all" on users for select using (true);
+// create policy "Allow insert for all" on users for insert with check (true);
+//
+// For production, restrict as needed (e.g. auth.uid() = id)
+// --- 
