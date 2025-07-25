@@ -239,19 +239,23 @@ function OrdersPage({ user }: OrdersPageProps) {
       const fileExt = file.name.split('.').pop();
       const fileName = `comprobante_${orderId}_${Date.now()}.${fileExt}`;
       
-      // Por ahora, usar una URL simulada pero más realista
-      // En el futuro, esto se cambiará por Supabase Storage
-      const mockUrl = `https://supabase.com/storage/v1/object/public/comprobantes/${fileName}`;
+      // Crear una URL de datos (data URL) que funcione localmente
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const dataUrl = e.target?.result as string;
+        
+        console.log('DEBUG: Simulando subida de comprobante:', fileName);
+        console.log('DEBUG: Data URL del comprobante creada');
+        
+        // Actualizar la orden con la data URL del comprobante
+        const order = orders.find(o => o.id === orderId);
+        if (order) {
+          await updateOrder({ ...order, receiptUrl: dataUrl, status: 'pagado' });
+          console.log('DEBUG: Orden actualizada con comprobante');
+        }
+      };
       
-      console.log('DEBUG: Simulando subida de comprobante:', fileName);
-      console.log('DEBUG: URL del comprobante:', mockUrl);
-      
-      // Actualizar la orden con la URL del comprobante
-      const order = orders.find(o => o.id === orderId);
-      if (order) {
-        await updateOrder({ ...order, receiptUrl: mockUrl, status: 'pagado' });
-        console.log('DEBUG: Orden actualizada con comprobante');
-      }
+      reader.readAsDataURL(file);
     } catch (error) {
       console.error('Error en handleUploadPaymentProof:', error);
     }
