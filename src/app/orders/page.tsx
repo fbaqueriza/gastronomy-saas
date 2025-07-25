@@ -59,24 +59,24 @@ function OrdersPage({ user }: OrdersPageProps) {
     notes: string;
   }) => {
     if (!user) return;
-    const newOrder = {
-      provider_id: orderData.providerId,
+    const newOrder: Partial<Order> = {
+      providerId: orderData.providerId,
       user_id: user.id,
       items: orderData.items,
       status: 'pending',
-      total_amount: orderData.items.reduce((sum, item) => sum + item.total, 0),
+      totalAmount: orderData.items.reduce((sum, item) => sum + item.total, 0),
       currency: 'EUR',
-      order_date: new Date(),
-      due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-      invoice_number: '',
-      bank_info: {},
-      receipt_url: '',
+      orderDate: new Date(),
+      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      invoiceNumber: '',
+      bankInfo: {},
+      receiptUrl: '',
       notes: orderData.notes,
-      created_at: new Date(),
-      updated_at: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
     console.log('DEBUG Pedido:', JSON.stringify(newOrder, null, 2));
-    await addOrder(newOrder);
+    await addOrder(newOrder, user.id);
     setIsCreateModalOpen(false);
     setSuggestedOrder(null);
   };
@@ -86,30 +86,7 @@ function OrdersPage({ user }: OrdersPageProps) {
     setIsCreateModalOpen(true);
   };
 
-  // Handler para subir comprobante de pago
-  const handleUploadPaymentProof = (orderId: string, file: File) => {
-    const url = URL.createObjectURL(file);
-    const order = orders.find(o => o.id === orderId);
-    if (order) {
-      updateOrder({ ...order, receiptUrl: url, status: 'confirmed' });
-    }
-  };
-
-  // Handler para confirmar recepción
-  const handleConfirmReception = (orderId: string) => {
-    const order = orders.find(o => o.id === orderId);
-    if (order) {
-      updateOrder({ ...order, status: 'delivered' });
-    }
-  };
-
-  const handleSendTransfer = (orderId: string) => {
-    const order = orders.find(o => o.id === orderId);
-    if (order) {
-      updateOrder({ ...order, status: 'sent' });
-    }
-  };
-
+  
   // Re-add getStatusIcon and getStatusColor helpers
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -147,7 +124,7 @@ function OrdersPage({ user }: OrdersPageProps) {
   // Add getProviderName helper
   const getProviderName = (providerId: string) => {
     const provider = providers.find((p: Provider) => p.id === providerId);
-    return provider?.name || providerId;
+    return provider && provider.name ? provider.name : 'Proveedor desconocido';
   };
   // Add state and handlers for WhatsApp chat
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -156,28 +133,86 @@ function OrdersPage({ user }: OrdersPageProps) {
     setSelectedOrder(order);
     setIsWhatsAppOpen(true);
   };
-  // Add handleSendOrder for sending order (simulate WhatsApp send)
-  const handleSendOrder = async (orderId: string) => {
-    // You can implement WhatsApp send logic here if needed
-    // For now, just update the order status to 'sent'
-    const order = orders.find(o => o.id === orderId);
-    if (order) {
-      await updateOrder({ ...order, status: 'sent' });
-    }
-  };
+  // Ordenar órdenes por fecha descendente (created_at)
+  const sortedOrders = [...orders].sort((a, b) => {
+    const dateA = new Date(a.createdAt || a.orderDate).getTime();
+    const dateB = new Date(b.createdAt || b.orderDate).getTime();
+    return dateB - dateA;
+  });
+  const currentOrders = sortedOrders.filter(order => !['finalizado', 'cancelled', 'delivered'].includes(order.status));
+  let finishedOrders = sortedOrders.filter(order => ['finalizado', 'delivered'].includes(order.status));
 
-  if (!user) {
-    return null;
-  }
+  // Eliminar todas las definiciones duplicadas de:
+  // - handleSendOrder
+  // - handleUploadPaymentProof
+  // - handleConfirmReception
+  // Solo debe quedar la versión después del sorting.
 
-  // Ordenar órdenes por fecha descendente
-  const sortedOrders = [...orders].sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
-  const currentOrders = sortedOrders.filter(order => !['delivered', 'cancelled'].includes(order.status));
-  let finishedOrders = sortedOrders.filter(order => order.status === 'delivered');
   // Filtros
   // if (filterProvider) finishedOrders = finishedOrders.filter(o => o.providerId === filterProvider);
   // if (filterStartDate) finishedOrders = finishedOrders.filter(o => new Date(o.orderDate) >= new Date(filterStartDate));
   // if (filterEndDate) finishedOrders = finishedOrders.filter(o => new Date(o.orderDate) <= new Date(filterEndDate));
+
+  // After sorting and before render, define the handlers:
+  // 1. Cambiar el tipo de estado a: 'pendiente', 'factura_recibida', 'pagado', 'enviado', 'finalizado'.
+  // 2. Modificar los handlers:
+  const handleSendOrder = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      await updateOrder({ ...order, status: 'enviado' });
+      setTimeout(() => {
+        const updated = orders.find(o => o.id === orderId);
+        if (updated && updated.status === 'enviado') {
+          updateOrder({
+            ...updated,
+            status: 'factura_recibida',
+            invoiceNumber: 'INV-MOCK-001',
+            receiptUrl: '/mock-factura.pdf',
+            bankInfo: { bankName: 'Banco Mock', accountNumber: '1234567890' },
+            totalAmount: updated.totalAmount || 1000,
+          });
+        }
+      }, 2000);
+    }
+  };
+  const handleUploadPaymentProof = async (orderId: string, file: File) => {
+    const url = URL.createObjectURL(file);
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      await updateOrder({ ...order, receiptUrl: url, status: 'pagado' });
+    }
+  };
+  const handleConfirmReception = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      await updateOrder({ ...order, status: 'finalizado' });
+    }
+  };
+
+  // 1. Agregar estado para filtros
+  const [filterProvider, setFilterProvider] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  // 2. Aplicar filtros a finishedOrders
+  const filteredFinishedOrders = finishedOrders.filter(order => {
+    const providerMatch = !filterProvider || order.providerId === filterProvider;
+    const startMatch = !filterStartDate || new Date(order.orderDate) >= new Date(filterStartDate);
+    const endMatch = !filterEndDate || new Date(order.orderDate) <= new Date(filterEndDate);
+    return providerMatch && startMatch && endMatch;
+  });
+
+  // 1. Botón 'Enviar pedido' cuando estado === 'pending'
+  // 2. Mostrar nombre del proveedor con getProviderName(order.providerId)
+  // 3. Corregir formato de fecha:
+  const formatDate = (date: Date | string | undefined) => {
+    if (!date) return '';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+  };
+  // 4. Mostrar precio solo si estado es 'factura_recibida', 'pagado', 'enviado', 'finalizado'
+  const showPrice = (status: string) => ['factura_recibida','pagado','enviado','finalizado'].includes(status);
+  // 5. Al apretar 'ver resumen' en la orden nueva, no cerrar el modal (asegurar onClose solo se llama en el botón cancelar o submit)
+  // 6. Asegurar que las órdenes se muestran con las más recientes arriba (ya se usa sortedOrders)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -248,16 +283,16 @@ function OrdersPage({ user }: OrdersPageProps) {
                         <div className="flex items-center gap-2 mb-1">
                           {getStatusIcon(order.status)}
                           <span className="font-medium text-gray-900">{order.orderNumber}</span>
-                          <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>{order.status === 'pending' ? 'Pendiente' : order.status === 'sent' ? 'Enviado' : order.status === 'confirmed' ? 'Pagado' : order.status === 'delivered' ? 'Finalizado' : order.status === 'cancelled' ? 'Cancelado' : order.status}</span>
+                          <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>{order.status === 'pending' ? 'Pendiente' : order.status === 'enviado' ? 'Enviado' : order.status === 'factura_recibida' ? 'Factura recibida' : order.status === 'pagado' ? 'Pagado' : order.status === 'finalizado' ? 'Finalizado' : order.status === 'cancelled' ? 'Cancelado' : order.status}</span>
                         </div>
                         <div className="flex flex-wrap gap-2 text-xs text-gray-500 mb-1">
                           <span>{getProviderName(order.providerId)}</span>
                           <span>•</span>
                           <span>{order.items.length} ítems</span>
                           <span>•</span>
-                          <span>{order.totalAmount} {order.currency}</span>
+                          {showPrice(order.status) && <span>{order.totalAmount} {order.currency}</span>}
                           <span>•</span>
-                          <span>{new Date(order.orderDate).toLocaleDateString()}</span>
+                          <span>{formatDate(order.orderDate)}</span>
                         </div>
                         <div className="flex flex-col gap-1 mt-1 text-xs text-gray-600">
                           {order.items.slice(0, 2).map((item, index) => (
@@ -271,49 +306,60 @@ function OrdersPage({ user }: OrdersPageProps) {
                       {/* Lado derecho: botones de acción */}
                       <div className="flex flex-col items-end gap-1 sm:w-5/12 min-w-[160px]">
                         <div className="flex flex-row flex-wrap gap-2 justify-end">
+                          {/* Chat */}
                           <button
                             onClick={() => handleOrderClick(order)}
                             className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                           >
                             <MessageSquare className="h-4 w-4 mr-1" /> Chat
                           </button>
+                          {/* Enviar pedido */}
                           {order.status === 'pending' && (
                             <button
                               onClick={() => handleSendOrder(order.id)}
-                              // disabled={loading} // loading was removed
-                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
+                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
                             >
-                              <Send className="h-4 w-4 mr-1" />
-                              {es.orders.sendOrder}
+                              <Send className="h-4 w-4 mr-1" /> Enviar pedido
                             </button>
                           )}
-                          {['sent','confirmed','delivered'].includes(order.status) && (
+                          {/* Descargar factura */}
+                          {['factura_recibida','pagado','enviado','finalizado'].includes(order.status) && order.invoiceNumber && (
                             <a
                               href={order.receiptUrl || '/mock-factura.pdf'}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
+                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
                             >
-                              <Download className="h-4 w-4 mr-1" />
-                              Descargar factura
+                              <FileText className="h-4 w-4 mr-1" /> Descargar factura
                             </a>
                           )}
-                          {['sent','confirmed','delivered'].includes(order.status) && (
+                          {/* Subir comprobante */}
+                          {order.status === 'factura_recibida' && (
                             <ComprobanteButton
-                              comprobante={null} // Removed paymentProofs local state
+                              comprobante={order.receiptUrl ? { url: order.receiptUrl, name: 'Comprobante' } : null}
                               onUpload={(file) => handleUploadPaymentProof(order.id, file)}
-                              onView={() => {
-                                // Removed paymentProofs local state
-                              }}
+                              onView={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
                             />
                           )}
-                          {order.status === 'confirmed' && (
+                          {/* Confirmar recepción */}
+                          {order.status === 'pagado' && (
                             <button
-                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-blue-200 text-white bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
+                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-green-200 text-white bg-green-600 hover:bg-green-700 focus:ring-2 focus:ring-green-500"
                               onClick={() => handleConfirmReception(order.id)}
                             >
                               <CheckCircle className="h-4 w-4 mr-1" /> Confirmar recepción
                             </button>
+                          )}
+                          {/* Ver comprobante */}
+                          {['pagado','finalizado'].includes(order.status) && order.receiptUrl && (
+                            <a
+                              href={order.receiptUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
+                            >
+                              <Upload className="h-4 w-4 mr-1" /> Ver comprobante
+                            </a>
                           )}
                         </div>
                       </div>
@@ -326,15 +372,13 @@ function OrdersPage({ user }: OrdersPageProps) {
             <div className="bg-gray-50 shadow overflow-hidden sm:rounded-md mt-8">
               <div className="px-4 py-5 sm:px-6 border-b border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <h3 className="text-lg font-medium text-gray-800">
-                  Órdenes finalizadas ({finishedOrders.length})
+                  Órdenes finalizadas ({filteredFinishedOrders.length})
                 </h3>
                 <div className="flex flex-col md:flex-row gap-2 items-start md:items-center">
                   <select
                     className="border rounded px-2 py-1 text-xs"
-                    // value={filterProvider} // filterProvider was removed
-                    onChange={e => {
-                      // setFilterProvider(e.target.value); // filterProvider was removed
-                    }}
+                    value={filterProvider}
+                    onChange={e => setFilterProvider(e.target.value)}
                   >
                     <option value="">Todos los proveedores</option>
                     {providers.map(p => (
@@ -344,23 +388,19 @@ function OrdersPage({ user }: OrdersPageProps) {
                   <input
                     type="date"
                     className="border rounded px-2 py-1 text-xs"
-                    // value={filterStartDate} // filterStartDate was removed
-                    onChange={e => {
-                      // setFilterStartDate(e.target.value); // filterStartDate was removed
-                    }}
+                    value={filterStartDate}
+                    onChange={e => setFilterStartDate(e.target.value)}
                   />
                   <input
                     type="date"
                     className="border rounded px-2 py-1 text-xs"
-                    // value={filterEndDate} // filterEndDate was removed
-                    onChange={e => {
-                      // setFilterEndDate(e.target.value); // filterEndDate was removed
-                    }}
+                    value={filterEndDate}
+                    onChange={e => setFilterEndDate(e.target.value)}
                   />
                 </div>
               </div>
               <ul className="divide-y divide-gray-200">
-                {finishedOrders.map((order) => (
+                {filteredFinishedOrders.map((order) => (
                   <li key={order.id} className="py-3 px-2 flex flex-col gap-1 bg-white rounded-lg shadow mb-3">
                     <div className="flex flex-col sm:flex-row justify-between gap-4 w-full">
                       {/* Lado izquierdo: info del pedido */}
@@ -379,7 +419,7 @@ function OrdersPage({ user }: OrdersPageProps) {
                           <span>•</span>
                           <span>{order.totalAmount} {order.currency}</span>
                           <span>•</span>
-                          <span>{new Date(order.orderDate).toLocaleDateString()}</span>
+                          <span>{formatDate(order.orderDate)}</span>
                         </div>
                         <div className="flex flex-col gap-1 mt-1 text-xs text-gray-600">
                           {order.items.slice(0, 2).map((item, index) => (

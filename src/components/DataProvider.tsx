@@ -122,7 +122,24 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
 
   // CRUD: Orders
   const addOrder = useCallback(async (order: Partial<Order>, user_id: string) => {
-    await supabase.from('orders').insert([{ ...order, user_id }]);
+    // Mapear campos a snake_case
+    const snakeCaseOrder = {
+      provider_id: (order as any).providerId,
+      user_id,
+      items: order.items,
+      status: order.status,
+      total_amount: (order as any).totalAmount,
+      currency: order.currency,
+      order_date: (order as any).orderDate,
+      due_date: (order as any).dueDate,
+      invoice_number: (order as any).invoiceNumber,
+      bank_info: (order as any).bankInfo,
+      receipt_url: (order as any).receiptUrl,
+      notes: order.notes,
+      created_at: (order as any).createdAt,
+      updated_at: (order as any).updatedAt,
+    };
+    await supabase.from('orders').insert([snakeCaseOrder]);
     await fetchAll();
   }, [fetchAll]);
 

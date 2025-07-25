@@ -128,19 +128,11 @@ export default function CreateOrderModal({
     e.preventDefault();
     console.log('DEBUG Modal: handleSubmit ejecutado', { selectedProvider, orderText, notes });
     if (!selectedProvider) return;
-
-    const items = parseOrderText(orderText);
-    if (items.length === 0) {
-      return;
-    }
-
     onCreateOrder({
       providerId: selectedProvider,
-      items,
+      items: parseOrderText(orderText),
       notes,
     });
-
-    onClose();
   };
 
   const totalAmount = parseOrderText(orderText).reduce((sum, item) => sum + item.total, 0);
@@ -230,6 +222,7 @@ export default function CreateOrderModal({
               {orderText.trim() && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-md">
                   <button
+                    type="button"
                     className="text-blue-600 text-sm mb-2 focus:outline-none"
                     onClick={() => setShowSummary(s => !s)}
                   >

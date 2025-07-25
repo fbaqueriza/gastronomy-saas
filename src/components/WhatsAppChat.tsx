@@ -146,7 +146,7 @@ export default function WhatsAppChat({
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
                 <span className="text-green-500 font-bold text-lg">
-                  {providerName.charAt(0)}
+                  {providerName ? providerName.charAt(0) : '?'}
                 </span>
               </div>
               <div>

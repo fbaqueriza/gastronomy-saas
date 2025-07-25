@@ -1,6 +1,6 @@
 import React from 'react';
 import { Order, Provider } from '../types';
-import { MessageSquare, Upload, Send, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { MessageSquare, Upload, Send, CheckCircle, Clock, AlertCircle, FileText } from 'lucide-react';
 import ComprobanteButton from './ComprobanteButton';
 
 interface PendingOrderListProps {
@@ -108,51 +108,65 @@ const PendingOrderList: React.FC<PendingOrderListProps> = ({ orders, providers, 
             {/* Lado derecho: botones de acción */}
             <div className="flex flex-col items-end gap-1 sm:w-5/12 min-w-[160px]">
               <div className="flex flex-row flex-wrap gap-2 justify-end">
+                {/* Chat */}
                 <button
                   onClick={() => onViewChat(order)}
                   className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   <MessageSquare className="h-4 w-4 mr-1" /> Chat
                 </button>
+                {/* Enviar pedido */}
                 {order.status === 'pending' && (
                   <button
                     onClick={() => onSendOrder(order)}
                     className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12v1m0 4h.01M21 12c0 4.418-4.03 8-9 8a9 9 0 110-18c4.97 0 9 3.582 9 8z" /></svg>
-                    Enviar pedido
+                    <Send className="h-4 w-4 mr-1" /> Enviar pedido
                   </button>
                 )}
-                {(order.status === 'sent' || order.status === 'confirmed' || order.status === 'delivered') && (
-                  <a
-                    href={order.receiptUrl || '/mock-factura.pdf'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4" /></svg>
-                    Descargar factura
-                  </a>
-                )}
-                {(order.status === 'sent' || order.status === 'confirmed' || order.status === 'delivered') && (
+                {/* Subir comprobante */}
+                {order.status === 'sent' && (
                   <ComprobanteButton
-                    comprobante={paymentProofs?.[order.id] || null}
+                    comprobante={paymentProofs?.[order.id] || (order.receiptUrl ? { url: order.receiptUrl, name: 'Comprobante' } : null)}
                     onUpload={(file) => onUploadReceipt(order, file)}
                     onView={() => {
                       if (paymentProofs?.[order.id]) {
                         window.open(paymentProofs[order.id].url, '_blank');
+                      } else if (order.receiptUrl) {
+                        window.open(order.receiptUrl, '_blank');
                       }
                     }}
                   />
                 )}
+                {/* Confirmar recepción */}
                 {order.status === 'confirmed' && onConfirmReception && (
                   <button
                     onClick={() => onConfirmReception(order)}
-                    className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-blue-200 text-white bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
+                    className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-green-200 text-white bg-green-600 hover:bg-green-700 focus:ring-2 focus:ring-green-500"
                   >
                     <CheckCircle className="h-4 w-4 mr-1" /> Confirmar recepción
                   </button>
                 )}
+                {/* Ver comprobante */}
+                {(order.status === 'delivered' || paymentProofs?.[order.id] || order.receiptUrl) && (
+                  <a
+                    href={paymentProofs?.[order.id]?.url || order.receiptUrl || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
+                  >
+                    <Upload className="h-4 w-4 mr-1" /> Ver comprobante
+                  </a>
+                )}
+                {/* Descargar factura */}
+                <a
+                  href={order.receiptUrl || '/mock-factura.pdf'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
+                >
+                  <FileText className="h-4 w-4 mr-1" /> Descargar factura
+                </a>
               </div>
             </div>
           </div>
