@@ -173,121 +173,122 @@ export default function CreateOrderModal({
 
         {/* Content */}
         <div className="px-6 py-4">
-          {/* Provider Selection */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Selecciona proveedor *
-            </label>
-            <select
-              value={selectedProvider}
-              onChange={(e) => setSelectedProvider(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Elige un proveedor...</option>
-              {providers.map((provider) => (
-                <option key={provider.id} value={provider.id}>
-                  {provider.name} - {provider.email}
-                </option>
-              ))}
-            </select>
-            
-            {selectedProviderInfo && (
-              <div className="mt-2 p-3 bg-blue-50 rounded-md">
-                <div className="text-sm text-blue-800">
-                  <strong>Categorías del proveedor:</strong> {selectedProviderInfo.categories.join(', ')}
-                </div>
-                {selectedProviderInfo.notes && (
-                  <div className="text-sm text-blue-700 mt-1">
-                    <strong>Notas:</strong> {selectedProviderInfo.notes}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Order Items Text */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-md font-medium text-gray-900">Ítems del pedido</h3>
-            </div>
-
-            <div className="mb-2">
+          <form onSubmit={handleSubmit}>
+            {/* Provider Selection */}
+            <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ítems del pedido (Formato: Producto: Cantidad Unidad - Precio)
+                Selecciona proveedor *
               </label>
+              <select
+                value={selectedProvider}
+                onChange={(e) => setSelectedProvider(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Elige un proveedor...</option>
+                {providers.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.name} - {provider.email}
+                  </option>
+                ))}
+              </select>
+              
+              {selectedProviderInfo && (
+                <div className="mt-2 p-3 bg-blue-50 rounded-md">
+                  <div className="text-sm text-blue-800">
+                    <strong>Categorías del proveedor:</strong> {selectedProviderInfo.categories.join(', ')}
+                  </div>
+                  {selectedProviderInfo.notes && (
+                    <div className="text-sm text-blue-700 mt-1">
+                      <strong>Notas:</strong> {selectedProviderInfo.notes}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            <textarea
-              value={orderText}
-              onChange={(e) => setOrderText(e.target.value)}
-              rows={12}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-              placeholder="Selecciona un proveedor para ver ítems sugeridos..."
-            />
-
-            {/* Order Summary */}
-            {orderText.trim() && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-md">
-                <button
-                  className="text-blue-600 text-sm mb-2 focus:outline-none"
-                  onClick={() => setShowSummary(s => !s)}
-                >
-                  {showSummary ? 'Ocultar resumen' : 'Mostrar resumen'}
-                </button>
-                {showSummary && (
-                  <>
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">Resumen del pedido</h4>
-                    <div className="space-y-2">
-                      {parseOrderText(orderText).map((item, index) => (
-                        <div key={index} className="flex justify-between text-sm">
-                          <span>
-                            {item.productName} - {item.quantity} {item.unit}
-                          </span>
-                        </div>
-                      ))}
-                      <div className="flex justify-between font-semibold">
-                        <span>Total:</span>
-                        <span>${totalAmount.toFixed(0)}</span>
-                      </div>
-                    </div>
-                  </>
-                )}
+            {/* Order Items Text */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-md font-medium text-gray-900">Ítems del pedido</h3>
               </div>
-            )}
-          </div>
 
-          {/* Notes */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notas
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Instrucciones especiales o notas de entrega..."
-            />
-          </div>
-        </div>
+              <div className="mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ítems del pedido (Formato: Producto: Cantidad Unidad - Precio)
+                </label>
+              </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            onClick={() => console.log('DEBUG Modal: Botón crear pedido clickeado')}
-            disabled={!selectedProvider || !orderText.trim()}
-            className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ShoppingCart className="h-4 w-4 mr-1" />
-            Crear pedido
-          </button>
+              <textarea
+                value={orderText}
+                onChange={(e) => setOrderText(e.target.value)}
+                rows={12}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                placeholder="Selecciona un proveedor para ver ítems sugeridos..."
+              />
+
+              {/* Order Summary */}
+              {orderText.trim() && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-md">
+                  <button
+                    className="text-blue-600 text-sm mb-2 focus:outline-none"
+                    onClick={() => setShowSummary(s => !s)}
+                  >
+                    {showSummary ? 'Ocultar resumen' : 'Mostrar resumen'}
+                  </button>
+                  {showSummary && (
+                    <>
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Resumen del pedido</h4>
+                      <div className="space-y-2">
+                        {parseOrderText(orderText).map((item, index) => (
+                          <div key={index} className="flex justify-between text-sm">
+                            <span>
+                              {item.productName} - {item.quantity} {item.unit}
+                            </span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between font-semibold">
+                          <span>Total:</span>
+                          <span>${totalAmount.toFixed(0)}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Notes */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Notas
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Instrucciones especiales o notas de entrega..."
+              />
+            </div>
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                onClick={() => console.log('DEBUG Modal: Botón crear pedido clickeado')}
+                disabled={!selectedProvider || !orderText.trim()}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ShoppingCart className="h-4 w-4 mr-1" />
+                Crear pedido
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
