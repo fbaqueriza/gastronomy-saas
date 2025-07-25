@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { useAuth } from '../../hooks/useAuth';
+import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
 import Navigation from '../../components/Navigation';
 import DataGrid from '../../components/DataGrid';
 import { Provider } from '../../types';
@@ -21,7 +21,7 @@ import es from '../../locales/es';
 import { useRouter } from 'next/navigation';
 
 export default function ProvidersPageWrapper() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useSupabaseAuth();
   const router = useRouter();
   if (!authLoading && !user) {
     if (typeof window !== 'undefined') router.push('/auth/login');
@@ -38,8 +38,8 @@ export default function ProvidersPageWrapper() {
 }
 
 function ProvidersPage() {
-  const { user, loading: authLoading } = useAuth();
-  const { providers, addProvider } = useData();
+  const { user, loading: authLoading } = useSupabaseAuth();
+  const { providers, addProvider, deleteProvider } = useData();
   const isSeedUser = user?.email === 'test@test.com';
 
   // Debug log for loading and user
@@ -50,6 +50,7 @@ function ProvidersPage() {
   const [loading, setLoading] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
 
   // PDF upload handler
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -286,19 +287,24 @@ function ProvidersPage() {
   const handleAddRow = useCallback(() => {
     if (!user) return;
     const newProvider = createNewProvider();
-    newProvider.user_id = user.uid;
+    newProvider.user_id = user.id;
     // setProviders([newProvider, ...providers]); // This line was removed
   }, [user]);
 
   const handleDeleteRows = useCallback(
-    (rowsToDelete: Provider[]) => {
-      // pushUndo(providers); // Removed as per edit hint
-      // const idsToDelete = rowsToDelete.map((row) => row.id);
-      // setProviders( // This line was removed
-      //   providers.filter((provider) => !idsToDelete.includes(provider.id)),
-      // );
+    async (rowsToDelete: Provider[]) => {
+      if (!rowsToDelete || rowsToDelete.length === 0 || !user) return;
+      setLoading(true);
+      for (const row of rowsToDelete) {
+        try {
+          await deleteProvider(row.id, user.id);
+        } catch (err) {
+          console.error('Error deleting provider:', row, err);
+        }
+      }
+      setLoading(false);
     },
-    [providers], // Updated to use context providers/setProviders
+    [deleteProvider, user]
   );
 
   const csvEscape = (value: string) => {
@@ -360,80 +366,168 @@ function ProvidersPage() {
 
   const handleImport = useCallback((file: File) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const text = e.target?.result as string;
       const lines = text.split('\n').filter(Boolean);
-      // Normalize headers: remove common. prefix, lowercase, remove spaces, remove accents
-      const normalize = (str: string) => str
-        .trim()
-        .toLowerCase()
-        .replace(/^common\./, '')
-        .replace(/[áàäâ]/g, 'a')
-        .replace(/[éèëê]/g, 'e')
-        .replace(/[íìïî]/g, 'i')
-        .replace(/[óòöô]/g, 'o')
-        .replace(/[úùüû]/g, 'u')
-        .replace(/ñ/g, 'n')
-        .replace(/\s+/g, '');
-      const headers = parseCsvRow(lines[0]).map(normalize);
-      // Helper: find header by partial or fuzzy match
-      const findHeader = (candidates: string[]) => {
-        for (const candidate of candidates) {
-          const idx = headers.findIndex(h => h.includes(normalize(candidate)));
-          if (idx !== -1) return idx;
-        }
-        return -1;
-      };
-      // Debug: log normalized headers
-      if (typeof window !== 'undefined') {
-        console.log('CSV headers (normalized):', headers);
+      if (lines.length < 2) {
+        setImportMessage('El archivo CSV está vacío o no tiene datos.');
+        return;
       }
-      const importedProviders = lines.slice(1).map((line, index) => {
-        const values = parseCsvRow(line).map((v) => v.trim());
-        const get = (candidates: string | string[]) => {
-          const keys = Array.isArray(candidates) ? candidates : [candidates];
-          const idx = findHeader(keys);
-          return idx !== -1 ? String(values[idx] ?? '') : '';
-        };
+      const rawHeaders = lines[0].split(',').map(h => h.trim().toLowerCase());
+      // Normalizar headers a camelCase
+      const headerMap: Record<string, string> = {
+        'nombre': 'name',
+        'name': 'name',
+        'contacto': 'contactName',
+        'contactname': 'contactName',
+        'categoría': 'categories',
+        'category': 'categories',
+        'categorias': 'categories',
+        'tags': 'tags',
+        'notas': 'notes',
+        'notes': 'notes',
+        'cbu': 'cbu',
+        'alias': 'alias',
+        'razon social': 'razonSocial',
+        'razonsocial': 'razonSocial',
+        'cuit': 'cuitCuil',
+        'cuitcuil': 'cuitCuil',
+        'email': 'email',
+        'phone': 'phone',
+        'address': 'address',
+        'catalogos': 'catalogs',
+        'catalogs': 'catalogs',
+      };
+      const headers = rawHeaders.map(h => headerMap[h] || h);
+      const required = ['name', 'categories'];
+      const missing = required.filter(r => !headers.includes(r));
+      if (missing.length > 0) {
+        setImportMessage('Faltan columnas requeridas: ' + missing.join(', '));
+        return;
+      }
+      const importedProviders = lines.slice(1).map(line => {
+        const values = line.split(',');
+        const row: any = {};
+        headers.forEach((h, i) => { row[h] = values[i] ?? ''; });
         return {
-          id: (Date.now() + index).toString(),
-          name: get(['name', 'nombre']),
-          contactName: get(['contactname', 'nombrecontacto', 'nombre c']),
-          email: get(['email', 'correo']),
-          phone: get(['phone', 'telefono']),
-          address: get(['address', 'direccion']),
-          categories: (() => {
-            const val = get(['category', 'categoria', 'categoría']);
-            if (!val) return [];
-            if (val.includes(';')) return val.split(';').map((c) => c.trim());
-            return [val.trim()];
-          })(),
-          tags: get(['tags', 'etiquetas'])
-            ? get(['tags', 'etiquetas']).split(';').map((t) => t.trim())
-            : [],
-          notes: get(['notes', 'notas']),
-          cbu: get('cbu'),
-          alias: get('alias'),
-          cuitCuil: get(['cuitcuil', 'cuit/cuil']),
-          razonSocial: get(['razonsocial', 'razon social', 'razon soc']),
-          catalogs: [],
+          name: row.name || '',
+          contactName: row.contactName || '',
+          categories: row.categories ? String(row.categories).split(';').map((c: string) => c.trim()).filter(Boolean) : [],
+          tags: row.tags ? String(row.tags).split(';').map((t: string) => t.trim()).filter(Boolean) : [],
+          notes: row.notes || '',
+          cbu: row.cbu || '',
+          alias: row.alias || '',
+          razonSocial: row.razonSocial || '',
+          cuitCuil: row.cuitCuil || '',
+          email: row.email || '',
+          phone: row.phone || '',
+          address: row.address || '',
+          catalogs: [], // No se importa desde CSV, se deja vacío para cumplir el tipado
           createdAt: new Date(),
           updatedAt: new Date(),
         };
       });
-      handleImportProviders(importedProviders);
+      setLoading(true);
+      let successCount = 0;
+      let errorCount = 0;
+      try {
+        // Mapear todos los proveedores a snake_case para Supabase
+        const safeItems = importedProviders.map(item => ({
+          name: item.name,
+          contact_name: item.contactName,
+          categories: item.categories,
+          tags: item.tags,
+          notes: item.notes,
+          cbu: item.cbu,
+          alias: item.alias,
+          razon_social: item.razonSocial,
+          cuit_cuil: item.cuitCuil,
+          email: item.email,
+          phone: item.phone,
+          address: item.address,
+          catalogs: item.catalogs,
+          created_at: item.createdAt,
+          updated_at: item.updatedAt,
+          user_id: user.id,
+        }));
+        if (safeItems.length > 0) {
+          await addProvider(safeItems, user.id, true); // batch insert
+          successCount = safeItems.length;
+        }
+      } catch (err: any) {
+        errorCount = importedProviders.length;
+        console.error('Error importing providers batch:', err);
+      }
+      setLoading(false);
+      if (errorCount === 0) {
+        setImportMessage(`¡Importación exitosa! Se importaron ${successCount} proveedores.`);
+      } else {
+        setImportMessage(`Importación completada con ${successCount} éxitos y ${errorCount} errores. Revisa la consola para detalles.`);
+      }
     };
     reader.readAsText(file);
-  }, []);
+  }, [addProvider, user]);
 
   // Importación masiva de providers (ejemplo CSV)
   const handleImportProviders = useCallback(async (importedProviders: any[]) => {
     if (!user) return;
     setLoading(true);
+    let successCount = 0;
+    let errorCount = 0;
     for (const provider of importedProviders) {
-      await addProvider({ ...provider, user_id: user.uid }, user.uid);
+      try {
+        // Remove id if present
+        const { id, ...providerWithoutId } = provider;
+        // Ensure categories, tags, catalogs are arrays
+        const safeProvider = {
+          ...providerWithoutId,
+          categories: Array.isArray(providerWithoutId.categories)
+            ? providerWithoutId.categories
+            : (typeof providerWithoutId.categories === 'string' && providerWithoutId.categories ? providerWithoutId.categories.split(';').map((c: string) => c.trim()) : []),
+          tags: Array.isArray(providerWithoutId.tags)
+            ? providerWithoutId.tags
+            : (typeof providerWithoutId.tags === 'string' && providerWithoutId.tags ? providerWithoutId.tags.split(';').map((t: string) => t.trim()) : []),
+          catalogs: Array.isArray(providerWithoutId.catalogs) ? providerWithoutId.catalogs : [],
+          user_id: user.id,
+        };
+        // Remove undefined fields
+        Object.keys(safeProvider).forEach(key => {
+          if (safeProvider[key] === undefined) delete safeProvider[key];
+        });
+        // Map camelCase to snake_case for DB
+        const safeProviderSnake = {
+          ...safeProvider,
+          contact_name: safeProvider.contactName,
+          razon_social: safeProvider.razonSocial,
+          cuit_cuil: safeProvider.cuitCuil,
+          created_at: safeProvider.createdAt,
+          updated_at: safeProvider.updatedAt,
+        };
+        delete safeProviderSnake.contactName;
+        delete safeProviderSnake.razonSocial;
+        delete safeProviderSnake.cuitCuil;
+        delete safeProviderSnake.createdAt;
+        delete safeProviderSnake.updatedAt;
+        console.log('Insertando provider en Supabase:', JSON.stringify(safeProviderSnake, null, 2));
+        const result = await addProvider(safeProviderSnake, user.id);
+        if (result && result.error) {
+          errorCount++;
+          console.error('Error de Supabase:', JSON.stringify(result.error, null, 2));
+        } else {
+          successCount++;
+        }
+      } catch (err) {
+        errorCount++;
+        console.error('Error importing provider:', provider, err);
+      }
     }
     setLoading(false);
+    if (errorCount === 0) {
+      setImportMessage(`¡Importación exitosa! Se importaron ${successCount} proveedores.`);
+    } else {
+      setImportMessage(`Importación completada con ${successCount} éxitos y ${errorCount} errores. Revisa la consola para detalles.`);
+    }
+    setTimeout(() => setImportMessage(null), 6000);
   }, [user, addProvider]);
 
   if (authLoading) {
@@ -546,6 +640,11 @@ function ProvidersPage() {
               setSelectedProvider(null);
             }}
           />
+        </div>
+      )}
+      {importMessage && (
+        <div className="fixed top-4 right-4 z-50 bg-blue-100 border border-blue-400 text-blue-800 px-4 py-2 rounded shadow">
+          {importMessage}
         </div>
       )}
     </div>

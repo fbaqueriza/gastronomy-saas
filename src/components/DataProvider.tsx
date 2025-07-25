@@ -11,7 +11,7 @@ interface DataContextType {
   addOrder: (order: Partial<Order>, user_id: string) => Promise<void>;
   updateOrder: (order: Order) => Promise<void>;
   deleteOrder: (id: string, user_id: string) => Promise<void>;
-  addProvider: (provider: Partial<Provider>, user_id: string) => Promise<any>;
+  addProvider: (provider: Partial<Provider> | Partial<Provider>[], user_id: string, batch?: boolean) => Promise<any>;
   updateProvider: (provider: Provider) => Promise<void>;
   deleteProvider: (id: string, user_id: string) => Promise<void>;
   addStockItem: (item: Partial<StockItem> | Partial<StockItem>[], user_id: string, batch?: boolean) => Promise<void>;
@@ -117,7 +117,14 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
   }, [fetchAll]);
 
   // CRUD: Providers
-  const addProvider = useCallback(async (provider: Partial<Provider>, user_id: string) => {
+  // Permitir batch insert
+  const addProvider = useCallback(async (providerOrProviders: Partial<Provider>|Partial<Provider>[], user_id: string, batch = false) => {
+    if (batch && Array.isArray(providerOrProviders)) {
+      const result = await supabase.from('providers').insert(providerOrProviders);
+      await fetchAll();
+      return result;
+    }
+    const provider = Array.isArray(providerOrProviders) ? providerOrProviders[0] : providerOrProviders;
     const result = await supabase.from('providers').insert([{ ...provider, user_id }]);
     await fetchAll();
     return result;
