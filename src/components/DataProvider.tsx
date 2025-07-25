@@ -144,7 +144,24 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
   }, [fetchAll]);
 
   const updateOrder = useCallback(async (order: Order) => {
-    await supabase.from('orders').update(order).eq('id', order.id);
+    // Mapear campos a snake_case para Supabase
+    const snakeCaseOrder = {
+      provider_id: (order as any).providerId,
+      user_id: order.user_id,
+      items: order.items,
+      status: order.status,
+      total_amount: (order as any).totalAmount,
+      currency: order.currency,
+      order_date: (order as any).orderDate,
+      due_date: (order as any).dueDate,
+      invoice_number: (order as any).invoiceNumber,
+      bank_info: (order as any).bankInfo,
+      receipt_url: (order as any).receiptUrl,
+      notes: order.notes,
+      created_at: (order as any).createdAt,
+      updated_at: (order as any).updatedAt,
+    };
+    await supabase.from('orders').update(snakeCaseOrder).eq('id', order.id);
     await fetchAll();
   }, [fetchAll]);
 

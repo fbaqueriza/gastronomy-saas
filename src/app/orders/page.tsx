@@ -161,18 +161,26 @@ function OrdersPage({ user }: OrdersPageProps) {
   const handleSendOrder = async (orderId: string) => {
     const order = orders.find(o => o.id === orderId);
     if (order) {
+      console.log('DEBUG: Enviando pedido', orderId, 'estado actual:', order.status);
       await updateOrder({ ...order, status: 'enviado' });
-      setTimeout(() => {
+      console.log('DEBUG: Pedido enviado, esperando factura...');
+      
+      setTimeout(async () => {
+        console.log('DEBUG: Simulando recepción de factura...');
         const updated = orders.find(o => o.id === orderId);
         if (updated && updated.status === 'enviado') {
-          updateOrder({
+          const orderWithInvoice = {
             ...updated,
-            status: 'factura_recibida',
+            status: 'factura_recibida' as 'factura_recibida',
             invoiceNumber: 'INV-MOCK-001',
             receiptUrl: '/mock-factura.pdf',
             bankInfo: { bankName: 'Banco Mock', accountNumber: '1234567890' },
             totalAmount: updated.totalAmount || 1000,
-          });
+          } as Order;
+          console.log('DEBUG: Actualizando pedido con factura:', orderWithInvoice);
+          await updateOrder(orderWithInvoice);
+        } else {
+          console.log('DEBUG: Pedido no encontrado o estado incorrecto:', updated?.status);
         }
       }, 2000);
     }
