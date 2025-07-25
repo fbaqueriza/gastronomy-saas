@@ -125,14 +125,24 @@ function OrdersPage({ user }: OrdersPageProps) {
   // Add getProviderName helper
   const getProviderName = (providerId: string) => {
     if (!providerId) return 'Proveedor desconocido';
+    console.log('DEBUG: getProviderName - providerId:', providerId);
+    console.log('DEBUG: getProviderName - providers:', providers);
+    console.log('DEBUG: getProviderName - providers length:', providers?.length);
+    
     // Si providers está vacío o no cargado, mostrar el ID temporalmente
     if (!providers || providers.length === 0) {
+      console.log('DEBUG: getProviderName - providers vacío, retornando ID');
       return `(ID: ${providerId})`;
     }
+    
     const provider = providers.find((p: Provider) => p.id === providerId);
+    console.log('DEBUG: getProviderName - provider encontrado:', provider);
+    
     if (provider && provider.name) {
+      console.log('DEBUG: getProviderName - retornando nombre:', provider.name);
       return provider.name;
     } else {
+      console.log('DEBUG: getProviderName - provider no encontrado o sin nombre, retornando ID');
       return `(ID: ${providerId})`;
     }
   };
@@ -143,6 +153,10 @@ function OrdersPage({ user }: OrdersPageProps) {
     setSelectedOrder(order);
     setIsWhatsAppOpen(true);
   };
+  // Debug: mostrar datos de orders
+  console.log('DEBUG: orders data:', orders);
+  console.log('DEBUG: providers data:', providers);
+  
   // Ordenar órdenes por fecha descendente (created_at) - los más recientes primero
   const sortedOrders = [...orders].sort((a, b) => {
     const dateA = new Date(a.createdAt || a.orderDate || 0);
@@ -353,7 +367,7 @@ function OrdersPage({ user }: OrdersPageProps) {
                           )}
                           
                           {/* Descargar factura - cuando hay factura disponible */}
-                          {['factura_recibida','pagado','enviado','finalizado'].includes(order.status) && order.invoiceNumber && (
+                          {['factura_recibida','pagado','enviado','finalizado'].includes(order.status) && (
                             <a
                               href={order.receiptUrl || '/mock-factura.pdf'}
                               target="_blank"

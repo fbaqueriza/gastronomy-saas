@@ -47,6 +47,35 @@ function mapStockItemFromDb(item: any): StockItem {
   };
 }
 
+// Función para mapear Order de snake_case a camelCase
+function mapOrderFromDb(order: any): Order {
+  return {
+    ...order,
+    providerId: order.provider_id,
+    totalAmount: order.total_amount,
+    orderDate: order.order_date,
+    dueDate: order.due_date,
+    invoiceNumber: order.invoice_number,
+    bankInfo: order.bank_info,
+    receiptUrl: order.receipt_url,
+    createdAt: order.created_at,
+    updatedAt: order.updated_at,
+    id: order.id,
+    user_id: order.user_id,
+  };
+}
+
+// Función para mapear Provider de snake_case a camelCase
+function mapProviderFromDb(provider: any): Provider {
+  return {
+    ...provider,
+    createdAt: provider.created_at,
+    updatedAt: provider.updated_at,
+    id: provider.id,
+    user_id: provider.user_id,
+  };
+}
+
 export const DataProvider: React.FC<{ userEmail?: string; userId?: string; children: React.ReactNode }> = ({ userEmail, userId, children }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -110,8 +139,8 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
       supabase.from('orders').select('*').eq('user_id', currentUserId),
       supabase.from('stock').select('*').eq('user_id', currentUserId),
     ]);
-    setProviders(provs || []);
-    setOrders(ords || []);
+    setProviders((provs || []).map(mapProviderFromDb));
+    setOrders((ords || []).map(mapOrderFromDb));
     setStockItems((stocks || []).map(mapStockItemFromDb));
     setLoading(false);
   }, [currentUserId]);
