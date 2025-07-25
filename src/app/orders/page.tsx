@@ -107,11 +107,13 @@ function OrdersPage({ user }: OrdersPageProps) {
     switch (status) {
       case 'pending':
         return <Clock className="h-4 w-4 text-yellow-500" />;
-      case 'sent':
+      case 'enviado':
         return <Send className="h-4 w-4 text-blue-500" />;
-      case 'confirmed':
+      case 'factura_recibida':
+        return <FileText className="h-4 w-4 text-purple-500" />;
+      case 'pagado':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'delivered':
+      case 'finalizado':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'cancelled':
         return <AlertCircle className="h-4 w-4 text-red-500" />;
@@ -232,7 +234,10 @@ function OrdersPage({ user }: OrdersPageProps) {
     }
   };
   const handleUploadPaymentProof = async (orderId: string, file: File) => {
-    const url = URL.createObjectURL(file);
+    // Crear un nombre único para el archivo
+    const fileName = `comprobante_${orderId}_${Date.now()}.${file.name.split('.').pop()}`;
+    const url = `/uploads/${fileName}`; // URL simulada para el comprobante
+    
     const order = orders.find(o => o.id === orderId);
     if (order) {
       await updateOrder({ ...order, receiptUrl: url, status: 'pagado' });
@@ -621,6 +626,101 @@ function OrdersPage({ user }: OrdersPageProps) {
                   </ol>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Tabla de Pedidos */}
+        <div className="mt-8 px-4 sm:px-0">
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">
+                Tabla de Pedidos ({orders.length})
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Vista completa de todos los pedidos con sus archivos
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Fecha
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Proveedor
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Estado
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Monto
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Factura
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Comprobante
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedOrders.map((order) => (
+                    <tr key={order.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatDate(order.orderDate)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {getProviderName(order.providerId)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          {getStatusIcon(order.status)}
+                          <span className="ml-2 text-sm text-gray-900">
+                            {order.status === 'pending' && 'Pendiente'}
+                            {order.status === 'enviado' && 'Enviado'}
+                            {order.status === 'factura_recibida' && 'Factura Recibida'}
+                            {order.status === 'pagado' && 'Pagado'}
+                            {order.status === 'finalizado' && 'Finalizado'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {showPrice(order.status) ? `${order.totalAmount} ${order.currency}` : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {order.invoiceNumber ? (
+                          <a
+                            href="/mock-factura.pdf"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 underline"
+                          >
+                            Descargar
+                          </a>
+                        ) : (
+                          <span className="text-gray-400">No disponible</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {order.receiptUrl ? (
+                          <a
+                            href={order.receiptUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 underline"
+                          >
+                            Ver
+                          </a>
+                        ) : (
+                          <span className="text-gray-400">No disponible</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
