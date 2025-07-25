@@ -194,15 +194,23 @@ function OrdersPage({ user }: OrdersPageProps) {
         // Buscar el pedido actualizado después del fetchAll
         const updatedOrders = await supabase.from('orders').select('*').eq('id', orderId).single();
         if (updatedOrders.data && updatedOrders.data.status === 'enviado') {
+          // Obtener datos del proveedor para la orden de pago
+          const provider = providers.find(p => p.id === order.providerId);
+          const bankInfo = {
+            bankName: provider?.name || 'Banco Mock',
+            accountNumber: provider?.cbu || '1234567890'
+          };
+          const totalAmount = 1000; // Monto extraído de la factura PDF
+          
           const orderWithInvoice = {
             ...updatedOrders.data,
             status: 'factura_recibida' as 'factura_recibida',
             invoiceNumber: 'INV-MOCK-001',
             receiptUrl: '/mock-factura.pdf',
-            bankInfo: { bankName: 'Banco Mock', accountNumber: '1234567890' },
-            totalAmount: updatedOrders.data.total_amount || 1000,
+            bankInfo: bankInfo,
+            totalAmount: totalAmount,
           } as Order;
-          console.log('DEBUG: Actualizando pedido con factura:', orderWithInvoice);
+          console.log('DEBUG: Actualizando pedido con factura y orden de pago:', orderWithInvoice);
           await updateOrder(orderWithInvoice);
         } else {
           console.log('DEBUG: Pedido no encontrado o estado incorrecto:', updatedOrders.data?.status);
@@ -253,8 +261,22 @@ function OrdersPage({ user }: OrdersPageProps) {
   };
   // 4. Mostrar precio solo si estado es 'factura_recibida', 'pagado', 'enviado', 'finalizado'
   const showPrice = (status: string) => ['factura_recibida','pagado','enviado','finalizado'].includes(status);
-  // 5. Al apretar 'ver resumen' en la orden nueva, no cerrar el modal (asegurar onClose solo se llama en el botón cancelar o submit)
-  // 6. Asegurar que las órdenes se muestran con las más recientes arriba (ya se usa sortedOrders)
+  
+  // Función para mostrar orden de pago
+  const showPaymentOrder = (order: Order) => {
+    if (order.status !== 'factura_recibida' || !order.bankInfo) return null;
+    
+    return (
+      <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+        <h4 className="text-sm font-medium text-blue-900 mb-2">Orden de Pago</h4>
+        <div className="text-xs text-blue-800 space-y-1">
+          <div><strong>Banco:</strong> {order.bankInfo.bankName}</div>
+          <div><strong>Cuenta:</strong> {order.bankInfo.accountNumber}</div>
+          <div><strong>Monto a pagar:</strong> {order.totalAmount} {order.currency}</div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -344,71 +366,72 @@ function OrdersPage({ user }: OrdersPageProps) {
                             <span className="text-gray-400">+{order.items.length - 2} más</span>
                           )}
                         </div>
+                        
+                        {/* Orden de pago - solo en estado factura_recibida */}
+                        {showPaymentOrder(order)}
                       </div>
                       {/* Lado derecho: botones de acción */}
-                      <div className="flex flex-col items-end gap-1 sm:w-5/12 min-w-[160px]">
-                        <div className="flex flex-row flex-wrap gap-2 justify-end">
-                          {/* Chat - siempre visible */}
+                      <div className="flex flex-col items-end gap-2 sm:w-5/12 min-w-[160px]">
+                        {/* Chat - siempre visible */}
+                        <button
+                          onClick={() => handleOrderClick(order)}
+                          className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        >
+                          <MessageSquare className="h-4 w-4 mr-1" /> Chat
+                        </button>
+                        
+                        {/* Enviar pedido - solo en estado pending */}
+                        {order.status === 'pending' && (
                           <button
-                            onClick={() => handleOrderClick(order)}
-                            className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            onClick={() => handleSendOrder(order.id)}
+                            className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
                           >
-                            <MessageSquare className="h-4 w-4 mr-1" /> Chat
+                            <Send className="h-4 w-4 mr-1" /> Enviar pedido
                           </button>
-                          
-                          {/* Enviar pedido - solo en estado pending */}
-                          {order.status === 'pending' && (
-                            <button
-                              onClick={() => handleSendOrder(order.id)}
-                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
-                            >
-                              <Send className="h-4 w-4 mr-1" /> Enviar pedido
-                            </button>
-                          )}
-                          
-                          {/* Descargar factura - cuando hay factura disponible */}
-                          {['factura_recibida','pagado','enviado','finalizado'].includes(order.status) && (
-                            <a
-                              href={order.receiptUrl || '/mock-factura.pdf'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
-                            >
-                              <FileText className="h-4 w-4 mr-1" /> Descargar factura
-                            </a>
-                          )}
-                          
-                          {/* Subir comprobante - solo en estado factura_recibida */}
-                          {order.status === 'factura_recibida' && (
-                            <ComprobanteButton
-                              comprobante={order.receiptUrl ? { url: order.receiptUrl, name: 'Comprobante' } : null}
-                              onUpload={(file) => handleUploadPaymentProof(order.id, file)}
-                              onView={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
-                            />
-                          )}
-                          
-                          {/* Confirmar recepción - solo en estado pagado */}
-                          {order.status === 'pagado' && (
-                            <button
-                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-green-200 text-white bg-green-600 hover:bg-green-700 focus:ring-2 focus:ring-green-500"
-                              onClick={() => handleConfirmReception(order.id)}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" /> Confirmar recepción
-                            </button>
-                          )}
-                          
-                          {/* Ver comprobante - cuando hay comprobante disponible */}
-                          {['pagado','finalizado'].includes(order.status) && order.receiptUrl && (
-                            <a
-                              href={order.receiptUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
-                            >
-                              <Upload className="h-4 w-4 mr-1" /> Ver comprobante
-                            </a>
-                          )}
-                        </div>
+                        )}
+                        
+                        {/* Descargar factura - cuando hay factura disponible */}
+                        {['factura_recibida','pagado','enviado','finalizado'].includes(order.status) && (
+                          <a
+                            href={order.receiptUrl || '/mock-factura.pdf'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
+                          >
+                            <FileText className="h-4 w-4 mr-1" /> Descargar factura
+                          </a>
+                        )}
+                        
+                        {/* Subir comprobante - solo en estado factura_recibida */}
+                        {order.status === 'factura_recibida' && (
+                          <ComprobanteButton
+                            comprobante={order.receiptUrl ? { url: order.receiptUrl, name: 'Comprobante' } : null}
+                            onUpload={(file) => handleUploadPaymentProof(order.id, file)}
+                            onView={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
+                          />
+                        )}
+                        
+                        {/* Ver comprobante - cuando hay comprobante disponible */}
+                        {['pagado','finalizado'].includes(order.status) && order.receiptUrl && (
+                          <a
+                            href={order.receiptUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
+                          >
+                            <Upload className="h-4 w-4 mr-1" /> Ver comprobante
+                          </a>
+                        )}
+                        
+                        {/* Confirmar recepción - solo en estado pagado */}
+                        {order.status === 'pagado' && (
+                          <button
+                            className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-green-200 text-white bg-green-600 hover:bg-green-700 focus:ring-2 focus:ring-green-500"
+                            onClick={() => handleConfirmReception(order.id)}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" /> Confirmar recepción
+                          </button>
+                        )}
                       </div>
                     </div>
                   </li>
