@@ -22,6 +22,7 @@ import {
   Clipboard,
   Check,
   Download,
+  ChevronDown,
 } from 'lucide-react';
 import { DataProvider, useData } from '../../components/DataProvider';
 import es from '../../locales/es';
@@ -52,6 +53,7 @@ function OrdersPage({ user }: OrdersPageProps) {
   // Only keep local state for modal and suggestedOrder
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [suggestedOrder, setSuggestedOrder] = useState<any>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   // Remove all other local state for orders/providers/stockItems
   // All handlers now use Supabase CRUD only
   const handleCreateOrder = async (orderData: {
@@ -85,6 +87,18 @@ function OrdersPage({ user }: OrdersPageProps) {
   const handleSuggestedOrderCreate = (suggestedOrder: any) => {
     setSuggestedOrder(suggestedOrder);
     setIsCreateModalOpen(true);
+  };
+
+  const toggleOrderExpansion = (orderId: string) => {
+    setExpandedOrders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(orderId)) {
+        newSet.delete(orderId);
+      } else {
+        newSet.add(orderId);
+      }
+      return newSet;
+    });
   };
 
   
@@ -471,7 +485,7 @@ function OrdersPage({ user }: OrdersPageProps) {
                 {filteredFinishedOrders.map((order) => (
                   <li key={order.id} className="py-3 px-2 flex flex-col gap-1 bg-white rounded-lg shadow mb-3">
                     <div className="flex flex-col sm:flex-row justify-between gap-4 w-full">
-                      {/* Lado izquierdo: info del pedido */}
+                      {/* Lado izquierdo: info básica del pedido */}
                       <div className="flex-1 min-w-0 sm:w-7/12">
                         <div className="flex items-center gap-2 mb-1">
                           {getStatusIcon(order.status)}
@@ -489,14 +503,16 @@ function OrdersPage({ user }: OrdersPageProps) {
                           <span>•</span>
                           <span>{formatDate(order.orderDate)}</span>
                         </div>
-                        <div className="flex flex-col gap-1 mt-1 text-xs text-gray-600">
-                          {order.items.slice(0, 2).map((item, index) => (
-                            <span key={index}>{item.productName} - {item.quantity} {item.unit}</span>
-                          ))}
-                          {order.items.length > 2 && (
-                            <span className="text-gray-400">+{order.items.length - 2} más</span>
-                          )}
-                        </div>
+                        {/* Botón para expandir/contraer detalles */}
+                        <button
+                          onClick={() => toggleOrderExpansion(order.id)}
+                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 mt-1"
+                        >
+                          <ChevronDown 
+                            className={`h-3 w-3 transition-transform ${expandedOrders.has(order.id) ? 'rotate-180' : ''}`} 
+                          />
+                          {expandedOrders.has(order.id) ? 'Ocultar detalles' : 'Ver detalles'}
+                        </button>
                       </div>
                       {/* Lado derecho: botón de documentos */}
                       <div className="flex flex-col items-end gap-1 sm:w-5/12 min-w-[160px] justify-center">
@@ -508,13 +524,6 @@ function OrdersPage({ user }: OrdersPageProps) {
                             <div className="py-1 flex flex-col gap-1">
                               <button
                                 className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={!order.receiptUrl}
-                                onClick={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
-                              >
-                                {order.receiptUrl ? 'Descargar pedido' : 'Pedido no disponible'}
-                              </button>
-                              <button
-                                className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={!order.invoiceNumber}
                                 onClick={() => { if(order.invoiceNumber) window.open('/mock-factura.pdf', '_blank'); }}
                               >
@@ -522,16 +531,67 @@ function OrdersPage({ user }: OrdersPageProps) {
                               </button>
                               <button
                                 className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={!order.receiptUrl} // Changed to order.receiptUrl
+                                disabled={!order.receiptUrl}
                                 onClick={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
                               >
-                                {order.receiptUrl ? 'Descargar comprobante' : 'Comprobante no disponible'}
+                                {order.receiptUrl ? 'Ver comprobante' : 'Comprobante no disponible'}
                               </button>
                             </div>
                           </Menu.Items>
                         </Menu>
                       </div>
                     </div>
+                    
+                    {/* Detalles expandibles */}
+                    {expandedOrders.has(order.id) && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Información del proveedor */}
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-900 mb-2">Información del proveedor</h4>
+                            <div className="text-xs text-gray-600 space-y-1">
+                              <div><strong>Proveedor:</strong> {getProviderName(order.providerId)}</div>
+                              <div><strong>Fecha del pedido:</strong> {formatDate(order.orderDate)}</div>
+                              <div><strong>Fecha de vencimiento:</strong> {formatDate(order.dueDate)}</div>
+                              {order.notes && (
+                                <div><strong>Notas:</strong> {order.notes}</div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Información de pago */}
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-900 mb-2">Información de pago</h4>
+                            <div className="text-xs text-gray-600 space-y-1">
+                              <div><strong>Total:</strong> {order.totalAmount} {order.currency}</div>
+                              {order.invoiceNumber && (
+                                <div><strong>Número de factura:</strong> {order.invoiceNumber}</div>
+                              )}
+                              {order.bankInfo && (
+                                <div><strong>CBU:</strong> {order.bankInfo.accountNumber}</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Lista de ítems */}
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-gray-900 mb-2">Ítems del pedido</h4>
+                          <div className="bg-gray-50 rounded-md p-3">
+                            <div className="space-y-2">
+                              {order.items.map((item, index) => (
+                                <div key={index} className="flex justify-between text-xs">
+                                  <span className="text-gray-700">{item.productName}</span>
+                                  <span className="text-gray-600">
+                                    {item.quantity} {item.unit} - ${item.total}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
