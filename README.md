@@ -78,6 +78,28 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key_supabase
 
 Estas variables también deben configurarse en Vercel para producción.
 
+## Automatizar la creación de usuarios en la tabla `users` (Postgres trigger)
+
+Agrega este trigger y función en Supabase para que cada vez que se registre un usuario nuevo en Auth, se cree automáticamente en tu tabla `users`:
+
+```sql
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.users (id, email, created_at)
+  values (new.id, new.email, now())
+  on conflict (id) do nothing;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+```
+
+Esto asegura que la relación foránea de `user_id` siempre apunte a un usuario existente.
+
 ## Contributing
 
 This is a demo application showcasing a complete SaaS solution for gastronomy management.

@@ -295,12 +295,11 @@ function ProvidersPage() {
     async (rowsToDelete: Provider[]) => {
       if (!rowsToDelete || rowsToDelete.length === 0 || !user) return;
       setLoading(true);
-      for (const row of rowsToDelete) {
-        try {
-          await deleteProvider(row.id, user.id);
-        } catch (err) {
-          console.error('Error deleting provider:', row, err);
-        }
+      try {
+        const ids = rowsToDelete.map(row => row.id);
+        await deleteProvider(ids, user.id, true); // batch delete
+      } catch (err) {
+        console.error('Error deleting providers:', rowsToDelete, err);
       }
       setLoading(false);
     },
@@ -364,6 +363,39 @@ function ProvidersPage() {
     return result;
   }
 
+  const normalizeHeader = (str: string) => str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // quita tildes
+    .replace(/\s+/g, '') // quita espacios
+    .replace(/[^a-z0-9]/g, ''); // quita caracteres especiales
+
+  const headerMap: Record<string, string> = {
+    'nombre': 'name',
+    'name': 'name',
+    'contacto': 'contactName',
+    'contactname': 'contactName',
+    'categoría': 'categories',
+    'categoria': 'categories',
+    'categorias': 'categories',
+    'category': 'categories',
+    'tags': 'tags',
+    'notas': 'notes',
+    'notes': 'notes',
+    'cbu': 'cbu',
+    'alias': 'alias',
+    'razonsocial': 'razonSocial',
+    'razon social': 'razonSocial',
+    'cuit': 'cuitCuil',
+    'cuitcuil': 'cuitCuil',
+    'email': 'email',
+    'phone': 'phone',
+    'direccion': 'address',
+    'address': 'address',
+    'catalogos': 'catalogs',
+    'catalogs': 'catalogs',
+  };
+
   const handleImport = useCallback((file: File) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -373,31 +405,8 @@ function ProvidersPage() {
         setImportMessage('El archivo CSV está vacío o no tiene datos.');
         return;
       }
-      const rawHeaders = lines[0].split(',').map(h => h.trim().toLowerCase());
-      // Normalizar headers a camelCase
-      const headerMap: Record<string, string> = {
-        'nombre': 'name',
-        'name': 'name',
-        'contacto': 'contactName',
-        'contactname': 'contactName',
-        'categoría': 'categories',
-        'category': 'categories',
-        'categorias': 'categories',
-        'tags': 'tags',
-        'notas': 'notes',
-        'notes': 'notes',
-        'cbu': 'cbu',
-        'alias': 'alias',
-        'razon social': 'razonSocial',
-        'razonsocial': 'razonSocial',
-        'cuit': 'cuitCuil',
-        'cuitcuil': 'cuitCuil',
-        'email': 'email',
-        'phone': 'phone',
-        'address': 'address',
-        'catalogos': 'catalogs',
-        'catalogs': 'catalogs',
-      };
+      // Usar parseCsvRow para headers y filas
+      const rawHeaders = parseCsvRow(lines[0]).map(h => normalizeHeader(h));
       const headers = rawHeaders.map(h => headerMap[h] || h);
       const required = ['name', 'categories'];
       const missing = required.filter(r => !headers.includes(r));
@@ -406,13 +415,14 @@ function ProvidersPage() {
         return;
       }
       const importedProviders = lines.slice(1).map(line => {
-        const values = line.split(',');
+        const values = parseCsvRow(line);
         const row: any = {};
         headers.forEach((h, i) => { row[h] = values[i] ?? ''; });
+        const categories = row.categories ? String(row.categories).split(';').map((c: string) => c.trim()).filter(Boolean) : [];
         return {
           name: row.name || '',
           contactName: row.contactName || '',
-          categories: row.categories ? String(row.categories).split(';').map((c: string) => c.trim()).filter(Boolean) : [],
+          categories,
           tags: row.tags ? String(row.tags).split(';').map((t: string) => t.trim()).filter(Boolean) : [],
           notes: row.notes || '',
           cbu: row.cbu || '',
@@ -422,7 +432,7 @@ function ProvidersPage() {
           email: row.email || '',
           phone: row.phone || '',
           address: row.address || '',
-          catalogs: [], // No se importa desde CSV, se deja vacío para cumplir el tipado
+          catalogs: [],
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -431,7 +441,6 @@ function ProvidersPage() {
       let successCount = 0;
       let errorCount = 0;
       try {
-        // Mapear todos los proveedores a snake_case para Supabase
         const safeItems = importedProviders.map(item => ({
           name: item.name,
           contact_name: item.contactName,
@@ -451,7 +460,7 @@ function ProvidersPage() {
           user_id: user.id,
         }));
         if (safeItems.length > 0) {
-          await addProvider(safeItems, user.id, true); // batch insert
+          await addProvider(safeItems, user.id, true);
           successCount = safeItems.length;
         }
       } catch (err: any) {

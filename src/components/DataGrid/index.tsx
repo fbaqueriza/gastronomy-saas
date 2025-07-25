@@ -234,13 +234,18 @@ export default function DataGrid({
 
   // Handle delete selected rows
   const handleDeleteSelected = useCallback(() => {
-    if (selectedRows.size === 0 || !onDeleteRows) return;
-
-    const rowsToDelete = filteredData.filter((row) => selectedRows.has(row.id));
-
-    onDeleteRows(rowsToDelete);
-    setSelectedRows(new Set());
-  }, [selectedRows, filteredData, onDeleteRows]);
+    if (!Array.isArray(data) || data.length === 0) return;
+    const rowsToDelete = Array.from(selectedRows).map(id => data.find((row: any) => row.id === id)).filter(Boolean);
+    if (rowsToDelete.length === 0) return;
+    if (typeof onDeleteRows === 'function') {
+      try {
+        onDeleteRows(rowsToDelete);
+      } catch (err) {
+        alert('Error al eliminar filas. Revisa la consola para más detalles.');
+        console.error('Error al eliminar filas:', err);
+      }
+    }
+  }, [selectedRows, data, onDeleteRows]);
 
   const table = useReactTable({
     data: filteredData,

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../../../hooks/useAuth';
+import { useSupabaseAuth } from '../../../hooks/useSupabaseAuth';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -12,7 +12,7 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  const { signUp } = useAuth();
+  const { signUp } = useSupabaseAuth();
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);

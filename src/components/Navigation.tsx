@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useSupabaseAuth } from '../hooks/useSupabaseAuth';
 import { Menu, X, User, LogOut, Settings, Bell } from 'lucide-react';
 import es from '../locales/es';
 
 export default function Navigation() {
-  const { user, signOut } = useAuth();
+  const { user, signOut } = useSupabaseAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 

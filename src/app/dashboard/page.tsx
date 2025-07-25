@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useAuth } from '../../hooks/useAuth';
+import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
 import Navigation from "../../components/Navigation";
 import SuggestedOrders from "../../components/SuggestedOrders";
 import CreateOrderModal from "../../components/CreateOrderModal";
@@ -25,8 +25,6 @@ import {
 import {
   DataProvider,
   useData,
-  ChatProvider,
-  useChat,
 } from "../../components/DataProvider";
 import es from "../../locales/es";
 import WhatsAppChat from "../../components/WhatsAppChat";
@@ -35,7 +33,7 @@ import { Menu } from '@headlessui/react';
 import { useRouter } from 'next/navigation';
 
 export default function DashboardPageWrapper() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useSupabaseAuth();
   const router = useRouter();
   if (!authLoading && !user) {
     if (typeof window !== 'undefined') router.push('/auth/login');
@@ -45,43 +43,16 @@ export default function DashboardPageWrapper() {
     return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div><p className="mt-4 text-gray-600">Cargando...</p></div></div>;
   }
   return (
-    <DataProvider userEmail={user?.email ?? undefined}>
+    <DataProvider userEmail={user?.email ?? undefined} userId={user?.id}>
       <DashboardPage />
     </DataProvider>
   );
 }
 
 function DashboardPage() {
-  const { user, loading: authLoading } = useAuth();
-  const {
-    orders,
-    setOrders,
-    providers,
-    setProviders,
-    stockItems,
-    setStockItems,
-  } = useData();
-  const isSeedUser = user?.email === "test@test.com";
-  const mockConversations = isSeedUser
-    ? providers.reduce((acc, provider) => {
-        acc[provider.id] = {
-          providerId: provider.id,
-          messages: [
-            {
-              id: '1',
-              orderId: '',
-              providerId: provider.id,
-              type: 'order',
-              message: `¡Hola ${provider.name}! Este es un mensaje de prueba para ${provider.name}.`,
-              status: 'sent',
-              createdAt: new Date(),
-            },
-          ],
-          unreadCount: 1,
-        };
-        return acc;
-      }, {} as any)
-    : undefined;
+  const { user, loading: authLoading } = useSupabaseAuth();
+  const { orders, providers, stockItems } = useData();
+  // Remove isSeedUser and mockConversations logic
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [suggestedOrder, setSuggestedOrder] = useState<any>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -100,40 +71,29 @@ function DashboardPage() {
   }
   if (!user) return null;
   return (
-    <ChatProvider
+    <DashboardPageContent
+      orders={orders}
       providers={providers}
-      initialConversations={mockConversations}
-    >
-      <DashboardPageContent
-        orders={orders}
-        setOrders={setOrders}
-        providers={providers}
-        setProviders={setProviders}
-        stockItems={stockItems}
-        setStockItems={setStockItems}
-        isCreateModalOpen={isCreateModalOpen}
-        setIsCreateModalOpen={setIsCreateModalOpen}
-        suggestedOrder={suggestedOrder}
-        setSuggestedOrder={setSuggestedOrder}
-        isChatOpen={isChatOpen}
-        setIsChatOpen={setIsChatOpen}
-        user={user}
-        selectedProviderId={typeof selectedProviderId === 'string' ? selectedProviderId : null}
-        setSelectedProviderId={setSelectedProviderId}
-        paymentProofs={paymentProofs}
-        setPaymentProofs={setPaymentProofs}
-      />
-    </ChatProvider>
+      stockItems={stockItems}
+      isCreateModalOpen={isCreateModalOpen}
+      setIsCreateModalOpen={setIsCreateModalOpen}
+      suggestedOrder={suggestedOrder}
+      setSuggestedOrder={setSuggestedOrder}
+      isChatOpen={isChatOpen}
+      setIsChatOpen={setIsChatOpen}
+      user={user}
+      selectedProviderId={typeof selectedProviderId === 'string' ? selectedProviderId : null}
+      setSelectedProviderId={setSelectedProviderId}
+      paymentProofs={paymentProofs}
+      setPaymentProofs={setPaymentProofs}
+    />
   );
 }
 
 function DashboardPageContent({
   orders,
-  setOrders,
   providers,
-  setProviders,
   stockItems,
-  setStockItems,
   isCreateModalOpen,
   setIsCreateModalOpen,
   suggestedOrder,
@@ -147,11 +107,8 @@ function DashboardPageContent({
   setPaymentProofs,
 }: {
   orders: Order[];
-  setOrders: (orders: Order[]) => void;
   providers: Provider[];
-  setProviders: (providers: Provider[]) => void;
   stockItems: StockItem[];
-  setStockItems: (stockItems: StockItem[]) => void;
   isCreateModalOpen: boolean;
   setIsCreateModalOpen: (open: boolean) => void;
   suggestedOrder: any;
@@ -164,8 +121,7 @@ function DashboardPageContent({
   paymentProofs: { [orderId: string]: { url: string; name: string } };
   setPaymentProofs: (proofs: { [orderId: string]: { url: string; name: string } }) => void;
 }) {
-  const { conversations, openProviderId, setOpenProviderId, markAsRead } =
-    useChat();
+  const { addOrder } = useData();
   // Calculate pending orders (not delivered)
   const pendingOrders = orders.filter((order: Order) => order.status !== 'delivered').length;
   // Calculate upcoming orders (stock items with próxima orden within 7 days)
@@ -213,15 +169,13 @@ function DashboardPageContent({
     const provider = providers.find((p: Provider) => p.id === providerId);
     return provider?.name || "Unknown Provider";
   };
-  const handleCreateOrder = (orderData: {
+  const handleCreateOrder = async (orderData: {
     providerId: string;
     items: OrderItem[];
     notes: string;
   }) => {
     if (!user) return;
-    const newOrder: Order = {
-      id: Date.now().toString(),
-      user_id: user.id,
+    const newOrder: Partial<Order> = {
       orderNumber: `ORD-${String(orders.length + 1).padStart(3, "0")}`,
       providerId: orderData.providerId,
       items: orderData.items,
@@ -236,11 +190,11 @@ function DashboardPageContent({
       notes: orderData.notes,
       createdAt: new Date(),
       updatedAt: new Date(),
+      user_id: user.id,
     };
-    setOrders([...orders, newOrder]);
+    await addOrder(newOrder, user.id);
     setIsCreateModalOpen(false);
     setSuggestedOrder(null);
-    setSelectedProviderId(null);
   };
   const handleSuggestedOrderCreate = (suggestedOrder: any) => {
     setSuggestedOrder(suggestedOrder);
@@ -253,20 +207,22 @@ function DashboardPageContent({
   };
   // Helper: get last order date for a provider
   function getProviderLastOrderDate(providerId: string): Date | null {
-    const providerOrders = orders.filter((o: any) => o.providerId === providerId);
+    const providerOrders = Array.isArray(orders) ? orders.filter((o: any) => o.providerId === providerId) : [];
     if (providerOrders.length === 0) return null;
     return new Date(Math.max(...providerOrders.map((o: any) => new Date(o.orderDate).getTime())));
   }
   // Helper: check if provider has active/pending orders
   function providerHasActiveOrder(providerId: string): boolean {
-    return orders.some((o: any) => o.providerId === providerId && ['pending', 'sent', 'confirmed'].includes(o.status));
+    return Array.isArray(orders) && orders.some((o: any) => o.providerId === providerId && ['pending', 'sent', 'confirmed'].includes(o.status));
   }
   // Helper: check if provider has imminent order (next order for any of their products within 7 days)
   function providerHasImminentOrder(providerId: string): boolean {
     const now = new Date();
     const weekFromNow = new Date();
     weekFromNow.setDate(now.getDate() + 7);
-    return stockItems.some((item: any) => item.associatedProviders.includes(providerId) && item.nextOrder && new Date(item.nextOrder) <= weekFromNow);
+    return Array.isArray(stockItems) && stockItems.some((item: any) =>
+      Array.isArray(item.associatedProviders) && item.associatedProviders.includes(providerId) && item.nextOrder && new Date(item.nextOrder) <= weekFromNow
+    );
   }
   // Sort providers
   const sortedProviders = [...providers].sort((a, b) => {
@@ -322,30 +278,30 @@ function DashboardPageContent({
                 <PendingOrderList
                   orders={orders.filter((o: Order) => o.status === 'pending' || o.status === 'sent' || o.status === 'confirmed')}
                   providers={providers}
-                  onViewChat={(order) => setOpenProviderId(order.providerId)}
+                  onViewChat={(order) => {}}
                   onUploadReceipt={(order, file) => {
                     const url = URL.createObjectURL(file);
                     setPaymentProofs({ ...paymentProofs, [order.id]: { url, name: file.name } });
-                    setOrders(orders.map((o: Order) => {
-                      if (o.id === order.id) {
-                        if (o.status === 'sent') {
-                          return { ...o, status: 'confirmed', updatedAt: new Date() };
-                        }
-                        return { ...o };
-                      }
-                      return o;
-                    }));
+                    // setOrders(orders.map((o: Order) => { // This line was removed as per the edit hint
+                    //   if (o.id === order.id) {
+                    //     if (o.status === 'sent') {
+                    //       return { ...o, status: 'confirmed', updatedAt: new Date() };
+                    //     }
+                    //     return { ...o };
+                    //   }
+                    //   return o;
+                    // }));
                   }}
                   onSendOrder={(order) => {
-                    setOrders(orders.map((o: Order) =>
-                      o.id === order.id ? { ...o, status: 'sent', updatedAt: new Date() } : o
-                    ));
+                    // setOrders(orders.map((o: Order) => // This line was removed as per the edit hint
+                    //   o.id === order.id ? { ...o, status: 'sent', updatedAt: new Date() } : o
+                    // ));
                   }}
                   paymentProofs={paymentProofs}
                   onConfirmReception={(order) => {
-                    setOrders(orders.map((o: Order) =>
-                      o.id === order.id ? { ...o, status: 'delivered', updatedAt: new Date() } : o
-                    ));
+                    // setOrders(orders.map((o: Order) => // This line was removed as per the edit hint
+                    //   o.id === order.id ? { ...o, status: 'delivered', updatedAt: new Date() } : o
+                    // ));
                   }}
                 />
               )}
@@ -379,8 +335,9 @@ function DashboardPageContent({
                     .sort((a: any, b: any) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime())
                     .map((order: any) => {
                       const provider = providers.find((p: any) => p.id === order.providerId);
-                      const conv = conversations?.[provider?.id ?? ''];
-                      const lastMsg = conv?.messages[conv.messages.length - 1]?.message || 'Sin mensajes';
+                      // const conv = mockConversations?.[provider?.id ?? '']; // This line was removed as per the edit hint
+                      // const lastMsg = conv?.messages[conv.messages.length - 1]?.message || 'Sin mensajes'; // This line was removed as per the edit hint
+                      const lastMsg = 'Sin mensajes'; // Placeholder as mockConversations is removed
                       return (
                         <li key={order.id} className="py-3 flex flex-col gap-1">
                           <div className="flex items-center justify-between">
@@ -477,7 +434,7 @@ function DashboardPageContent({
                   const providerUpcoming = providers
                     .map((provider: Provider) => {
                       const nextOrderDates = stockItems
-                        .filter((item: StockItem) => item.associatedProviders.includes(provider.id) && item.nextOrder)
+                        .filter((item: StockItem) => Array.isArray(item.associatedProviders) && item.associatedProviders.includes(provider.id) && item.nextOrder)
                         .map((item: StockItem) => item.nextOrder ? new Date(item.nextOrder as string | number | Date) : null)
                         .filter((d): d is Date => d !== null);
                       const nextExpectedOrderDate = nextOrderDates.length > 0 ? new Date(Math.min(...nextOrderDates.map((d: Date) => d.getTime()))) : null;
@@ -561,19 +518,19 @@ function DashboardPageContent({
         selectedProviderId={typeof selectedProviderId === 'string' ? selectedProviderId : null}
       />
       {/* Split-pane chat UI */}
-      {openProviderId && (
+      {false && (
         <div className="fixed top-0 right-0 h-full w-full md:w-1/2 lg:w-1/3 z-40 bg-white shadow-xl flex flex-col">
           <WhatsAppChat
             orderId={orders[0]?.id || ""}
             providerName={
-              providers.find((p: Provider) => p.id === openProviderId)?.name ||
+              providers.find((p: Provider) => p.id === selectedProviderId)?.name ||
               "Proveedor"
             }
             providerPhone={
-              providers.find((p: Provider) => p.id === openProviderId)?.phone || ""
+              providers.find((p: Provider) => p.id === selectedProviderId)?.phone || ""
             }
-            isOpen={!!openProviderId}
-            onClose={() => setOpenProviderId(null)}
+            isOpen={!!selectedProviderId}
+            onClose={() => setSelectedProviderId(null)}
           />
         </div>
       )}

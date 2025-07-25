@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../../../hooks/useAuth';
+import { useSupabaseAuth } from '../../../hooks/useSupabaseAuth';
 import { Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
@@ -22,7 +22,7 @@ export default function LoginPage() {
     }
   }, []);
 
-  const { signIn } = useAuth();
+  const { signIn } = useSupabaseAuth();
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);

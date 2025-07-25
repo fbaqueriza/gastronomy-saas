@@ -117,17 +117,18 @@ function StockPage({ user }: StockPageProps) {
                 </span>
               </div>
             );
-          } else if (current) {
+          } else if (current && typeof current === 'string' && current.trim() !== '') {
+            // Mostrar el valor real aunque no sea un ID válido
             return (
               <div className="w-full h-full" onClick={() => setEditing(true)} style={{ cursor: 'pointer' }}>
                 <span
-                  className="flex items-center bg-red-100 text-red-800 rounded px-2 py-0.5 text-sm font-medium"
-                  title="Proveedor no existe"
+                  className="flex items-center bg-yellow-100 text-yellow-800 rounded px-2 py-0.5 text-sm font-medium"
+                  title="Valor no es un ID válido"
                 >
                   {current}
                   <button
                     type="button"
-                    className="ml-1 text-red-700 hover:text-red-900 focus:outline-none"
+                    className="ml-1 text-yellow-700 hover:text-red-900 focus:outline-none"
                     title="Quitar proveedor"
                     onClick={e => { e.stopPropagation(); handleChange(''); }}
                   >
@@ -193,27 +194,41 @@ function StockPage({ user }: StockPageProps) {
                 )}
                 {current.map((provId: string) => {
                   const prov = getProviderById(provId);
-                  return (
-                    <span
-                      key={provId}
-                      className={`flex items-center rounded px-2 py-0.5 text-sm font-medium ${prov ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
-                      title={prov ? prov.name : 'Proveedor no existe'}
-                      style={{ width: '100%', minWidth: 0, maxWidth: 200, overflowWrap: 'break-word', wordBreak: 'break-word' }}
-                    >
-                      {prov ? prov.name : provId}
-                      <button
-                        type="button"
-                        className={`ml-1 ${prov ? 'text-green-700 hover:text-red-600' : 'text-red-700 hover:text-red-900'} focus:outline-none`}
-                        title="Quitar proveedor"
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleChange(current.filter((n: string) => n !== provId));
-                        }}
+                  if (prov) {
+                    return (
+                      <span
+                        key={provId}
+                        className="flex items-center rounded px-2 py-0.5 text-sm font-medium bg-green-100 text-green-800"
+                        title={prov.name}
                       >
-                        ×
-                      </button>
-                    </span>
-                  );
+                        {prov.name}
+                      </span>
+                    );
+                  } else if (provId && typeof provId === 'string' && provId.trim() !== '') {
+                    // Mostrar el valor real aunque no sea un ID válido y permitir borrarlo
+                    return (
+                      <span
+                        key={provId}
+                        className="flex items-center rounded px-2 py-0.5 text-sm font-medium bg-yellow-100 text-yellow-800"
+                        title="Valor no es un ID válido"
+                      >
+                        {provId}
+                        <button
+                          type="button"
+                          className="ml-1 text-yellow-700 hover:text-red-900 focus:outline-none"
+                          title="Quitar proveedor inválido"
+                          onClick={e => {
+                            e.stopPropagation();
+                            const filtered = current.filter((n: string) => n !== provId);
+                            handleChange(filtered);
+                          }}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  }
+                  return null;
                 })}
               </div>
               {editing && (
@@ -318,12 +333,11 @@ function StockPage({ user }: StockPageProps) {
     async (rowsToDelete: any[]) => {
       if (!rowsToDelete || rowsToDelete.length === 0) return;
       setLoading(true);
-      for (const row of rowsToDelete) {
-        try {
-          await deleteStockItem(row.id, user.id);
-        } catch (err) {
-          console.error('Error deleting stock item:', row, err);
-        }
+      try {
+        const ids = rowsToDelete.map(row => row.id);
+        await deleteStockItem(ids, user.id, true); // batch delete
+      } catch (err) {
+        console.error('Error deleting stock items:', rowsToDelete, err);
       }
       setLoading(false);
     },
@@ -380,27 +394,31 @@ function StockPage({ user }: StockPageProps) {
         setImportMessage('El archivo CSV está vacío o no tiene datos.');
         return;
       }
-      const rawHeaders = lines[0].split(',').map(h => h.trim());
-      // Función para normalizar headers (trim, lowercase, sin acentos, sin espacios)
+      // Limpiar BOM y parsear headers con parseCsvRow
+      let rawHeaders = parseCsvRow(lines[0]);
+      if (rawHeaders[0].charCodeAt(0) === 0xFEFF) {
+        rawHeaders[0] = rawHeaders[0].slice(1);
+      }
+      // Normalizar headers (igual que en proveedores)
       const normalizeHeader = (str: string) => str
         .toLowerCase()
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // quita tildes
-        .replace(/\s+/g, '') // quita espacios
-        .replace(/[^a-z0-9]/g, ''); // quita caracteres especiales
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '')
+        .replace(/[^a-z0-9]/g, '');
       const headerMap: Record<string, string> = {
         'producto': 'productName',
         'productname': 'productName',
         'product_name': 'productName',
         'categoria': 'category',
-        'categoría': 'category', // acepta con tilde
+        'categoría': 'category',
         'category': 'category',
         'cantidad': 'quantity',
         'quantity': 'quantity',
         'unidad': 'unit',
         'unit': 'unit',
         'frecuenciadereposicion': 'restockFrequency',
-        'frecuenciadereposición': 'restockFrequency', // acepta con tilde
+        'frecuenciadereposición': 'restockFrequency',
         'restockfrequency': 'restockFrequency',
         'restock_frequency': 'restockFrequency',
         'frecuencia': 'restockFrequency',
@@ -410,44 +428,49 @@ function StockPage({ user }: StockPageProps) {
         'associatedproviders': 'associatedProviders',
         'associated_providers': 'associatedProviders',
         'proveedorpreferido': 'preferredProvider',
-        'proveedorpreferído': 'preferredProvider', // tilde
+        'proveedorpreferído': 'preferredProvider',
         'preferredprovider': 'preferredProvider',
         'preferred_provider': 'preferredProvider',
         'ultimaorden': 'lastOrdered',
-        'últimaorden': 'lastOrdered', // tilde
+        'últimaorden': 'lastOrdered',
         'lastordered': 'lastOrdered',
         'proximaorden': 'nextOrder',
-        'próximaorden': 'nextOrder', // tilde
+        'próximaorden': 'nextOrder',
         'nextorder': 'nextOrder',
         'createdat': 'createdAt',
         'created_at': 'createdAt',
         'updatedat': 'updatedAt',
         'updated_at': 'updatedAt',
       };
-      // Normalizar headers del CSV
       const normalizedRawHeaders = rawHeaders.map(h => normalizeHeader(h));
       const headers = normalizedRawHeaders.map(h => headerMap[h] || h);
+      console.log('HEADERS:', headers);
       const required = ['productName', 'category', 'quantity', 'unit', 'restockFrequency'];
       const missing = required.filter(r => !headers.includes(r));
       if (missing.length > 0) {
         setImportMessage('Faltan columnas requeridas: ' + missing.join(', '));
         return;
       }
-      // Filtrar filas sin productName
       const importedStock = lines.slice(1).map(line => {
-        const values = line.split(',');
+        const values = parseCsvRow(line);
         const row: any = {};
         headers.forEach((h, i) => { row[h] = values[i] ?? ''; });
-        // Normalizar tipos y arrays
+        console.log('ROW:', row);
         let associatedProviders: string[] = [];
         if (row.associatedProviders && typeof row.associatedProviders === 'string') {
           associatedProviders = row.associatedProviders.split(';').map((p: string) => p.trim()).filter(Boolean);
         }
-        const preferredProvider = row.preferredProvider && row.preferredProvider.trim() !== '' ? row.preferredProvider : null;
+        const providerNameToId = (name: string) => {
+          if (!name) return '';
+          const prov = providers?.find((p: any) => p.name?.toLowerCase().trim() === name.toLowerCase().trim());
+          return prov ? prov.id : name;
+        };
+        associatedProviders = associatedProviders.map(providerNameToId);
+        let preferredProvider = row.preferredProvider ? row.preferredProvider.trim() : '';
+        preferredProvider = providerNameToId(preferredProvider);
         const lastOrdered = row.lastOrdered && !isNaN(Date.parse(row.lastOrdered)) ? new Date(row.lastOrdered) : null;
         const nextOrder = row.nextOrder && !isNaN(Date.parse(row.nextOrder)) ? new Date(row.nextOrder) : null;
         const quantity = row.quantity && !isNaN(Number(row.quantity)) ? Number(row.quantity) : 0;
-        // Conversión de frecuencia en español a valor interno
         const freqMap: Record<string, string> = {
           'diario': 'daily',
           'semanal': 'weekly',
@@ -456,7 +479,6 @@ function StockPage({ user }: StockPageProps) {
         };
         let restockFrequency = row.restockFrequency?.toLowerCase();
         restockFrequency = freqMap[restockFrequency] || restockFrequency;
-        // Si la frecuencia no es válida, dejarla vacía
         const allowedFrequencies = ['daily','weekly','monthly','custom'];
         const finalRestockFrequency = allowedFrequencies.includes(restockFrequency) ? restockFrequency : '';
         return {
@@ -477,38 +499,38 @@ function StockPage({ user }: StockPageProps) {
       setLoading(true);
       let successCount = 0;
       let errorCount = 0;
-      for (const item of importedStock) {
-        try {
-          // Mapear a snake_case para Supabase
-          const safeItem = {
-            product_name: item.productName,
-            category: item.category,
-            quantity: item.quantity,
-            unit: item.unit,
-            restock_frequency: item.restockFrequency,
-            associated_providers: item.associatedProviders,
-            preferred_provider: item.preferredProvider,
-            last_ordered: item.lastOrdered,
-            next_order: item.nextOrder,
-            created_at: item.createdAt,
-            updated_at: item.updatedAt,
-            user_id: user.id,
-          };
-          await addStockItem(safeItem, user.id);
-          successCount++;
-        } catch (err: any) {
-          errorCount++;
-          let errorMsg = 'Error desconocido';
-          if (err && (err.message || err.details)) {
-            errorMsg = err.message || err.details;
-          } else if (typeof err === 'string') {
-            errorMsg = err;
-          } else if (err && err.toString) {
-            errorMsg = err.toString();
-          }
-          console.error('Error importing stock item:', item, errorMsg);
-          setImportMessage(`Error al importar producto: ${item.productName || ''}. Detalle: ${errorMsg}`);
+      try {
+        const safeItems = importedStock.map(item => ({
+          product_name: item.productName,
+          category: item.category,
+          quantity: item.quantity,
+          unit: item.unit,
+          restock_frequency: item.restockFrequency,
+          associated_providers: item.associatedProviders,
+          preferred_provider: item.preferredProvider,
+          last_ordered: item.lastOrdered,
+          next_order: item.nextOrder,
+          created_at: item.createdAt,
+          updated_at: item.updatedAt,
+          user_id: user.id,
+        }));
+        if (safeItems.length > 0) {
+          await addStockItem(safeItems, user.id, true); // batch insert
+          successCount = safeItems.length;
         }
+      } catch (err: any) {
+        errorCount = importedStock.length;
+        console.error('Error importing stock batch:', err);
+        let errorMsg = 'Error desconocido';
+        if (err && (err.message || err.details)) {
+          errorMsg = err.message || err.details;
+        } else if (typeof err === 'string') {
+          errorMsg = err;
+        } else if (err && err.toString) {
+          errorMsg = err.toString();
+        }
+        console.error('Error importing stock batch:', errorMsg);
+        setImportMessage(`Error al importar productos. Detalle: ${errorMsg}`);
       }
       setLoading(false);
       if (errorCount === 0) {
@@ -518,7 +540,7 @@ function StockPage({ user }: StockPageProps) {
       }
     };
     reader.readAsText(file);
-  }, [addStockItem, user]);
+  }, [addStockItem, providers, user]);
 
   // Remove lowStockItems and quick stats that depend on removed columns
 
@@ -749,6 +771,7 @@ function StockPage({ user }: StockPageProps) {
   );
 }
 
+// Función robusta para parsear filas CSV (ya existe en el archivo, reutilizar)
 function parseCsvRow(row: string): string[] {
   const result: string[] = [];
   let current = '';
