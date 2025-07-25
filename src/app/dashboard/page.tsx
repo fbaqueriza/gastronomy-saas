@@ -31,6 +31,7 @@ import WhatsAppChat from "../../components/WhatsAppChat";
 import PendingOrderList from '../../components/PendingOrderList';
 import { Menu } from '@headlessui/react';
 import { useRouter } from 'next/navigation';
+import supabase from '../../lib/supabaseClient';
 
 export default function DashboardPageWrapper() {
   const { user, loading: authLoading } = useSupabaseAuth();
@@ -121,8 +122,16 @@ function DashboardPageContent({
   paymentProofs: { [orderId: string]: { url: string; name: string } };
   setPaymentProofs: (proofs: { [orderId: string]: { url: string; name: string } }) => void;
 }) {
-  const { addOrder } = useData();
-  // Calculate pending orders (not delivered)
+  const { addOrder, updateOrder, fetchAll } = useData();
+  
+  // Ordenar órdenes por fecha descendente (created_at) - los más recientes primero
+  const sortedOrders = [...orders].sort((a, b) => {
+    const dateA = new Date(a.createdAt || a.orderDate || 0);
+    const dateB = new Date(b.createdAt || b.orderDate || 0);
+    return dateB.getTime() - dateA.getTime();
+  });
+  const currentOrders = sortedOrders.filter(order => !['finalizado', 'cancelled', 'delivered'].includes(order.status));
+  const finishedOrders = sortedOrders.filter(order => ['finalizado', 'delivered'].includes(order.status));
   const pendingOrders = orders.filter((order: Order) => order.status !== 'delivered').length;
   // Calculate upcoming orders (stock items with próxima orden within 7 days)
   const upcomingOrders = stockItems.filter((item: StockItem) => {
@@ -208,6 +217,92 @@ function DashboardPageContent({
     setSelectedProviderId((suggestedOrder?.suggestedProviders?.[0]?.id as string) ?? null);
     setIsCreateModalOpen(true);
   };
+
+  const handleSendOrder = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      console.log('DEBUG: Enviando pedido', orderId, 'estado actual:', order.status);
+      await updateOrder({ ...order, status: 'enviado' });
+      console.log('DEBUG: Pedido enviado, esperando factura...');
+      
+      setTimeout(async () => {
+        console.log('DEBUG: Simulando recepción de factura...');
+        // Refetch orders para obtener el estado actualizado
+        await fetchAll();
+        // Buscar el pedido actualizado después del fetchAll
+        const updatedOrders = await supabase.from('orders').select('*').eq('id', orderId).single();
+        if (updatedOrders.data && updatedOrders.data.status === 'enviado') {
+          // Obtener datos del proveedor para la orden de pago
+          const provider = providers.find(p => p.id === order.providerId);
+          const bankInfo = {
+            accountNumber: provider?.cbu || '1234567890'
+          };
+          const totalAmount = 1000; // Monto extraído de la factura PDF
+
+          const orderWithInvoice = {
+            ...updatedOrders.data,
+            status: 'factura_recibida' as 'factura_recibida',
+            invoiceNumber: 'INV-MOCK-001',
+            receiptUrl: '/mock-factura.pdf',
+            bankInfo: bankInfo,
+            totalAmount: totalAmount,
+          } as Order;
+          console.log('DEBUG: Actualizando pedido con factura y orden de pago:', orderWithInvoice);
+          await updateOrder(orderWithInvoice);
+        } else {
+          console.log('DEBUG: Pedido no encontrado o estado incorrecto:', updatedOrders.data?.status);
+        }
+      }, 2000);
+    }
+  };
+
+  const handleUploadPaymentProof = async (orderId: string, file: File) => {
+    try {
+      // Crear un nombre único para el archivo
+      const fileExt = file.name.split('.').pop();
+      const fileName = `comprobante_${orderId}_${Date.now()}.${fileExt}`;
+      
+      // Crear una URL de datos (data URL) que funcione localmente
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const dataUrl = e.target?.result as string;
+        
+        console.log('DEBUG: Simulando subida de comprobante:', fileName);
+        console.log('DEBUG: Data URL del comprobante creada');
+        
+        // Actualizar la orden con la data URL del comprobante
+        const order = orders.find(o => o.id === orderId);
+        if (order) {
+          await updateOrder({ ...order, receiptUrl: dataUrl, status: 'pagado' });
+          console.log('DEBUG: Orden actualizada con comprobante');
+        }
+      };
+      
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error en handleUploadPaymentProof:', error);
+    }
+  };
+
+  const handleConfirmReception = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      await updateOrder({ ...order, status: 'finalizado' });
+    }
+  };
+
+  const formatDate = (date: Date | string | undefined) => {
+    if (!date) return '';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
   const handleProviderOrder = (providerId: string) => {
     setSelectedProviderId(providerId ?? null);
     setIsCreateModalOpen(true);
@@ -263,52 +358,120 @@ function DashboardPageContent({
             {/* Pedidos pendientes */}
             <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-6 mb-6 shadow">
               <h2 className="text-xl font-bold text-yellow-800 mb-4">Pedidos pendientes</h2>
-              {orders.filter((o: Order) => o.status === 'pending' || o.status === 'sent' || o.status === 'confirmed').length === 0 ? (
-                <ul className="divide-y divide-yellow-100">
-                  {/* Mock pending order for visual testing */}
-                  <li className="py-3 flex flex-col gap-1 opacity-60">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="font-medium text-gray-900">Proveedor Demo</span>
-                        <span className="ml-2 text-gray-500 text-sm">{new Date().toLocaleDateString()}</span>
-                        <span className="ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-200 text-yellow-800">En curso</span>
+              {currentOrders.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-gray-500 mb-4">No hay pedidos pendientes</div>
+                  <button
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear nuevo pedido
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {currentOrders.slice(0, 5).map((order) => (
+                    <div key={order.id} className="bg-white rounded-lg p-4 border border-yellow-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          {getStatusIcon(order.status)}
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {getProviderName(order.providerId)}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {formatDate(order.createdAt || order.orderDate)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {order.status === 'pending' && (
+                            <button
+                              onClick={() => handleSendOrder(order.id)}
+                              className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                            >
+                              Enviar pedido
+                            </button>
+                          )}
+                          {order.status === 'enviado' && (
+                            <button
+                              onClick={() => window.open('/mock-factura.pdf', '_blank')}
+                              className="px-3 py-1 text-xs font-medium text-white bg-purple-600 rounded hover:bg-purple-700"
+                            >
+                              Descargar factura
+                            </button>
+                          )}
+                          {order.status === 'factura_recibida' && (
+                            <div className="space-y-2">
+                              <div className="text-xs bg-blue-50 p-2 rounded">
+                                <div className="font-medium text-blue-900">Orden de Pago</div>
+                                <div className="text-blue-800">
+                                  <div>CBU: {order.bankInfo?.accountNumber || 'N/A'}</div>
+                                  <div>Monto: {order.totalAmount} {order.currency}</div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => document.getElementById(`file-input-${order.id}`)?.click()}
+                                className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 w-full"
+                              >
+                                Ver/Cargar comprobante
+                              </button>
+                              <input
+                                id={`file-input-${order.id}`}
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleUploadPaymentProof(order.id, file);
+                                }}
+                              />
+                            </div>
+                          )}
+                          {order.status === 'pagado' && (
+                            <div className="space-y-2">
+                              <button
+                                onClick={() => window.open(order.receiptUrl, '_blank')}
+                                className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"
+                              >
+                                Ver comprobante
+                              </button>
+                              <button
+                                onClick={() => handleConfirmReception(order.id)}
+                                className="px-3 py-1 text-xs font-medium text-white bg-orange-600 rounded hover:bg-orange-700 w-full"
+                              >
+                                Confirmar recepción
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <button className="text-blue-600 hover:underline text-sm flex items-center cursor-not-allowed" title="Ver chat">
-                        Ver más
-                        <svg className="ml-1 h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                      {order.items && order.items.length > 0 && (
+                        <div className="text-xs text-gray-600">
+                          {order.items.slice(0, 3).map((item, index) => (
+                            <span key={index} className="mr-2">
+                              {item.product}: {item.quantity} {item.unit}
+                            </span>
+                          ))}
+                          {order.items.length > 3 && (
+                            <span className="text-gray-400">+{order.items.length - 3} más</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {currentOrders.length > 5 && (
+                    <div className="text-center">
+                      <button
+                        onClick={() => window.location.href = '/orders'}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        Ver todos los pedidos ({currentOrders.length})
                       </button>
                     </div>
-                    <div className="text-xs text-gray-400 mt-1">Sin mensajes</div>
-                  </li>
-                </ul>
-              ) : (
-                <PendingOrderList
-                  orders={orders.filter((o: Order) => o.status === 'pending' || o.status === 'sent' || o.status === 'confirmed')}
-                  providers={providers}
-                  onViewChat={(order) => {}}
-                  onUploadReceipt={(order, file) => {
-                    // Crear una data URL para el comprobante
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                      const dataUrl = e.target?.result as string;
-                      console.log('DEBUG: Comprobante subido en dashboard:', file.name);
-                      console.log('DEBUG: Data URL creada para dashboard');
-                      setPaymentProofs({ ...paymentProofs, [order.id]: { url: dataUrl, name: file.name } });
-                    };
-                    reader.readAsDataURL(file);
-                  }}
-                  onSendOrder={(order) => {
-                    // setOrders(orders.map((o: Order) => // This line was removed as per the edit hint
-                    //   o.id === order.id ? { ...o, status: 'sent', updatedAt: new Date() } : o
-                    // ));
-                  }}
-                  paymentProofs={paymentProofs}
-                  onConfirmReception={(order) => {
-                    // setOrders(orders.map((o: Order) => // This line was removed as per the edit hint
-                    //   o.id === order.id ? { ...o, status: 'delivered', updatedAt: new Date() } : o
-                    // ));
-                  }}
-                />
+                  )}
+                </div>
               )}
             </div>
             {/* Divider */}
@@ -316,77 +479,75 @@ function DashboardPageContent({
             {/* Pedidos recientes */}
             <div className="bg-white rounded-lg p-6 shadow">
               <h2 className="text-lg font-bold text-gray-800 mb-4">Pedidos recientes</h2>
-              {(orders.filter((o: any) => (o.status === 'delivered' || o.status === 'confirmed') && new Date(o.orderDate) > new Date(Date.now() - 30*24*60*60*1000)).length === 0) ? (
-                <ul className="divide-y divide-gray-100">
-                  {/* Mock recent order for visual testing */}
-                  <li className="py-3 flex flex-col gap-1 opacity-60">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="font-medium text-gray-900">Proveedor Demo</span>
-                        <span className="ml-2 text-gray-500 text-sm">{new Date().toLocaleDateString()}</span>
-                        <span className="ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Completado</span>
+              {finishedOrders.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-gray-500">No hay pedidos finalizados recientes</div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {finishedOrders.slice(0, 5).map((order) => (
+                    <div key={order.id} className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          {getStatusIcon(order.status)}
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {getProviderName(order.providerId)}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {formatDate(order.createdAt || order.orderDate)}
+                            </div>
+                          </div>
+                        </div>
+                        <Menu as="div" className="relative inline-block text-left">
+                          <Menu.Button className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400">
+                            Ver documentos
+                          </Menu.Button>
+                          <Menu.Items className="absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-[9999]" style={{ top: 'auto', bottom: '100%', marginBottom: '0.5rem' }}>
+                            <div className="py-1 flex flex-col gap-1">
+                              <button
+                                className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!order.invoiceNumber}
+                                onClick={() => { if(order.invoiceNumber) window.open('/mock-factura.pdf', '_blank'); }}
+                              >
+                                {order.invoiceNumber ? 'Descargar factura' : 'Factura no disponible'}
+                              </button>
+                              <button
+                                className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!order.receiptUrl}
+                                onClick={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
+                              >
+                                {order.receiptUrl ? 'Ver comprobante' : 'Comprobante no disponible'}
+                              </button>
+                            </div>
+                          </Menu.Items>
+                        </Menu>
+                      </div>
+                      {order.items && order.items.length > 0 && (
+                        <div className="text-xs text-gray-600 mt-2">
+                          {order.items.slice(0, 3).map((item, index) => (
+                            <span key={index} className="mr-2">
+                              {item.product}: {item.quantity} {item.unit}
+                            </span>
+                          ))}
+                          {order.items.length > 3 && (
+                            <span className="text-gray-400">+{order.items.length - 3} más</span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                      <button className="text-blue-600 hover:underline text-sm flex items-center cursor-not-allowed" title="Ver chat">
-                        Ver más
-                        <svg className="ml-1 h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                  ))}
+                  {finishedOrders.length > 5 && (
+                    <div className="text-center">
+                      <button
+                        onClick={() => window.location.href = '/orders'}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        Ver todos los pedidos ({finishedOrders.length})
                       </button>
                     </div>
-                    <div className="text-xs text-gray-300 mt-1">Sin mensajes</div>
-                  </li>
-                </ul>
-              ) : (
-                <ul className="divide-y divide-gray-100">
-                  {orders.filter((o: any) => (o.status === 'delivered' || o.status === 'confirmed') && new Date(o.orderDate) > new Date(Date.now() - 30*24*60*60*1000))
-                    .sort((a: any, b: any) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime())
-                    .map((order: any) => {
-                      const provider = providers.find((p: any) => p.id === order.providerId);
-                      // const conv = mockConversations?.[provider?.id ?? '']; // This line was removed as per the edit hint
-                      // const lastMsg = conv?.messages[conv.messages.length - 1]?.message || 'Sin mensajes'; // This line was removed as per the edit hint
-                      const lastMsg = 'Sin mensajes'; // Placeholder as mockConversations is removed
-                      return (
-                        <li key={order.id} className="py-3 flex flex-col gap-1">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <span className="font-medium text-gray-900">{provider?.name || 'Proveedor'}</span>
-                              <span className="ml-2 text-gray-500 text-sm">{new Date(order.orderDate).toLocaleDateString()}</span>
-                              <span className="ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Completado</span>
-                  </div>
-                            <Menu as="div" className="relative inline-block text-left">
-  <Menu.Button className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400">
-    Ver documentos
-  </Menu.Button>
-  <Menu.Items className="absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-[9999]" style={{ top: 'auto', bottom: '100%', marginBottom: '0.5rem' }}>
-    <div className="py-1 flex flex-col gap-1">
-      <button
-        className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled={!order.receiptUrl}
-        onClick={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
-      >
-        {order.receiptUrl ? 'Descargar pedido' : 'Pedido no disponible'}
-      </button>
-      <button
-        className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled={!order.invoiceNumber}
-        onClick={() => { if(order.invoiceNumber) window.open('/mock-factura.pdf', '_blank'); }}
-      >
-        {order.invoiceNumber ? 'Descargar factura' : 'Factura no disponible'}
-      </button>
-      <button
-        className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled={!paymentProofs[order.id]}
-        onClick={() => { if(paymentProofs[order.id]) window.open(paymentProofs[order.id].url, '_blank'); }}
-      >
-        {paymentProofs[order.id] ? 'Descargar comprobante' : 'Comprobante no disponible'}
-      </button>
-    </div>
-  </Menu.Items>
-</Menu>
-                  </div>
-                          <div className="text-xs text-gray-400 mt-1 truncate max-w-full" title={lastMsg}>{lastMsg.length > 80 ? lastMsg.slice(0, 80) + '…' : lastMsg}</div>
-                        </li>
-                      );
-                    })}
-                </ul>
+                  )}
+                </div>
               )}
             </div>
           </div>
