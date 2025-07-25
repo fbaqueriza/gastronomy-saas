@@ -59,24 +59,24 @@ function OrdersPage({ user }: OrdersPageProps) {
     notes: string;
   }) => {
     if (!user) return;
-    const newOrder: Partial<Order> = {
-      orderNumber: `ORD-${String(orders.length + 1).padStart(3, '0')}`,
-      providerId: orderData.providerId,
+    const newOrder = {
+      provider_id: orderData.providerId,
+      user_id: user.id,
       items: orderData.items,
       status: 'pending',
-      totalAmount: orderData.items.reduce((sum, item) => sum + item.total, 0),
+      total_amount: orderData.items.reduce((sum, item) => sum + item.total, 0),
       currency: 'EUR',
-      orderDate: new Date(),
-      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-      invoiceNumber: '',
-      bankInfo: {},
-      receiptUrl: '',
+      order_date: new Date(),
+      due_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      invoice_number: '',
+      bank_info: {},
+      receipt_url: '',
       notes: orderData.notes,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      created_at: new Date(),
+      updated_at: new Date(),
     };
-    console.log('DEBUG Pedido:', { newOrder, userId: user.id });
-    await addOrder(newOrder, user.id);
+    console.log('DEBUG Pedido:', JSON.stringify(newOrder, null, 2));
+    await addOrder(newOrder);
     setIsCreateModalOpen(false);
     setSuggestedOrder(null);
   };
