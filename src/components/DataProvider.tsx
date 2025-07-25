@@ -14,7 +14,7 @@ interface DataContextType {
   addProvider: (provider: Partial<Provider>, user_id: string) => Promise<any>;
   updateProvider: (provider: Provider) => Promise<void>;
   deleteProvider: (id: string, user_id: string) => Promise<void>;
-  addStockItem: (item: Partial<StockItem>, user_id: string) => Promise<void>;
+  addStockItem: (item: Partial<StockItem> | Partial<StockItem>[], user_id: string, batch?: boolean) => Promise<void>;
   updateStockItem: (item: StockItem) => Promise<void>;
   deleteStockItem: (id: string, user_id: string) => Promise<void>;
 }
