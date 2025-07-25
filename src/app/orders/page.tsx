@@ -123,13 +123,12 @@ function OrdersPage({ user }: OrdersPageProps) {
 
   // Add getProviderName helper
   const getProviderName = (providerId: string) => {
+    if (!providerId) return 'Proveedor desconocido';
     const provider = providers.find((p: Provider) => p.id === providerId);
     if (provider && provider.name) {
       return provider.name;
-    } else if (providerId) {
-      return `(ID: ${providerId})`;
     } else {
-      return 'Proveedor desconocido';
+      return `(ID: ${providerId})`;
     }
   };
   // Add state and handlers for WhatsApp chat
@@ -139,8 +138,12 @@ function OrdersPage({ user }: OrdersPageProps) {
     setSelectedOrder(order);
     setIsWhatsAppOpen(true);
   };
-  // Ordenar órdenes por fecha descendente (created_at)
-  const sortedOrders = [...orders].sort((a, b) => new Date(b.createdAt || b.orderDate).getTime() - new Date(a.createdAt || a.orderDate).getTime());
+  // Ordenar órdenes por fecha descendente (created_at) - los más recientes primero
+  const sortedOrders = [...orders].sort((a, b) => {
+    const dateA = new Date(a.createdAt || a.orderDate || 0);
+    const dateB = new Date(b.createdAt || b.orderDate || 0);
+    return dateB.getTime() - dateA.getTime();
+  });
   const currentOrders = sortedOrders.filter(order => !['finalizado', 'cancelled', 'delivered'].includes(order.status));
   let finishedOrders = sortedOrders.filter(order => ['finalizado', 'delivered'].includes(order.status));
 
@@ -217,7 +220,14 @@ function OrdersPage({ user }: OrdersPageProps) {
   const formatDate = (date: Date | string | undefined) => {
     if (!date) return '';
     const d = typeof date === 'string' ? new Date(date) : date;
-    return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
   // 4. Mostrar precio solo si estado es 'factura_recibida', 'pagado', 'enviado', 'finalizado'
   const showPrice = (status: string) => ['factura_recibida','pagado','enviado','finalizado'].includes(status);
@@ -316,14 +326,15 @@ function OrdersPage({ user }: OrdersPageProps) {
                       {/* Lado derecho: botones de acción */}
                       <div className="flex flex-col items-end gap-1 sm:w-5/12 min-w-[160px]">
                         <div className="flex flex-row flex-wrap gap-2 justify-end">
-                          {/* Chat */}
+                          {/* Chat - siempre visible */}
                           <button
                             onClick={() => handleOrderClick(order)}
                             className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                           >
                             <MessageSquare className="h-4 w-4 mr-1" /> Chat
                           </button>
-                          {/* Enviar pedido */}
+                          
+                          {/* Enviar pedido - solo en estado pending */}
                           {order.status === 'pending' && (
                             <button
                               onClick={() => handleSendOrder(order.id)}
@@ -332,7 +343,8 @@ function OrdersPage({ user }: OrdersPageProps) {
                               <Send className="h-4 w-4 mr-1" /> Enviar pedido
                             </button>
                           )}
-                          {/* Descargar factura */}
+                          
+                          {/* Descargar factura - cuando hay factura disponible */}
                           {['factura_recibida','pagado','enviado','finalizado'].includes(order.status) && order.invoiceNumber && (
                             <a
                               href={order.receiptUrl || '/mock-factura.pdf'}
@@ -343,7 +355,8 @@ function OrdersPage({ user }: OrdersPageProps) {
                               <FileText className="h-4 w-4 mr-1" /> Descargar factura
                             </a>
                           )}
-                          {/* Subir comprobante */}
+                          
+                          {/* Subir comprobante - solo en estado factura_recibida */}
                           {order.status === 'factura_recibida' && (
                             <ComprobanteButton
                               comprobante={order.receiptUrl ? { url: order.receiptUrl, name: 'Comprobante' } : null}
@@ -351,7 +364,8 @@ function OrdersPage({ user }: OrdersPageProps) {
                               onView={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
                             />
                           )}
-                          {/* Confirmar recepción */}
+                          
+                          {/* Confirmar recepción - solo en estado pagado */}
                           {order.status === 'pagado' && (
                             <button
                               className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-green-200 text-white bg-green-600 hover:bg-green-700 focus:ring-2 focus:ring-green-500"
@@ -360,7 +374,8 @@ function OrdersPage({ user }: OrdersPageProps) {
                               <CheckCircle className="h-4 w-4 mr-1" /> Confirmar recepción
                             </button>
                           )}
-                          {/* Ver comprobante */}
+                          
+                          {/* Ver comprobante - cuando hay comprobante disponible */}
                           {['pagado','finalizado'].includes(order.status) && order.receiptUrl && (
                             <a
                               href={order.receiptUrl}
