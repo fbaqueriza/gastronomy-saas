@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useAuth } from '../../hooks/useAuth';
+import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
 import Navigation from '../../components/Navigation';
 import SpreadsheetGrid from '../../components/DataGrid';
 import { StockItem } from '../../types';
@@ -32,7 +32,7 @@ function getRestockDays(frequency: string) {
 }
 
 export default function StockPageWrapper() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useSupabaseAuth();
   const router = useRouter();
   if (!authLoading && !user) {
     if (typeof window !== 'undefined') router.push('/auth/login');
@@ -42,16 +42,16 @@ export default function StockPageWrapper() {
     return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div><p className="mt-4 text-gray-600">Cargando...</p></div></div>;
   }
   return (
-    <DataProvider userEmail={user?.email ?? undefined}>
+    <DataProvider userEmail={user?.email ?? undefined} userId={user?.id}>
       {user && <StockPage user={user} />}
     </DataProvider>
   );
 }
 
-type StockPageProps = { user: import('firebase/auth').User };
+type StockPageProps = { user: any };
 function StockPage({ user }: StockPageProps) {
   // user y authLoading ya están definidos arriba
-  const { stockItems, providers, orders, addStockItem } = useData();
+  const { stockItems, providers, orders, addStockItem, deleteStockItem } = useData();
   const isSeedUser = user?.email === 'test@test.com';
 
   // Remove minimumQuantity and currentStock columns
@@ -299,7 +299,7 @@ function StockPage({ user }: StockPageProps) {
     if (!user) return;
     const newStockItem: StockItem = {
       id: Date.now().toString(),
-      user_id: user.uid,
+      user_id: user.id,
       productName: '',
       category: 'Other',
       quantity: 0,
@@ -315,13 +315,19 @@ function StockPage({ user }: StockPageProps) {
   }, [stockItems, user]);
 
   const handleDeleteRows = useCallback(
-    (rowsToDelete: any[]) => {
-      const idsToDelete = rowsToDelete.map((row) => row.id);
-      // setStockItems(
-      //   stockItems.filter((item) => !idsToDelete.includes(item.id)),
-      // ); // This line was removed
+    async (rowsToDelete: any[]) => {
+      if (!rowsToDelete || rowsToDelete.length === 0) return;
+      setLoading(true);
+      for (const row of rowsToDelete) {
+        try {
+          await deleteStockItem(row.id, user.id);
+        } catch (err) {
+          console.error('Error deleting stock item:', row, err);
+        }
+      }
+      setLoading(false);
     },
-    [stockItems],
+    [deleteStockItem, user]
   );
 
   const handleExport = useCallback(() => {
@@ -370,75 +376,135 @@ function StockPage({ user }: StockPageProps) {
     reader.onload = async (e) => {
       const text = e.target?.result as string;
       const lines = text.split('\n').filter(Boolean);
-      const normalize = (str: string) => str
-        .trim()
+      if (lines.length < 2) {
+        setImportMessage('El archivo CSV está vacío o no tiene datos.');
+        return;
+      }
+      const rawHeaders = lines[0].split(',').map(h => h.trim());
+      // Función para normalizar headers (trim, lowercase, sin acentos, sin espacios)
+      const normalizeHeader = (str: string) => str
         .toLowerCase()
-        .replace(/^common\./, '')
-        .replace(/[áàäâ]/g, 'a')
-        .replace(/[éèëê]/g, 'e')
-        .replace(/[íìïî]/g, 'i')
-        .replace(/[óòöô]/g, 'o')
-        .replace(/[úùüû]/g, 'u')
-        .replace(/ñ/g, 'n')
-        .replace(/\s+/g, '');
-      const headers = parseCsvRow(lines[0]).map(normalize);
-      const findHeader = (candidates: string[]) => {
-        for (const candidate of candidates) {
-          const idx = headers.findIndex(h => h.startsWith(normalize(candidate)));
-          if (idx !== -1) return idx;
-        }
-        return -1;
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // quita tildes
+        .replace(/\s+/g, '') // quita espacios
+        .replace(/[^a-z0-9]/g, ''); // quita caracteres especiales
+      const headerMap: Record<string, string> = {
+        'producto': 'productName',
+        'productname': 'productName',
+        'product_name': 'productName',
+        'categoria': 'category',
+        'categoría': 'category', // acepta con tilde
+        'category': 'category',
+        'cantidad': 'quantity',
+        'quantity': 'quantity',
+        'unidad': 'unit',
+        'unit': 'unit',
+        'frecuenciadereposicion': 'restockFrequency',
+        'frecuenciadereposición': 'restockFrequency', // acepta con tilde
+        'restockfrequency': 'restockFrequency',
+        'restock_frequency': 'restockFrequency',
+        'frecuencia': 'restockFrequency',
+        'frecuenciaderepocicion': 'restockFrequency',
+        'frecuenciareposicion': 'restockFrequency',
+        'proveedoresasociados': 'associatedProviders',
+        'associatedproviders': 'associatedProviders',
+        'associated_providers': 'associatedProviders',
+        'proveedorpreferido': 'preferredProvider',
+        'proveedorpreferído': 'preferredProvider', // tilde
+        'preferredprovider': 'preferredProvider',
+        'preferred_provider': 'preferredProvider',
+        'ultimaorden': 'lastOrdered',
+        'últimaorden': 'lastOrdered', // tilde
+        'lastordered': 'lastOrdered',
+        'proximaorden': 'nextOrder',
+        'próximaorden': 'nextOrder', // tilde
+        'nextorder': 'nextOrder',
+        'createdat': 'createdAt',
+        'created_at': 'createdAt',
+        'updatedat': 'updatedAt',
+        'updated_at': 'updatedAt',
       };
-      const importedStock = lines.slice(1).map((line: string, index: number) => {
-        const values = parseCsvRow(line).map((v: string) => v.trim());
-        const get = (candidates: string | string[]) => {
-          const keys = Array.isArray(candidates) ? candidates : [candidates];
-          const idx = findHeader(keys);
-          return idx !== -1 ? String(values[idx] ?? '') : '';
+      // Normalizar headers del CSV
+      const normalizedRawHeaders = rawHeaders.map(h => normalizeHeader(h));
+      const headers = normalizedRawHeaders.map(h => headerMap[h] || h);
+      const required = ['productName', 'category', 'quantity', 'unit', 'restockFrequency'];
+      const missing = required.filter(r => !headers.includes(r));
+      if (missing.length > 0) {
+        setImportMessage('Faltan columnas requeridas: ' + missing.join(', '));
+        return;
+      }
+      // Filtrar filas sin productName
+      const importedStock = lines.slice(1).map(line => {
+        const values = line.split(',');
+        const row: any = {};
+        headers.forEach((h, i) => { row[h] = values[i] ?? ''; });
+        // Normalizar tipos y arrays
+        let associatedProviders: string[] = [];
+        if (row.associatedProviders && typeof row.associatedProviders === 'string') {
+          associatedProviders = row.associatedProviders.split(';').map((p: string) => p.trim()).filter(Boolean);
+        }
+        const preferredProvider = row.preferredProvider && row.preferredProvider.trim() !== '' ? row.preferredProvider : null;
+        const lastOrdered = row.lastOrdered && !isNaN(Date.parse(row.lastOrdered)) ? new Date(row.lastOrdered) : null;
+        const nextOrder = row.nextOrder && !isNaN(Date.parse(row.nextOrder)) ? new Date(row.nextOrder) : null;
+        const quantity = row.quantity && !isNaN(Number(row.quantity)) ? Number(row.quantity) : 0;
+        // Conversión de frecuencia en español a valor interno
+        const freqMap: Record<string, string> = {
+          'diario': 'daily',
+          'semanal': 'weekly',
+          'mensual': 'monthly',
+          'personalizado': 'custom',
         };
-        const rf = get(['restockfrequency', 'frecuencia de reposicion', 'frecuencia de reposición']);
-        const validRF = ['daily', 'weekly', 'monthly', 'custom'];
-        const restockFrequency = validRF.includes(rf) ? rf as StockItem['restockFrequency'] : 'weekly';
+        let restockFrequency = row.restockFrequency?.toLowerCase();
+        restockFrequency = freqMap[restockFrequency] || restockFrequency;
         return {
-          id: (Date.now() + index).toString(),
-          productName: get(['productname', 'producto']),
-          category: (() => {
-            const val = get(['category', 'categoria', 'categoría']);
-            if (!val) return '';
-            return val.trim();
-          })(),
-          quantity: Number(get(['quantity', 'cantidad'])) || 0,
-          unit: get(['unit', 'unidad']),
-          restockFrequency,
-          associatedProviders: get(['associatedproviders', 'proveedores asociados'])
-            ? String(get(['associatedproviders', 'proveedores asociados'])).split(';').map((p: string) => p.trim())
-            : [],
-          preferredProvider: get(['preferredprovider', 'proveedor preferido']),
-          lastOrdered: get(['lastordered', 'ultima orden']) ? new Date(get(['lastordered', 'ultima orden'])) : undefined,
-          nextOrder: get(['nextorder', 'proxima orden']) ? new Date(get(['nextorder', 'proxima orden'])) : undefined,
+          productName: row.productName || '',
+          category: row.category || '',
+          quantity,
+          unit: row.unit || '',
+          restockFrequency: ['daily','weekly','monthly','custom'].includes(restockFrequency) ? restockFrequency : 'weekly',
+          associatedProviders,
+          preferredProvider,
+          lastOrdered,
+          nextOrder,
           createdAt: new Date(),
           updatedAt: new Date(),
-        } as StockItem;
-      });
+        };
+      })
+      .filter(item => item.productName && item.productName.trim() !== ''); // Solo importar si tiene productName
       setLoading(true);
       let successCount = 0;
       let errorCount = 0;
       for (const item of importedStock) {
         try {
-          const { id, ...itemWithoutId } = item;
+          // Mapear a snake_case para Supabase
           const safeItem = {
-            ...itemWithoutId,
-            associatedProviders: Array.isArray(itemWithoutId.associatedProviders)
-              ? itemWithoutId.associatedProviders
-              : (typeof itemWithoutId.associatedProviders === 'string' && itemWithoutId.associatedProviders ? String(itemWithoutId.associatedProviders).split(';').map((p: string) => p.trim()) : []),
-            user_id: user.uid,
+            product_name: item.productName,
+            category: item.category,
+            quantity: item.quantity,
+            unit: item.unit,
+            restock_frequency: item.restockFrequency,
+            associated_providers: item.associatedProviders,
+            preferred_provider: item.preferredProvider,
+            last_ordered: item.lastOrdered,
+            next_order: item.nextOrder,
+            created_at: item.createdAt,
+            updated_at: item.updatedAt,
+            user_id: user.id,
           };
-          console.log('Insertando stock item en Supabase:', safeItem);
-          await addStockItem(safeItem, user.uid);
+          await addStockItem(safeItem, user.id);
           successCount++;
-        } catch (err) {
+        } catch (err: any) {
           errorCount++;
-          console.error('Error importing stock item:', item, err);
+          let errorMsg = 'Error desconocido';
+          if (err && (err.message || err.details)) {
+            errorMsg = err.message || err.details;
+          } else if (typeof err === 'string') {
+            errorMsg = err;
+          } else if (err && err.toString) {
+            errorMsg = err.toString();
+          }
+          console.error('Error importing stock item:', item, errorMsg);
+          setImportMessage(`Error al importar producto: ${item.productName || ''}. Detalle: ${errorMsg}`);
         }
       }
       setLoading(false);
@@ -447,7 +513,6 @@ function StockPage({ user }: StockPageProps) {
       } else {
         setImportMessage(`Importación completada con ${successCount} éxitos y ${errorCount} errores. Revisa la consola para detalles.`);
       }
-      setTimeout(() => setImportMessage(null), 6000);
     };
     reader.readAsText(file);
   }, [addStockItem, user]);
