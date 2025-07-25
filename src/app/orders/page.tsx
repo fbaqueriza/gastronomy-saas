@@ -75,6 +75,7 @@ function OrdersPage({ user }: OrdersPageProps) {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+    console.log('DEBUG Pedido:', { newOrder, userId: user.id });
     await addOrder(newOrder, user.id);
     setIsCreateModalOpen(false);
     setSuggestedOrder(null);
