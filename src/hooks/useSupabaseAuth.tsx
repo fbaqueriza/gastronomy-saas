@@ -7,10 +7,12 @@ interface SupabaseAuthContextType {
   user: any;
   loading: boolean;
   needsEmailVerification: boolean;
+  emailVerified: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearEmailVerification: () => void;
+  clearEmailVerified: () => void;
 }
 
 const SupabaseAuthContext = createContext<SupabaseAuthContextType | undefined>(undefined);
@@ -19,6 +21,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
 
   useEffect(() => {
     // Manejo de access_token en el hash de la URL tras confirmación de Supabase
@@ -33,7 +36,8 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
             setUser(data.session?.user ?? null);
             setLoading(false);
             window.location.hash = '';
-            window.location.replace('/dashboard');
+            // Redirigir a la página de verificación exitosa
+            window.location.replace('/auth/email-verified');
           }
         });
       }
@@ -78,6 +82,10 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     setNeedsEmailVerification(false);
   };
 
+  const clearEmailVerified = () => {
+    setEmailVerified(false);
+  };
+
   const signOut = async () => {
     setLoading(true);
     await supabase.auth.signOut();
@@ -85,7 +93,17 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   };
 
   return (
-    <SupabaseAuthContext.Provider value={{ user, loading, needsEmailVerification, signIn, signUp, signOut, clearEmailVerification }}>
+    <SupabaseAuthContext.Provider value={{ 
+      user, 
+      loading, 
+      needsEmailVerification, 
+      emailVerified, 
+      signIn, 
+      signUp, 
+      signOut, 
+      clearEmailVerification, 
+      clearEmailVerified 
+    }}>
       {children}
     </SupabaseAuthContext.Provider>
   );
