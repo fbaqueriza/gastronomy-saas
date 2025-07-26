@@ -318,9 +318,11 @@ function DashboardPageContent({
     console.log('DEBUG: Chat clicked for order:', order.id);
   };
 
-  const openReceipt = (receiptUrl: string) => {
+  const openReceipt = (receiptUrl: string | undefined) => {
     // Función para abrir comprobantes (data URLs o URLs normales)
-    if (receiptUrl && receiptUrl.startsWith('data:')) {
+    if (!receiptUrl) return;
+    
+    if (receiptUrl.startsWith('data:')) {
       // Para data URLs, crear un blob y abrirlo
       const byteString = atob(receiptUrl.split(',')[1]);
       const mimeString = receiptUrl.split(',')[0].split(':')[1].split(';')[0];
@@ -332,7 +334,7 @@ function DashboardPageContent({
       const blob = new Blob([ab], { type: mimeString });
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
-    } else if (receiptUrl) {
+    } else {
       // Para URLs normales
       window.open(receiptUrl, '_blank');
     }
@@ -476,7 +478,7 @@ function DashboardPageContent({
                           {/* Ver comprobante - cuando hay comprobante disponible */}
                           {['pagado','finalizado'].includes(order.status) && order.receiptUrl && (
                             <button
-                              onClick={() => openReceipt(order.receiptUrl)}
+                              onClick={() => openReceipt(order.receiptUrl!)}
                               className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
                             >
                               <Upload className="h-4 w-4 mr-1" /> Ver comprobante
