@@ -29,6 +29,7 @@ import {
 import es from "../../locales/es";
 import WhatsAppChat from "../../components/WhatsAppChat";
 import PendingOrderList from '../../components/PendingOrderList';
+import ComprobanteButton from '../../components/ComprobanteButton';
 import { Menu } from '@headlessui/react';
 import { useRouter } from 'next/navigation';
 import supabase from '../../lib/supabaseClient';
@@ -305,6 +306,25 @@ function DashboardPageContent({
       minute: '2-digit'
     });
   };
+
+  const handleOrderClick = (order: Order) => {
+    // Función para manejar el clic en el pedido (chat)
+    console.log('DEBUG: Chat clicked for order:', order.id);
+  };
+
+  const showPaymentOrder = (order: Order) => {
+    if (order.status !== 'factura_recibida' || !order.bankInfo) return null;
+    
+    return (
+      <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+        <h4 className="text-sm font-medium text-blue-900 mb-2">Orden de Pago</h4>
+        <div className="text-xs text-blue-800 space-y-1">
+          <div><strong>CBU:</strong> {order.bankInfo.accountNumber}</div>
+          <div><strong>Monto a pagar:</strong> {order.totalAmount} {order.currency}</div>
+        </div>
+      </div>
+    );
+  };
   const handleProviderOrder = (providerId: string) => {
     setSelectedProviderId(providerId ?? null);
     setIsCreateModalOpen(true);
@@ -387,80 +407,84 @@ function DashboardPageContent({
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-col items-end gap-2">
+                          {/* Chat - siempre visible */}
+                          <button
+                            onClick={() => handleOrderClick(order)}
+                            className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            <MessageSquare className="h-4 w-4 mr-1" /> Chat
+                          </button>
+                          
+                          {/* Enviar pedido - solo en estado pending */}
                           {order.status === 'pending' && (
                             <button
                               onClick={() => handleSendOrder(order.id)}
-                              className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
                             >
-                              Enviar pedido
+                              <Send className="h-4 w-4 mr-1" /> Enviar pedido
                             </button>
                           )}
-                          {order.status === 'enviado' && (
-                            <button
-                              onClick={() => window.open('/mock-factura.pdf', '_blank')}
-                              className="px-3 py-1 text-xs font-medium text-white bg-purple-600 rounded hover:bg-purple-700"
+                          
+                          {/* Descargar factura - cuando hay factura disponible */}
+                          {['factura_recibida','pagado','enviado','finalizado'].includes(order.status) && (
+                            <a
+                              href={order.receiptUrl || '/mock-factura.pdf'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
                             >
-                              Descargar factura
-                            </button>
+                              <FileText className="h-4 w-4 mr-1" /> Descargar factura
+                            </a>
                           )}
+                          
+                          {/* Subir comprobante - solo en estado factura_recibida */}
                           {order.status === 'factura_recibida' && (
-                            <div className="space-y-2">
-                              <div className="text-xs bg-blue-50 p-2 rounded">
-                                <div className="font-medium text-blue-900">Orden de Pago</div>
-                                <div className="text-blue-800">
-                                  <div>CBU: {order.bankInfo?.accountNumber || 'N/A'}</div>
-                                  <div>Monto: {order.totalAmount} {order.currency}</div>
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => document.getElementById(`file-input-${order.id}`)?.click()}
-                                className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 w-full"
-                              >
-                                Ver/Cargar comprobante
-                              </button>
-                              <input
-                                id={`file-input-${order.id}`}
-                                type="file"
-                                accept=".pdf,.jpg,.jpeg,.png"
-                                className="hidden"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleUploadPaymentProof(order.id, file);
-                                }}
-                              />
-                            </div>
+                            <ComprobanteButton
+                              comprobante={null}
+                              onUpload={(file) => handleUploadPaymentProof(order.id, file)}
+                              onView={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
+                            />
                           )}
+                          
+                          {/* Ver comprobante - cuando hay comprobante disponible */}
+                          {['pagado','finalizado'].includes(order.status) && order.receiptUrl && (
+                            <a
+                              href={order.receiptUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
+                            >
+                              <Upload className="h-4 w-4 mr-1" /> Ver comprobante
+                            </a>
+                          )}
+                          
+                          {/* Confirmar recepción - solo en estado pagado */}
                           {order.status === 'pagado' && (
-                            <div className="space-y-2">
-                              <button
-                                onClick={() => window.open(order.receiptUrl, '_blank')}
-                                className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"
-                              >
-                                Ver comprobante
-                              </button>
-                              <button
-                                onClick={() => handleConfirmReception(order.id)}
-                                className="px-3 py-1 text-xs font-medium text-white bg-orange-600 rounded hover:bg-orange-700 w-full"
-                              >
-                                Confirmar recepción
-                              </button>
-                            </div>
+                            <button
+                              className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-green-200 text-white bg-green-600 hover:bg-green-700 focus:ring-2 focus:ring-green-500"
+                              onClick={() => handleConfirmReception(order.id)}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" /> Confirmar recepción
+                            </button>
                           )}
                         </div>
                       </div>
-                      {order.items && order.items.length > 0 && (
-                        <div className="text-xs text-gray-600">
-                          {order.items.slice(0, 3).map((item, index) => (
-                            <span key={index} className="mr-2">
-                              {item.product}: {item.quantity} {item.unit}
-                            </span>
-                          ))}
-                          {order.items.length > 3 && (
-                            <span className="text-gray-400">+{order.items.length - 3} más</span>
-                          )}
-                        </div>
-                      )}
+                                             {order.items && order.items.length > 0 && (
+                         <div className="text-xs text-gray-600">
+                           {order.items.slice(0, 3).map((item, index) => (
+                             <span key={index} className="mr-2">
+                               {item.product}: {item.quantity} {item.unit}
+                             </span>
+                           ))}
+                           {order.items.length > 3 && (
+                             <span className="text-gray-400">+{order.items.length - 3} más</span>
+                           )}
+                         </div>
+                       )}
+                       
+                       {/* Orden de pago - solo en estado factura_recibida */}
+                       {showPaymentOrder(order)}
                     </div>
                   ))}
                   {currentOrders.length > 5 && (
