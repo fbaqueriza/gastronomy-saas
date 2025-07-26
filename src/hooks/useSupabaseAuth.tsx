@@ -6,9 +6,11 @@ import supabase from "../lib/supabaseClient";
 interface SupabaseAuthContextType {
   user: any;
   loading: boolean;
+  needsEmailVerification: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  clearEmailVerification: () => void;
 }
 
 const SupabaseAuthContext = createContext<SupabaseAuthContextType | undefined>(undefined);
@@ -16,6 +18,7 @@ const SupabaseAuthContext = createContext<SupabaseAuthContextType | undefined>(u
 export function SupabaseAuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
 
   useEffect(() => {
     // Manejo de access_token en el hash de la URL tras confirmación de Supabase
@@ -53,7 +56,13 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (error) throw error;
+    if (error) {
+      // Verificar si el error es por email no verificado
+      if (error.message.includes('Email not confirmed') || error.message.includes('email not confirmed')) {
+        setNeedsEmailVerification(true);
+      }
+      throw error;
+    }
   };
 
   const signUp = async (email: string, password: string) => {
@@ -61,6 +70,12 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     const { error } = await supabase.auth.signUp({ email, password });
     setLoading(false);
     if (error) throw error;
+    // Si el registro es exitoso, mostrar mensaje de verificación
+    setNeedsEmailVerification(true);
+  };
+
+  const clearEmailVerification = () => {
+    setNeedsEmailVerification(false);
   };
 
   const signOut = async () => {
@@ -70,7 +85,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   };
 
   return (
-    <SupabaseAuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <SupabaseAuthContext.Provider value={{ user, loading, needsEmailVerification, signIn, signUp, signOut, clearEmailVerification }}>
       {children}
     </SupabaseAuthContext.Provider>
   );
