@@ -174,15 +174,17 @@ function DashboardPageContent({
         return "bg-gray-100 text-gray-800";
     }
   };
-  // Añadir o reemplazar la función getProviderName para que devuelva siempre un string válido
-  const getProviderName = (providers: Provider[], providerId: string) => {
-    const provider = providers.find(p => p.id === providerId);
+  // Función getProviderName que usa el array providers del contexto
+  const getProviderName = (providerId: string) => {
+    if (!providerId) return 'Proveedor desconocido';
+    if (!providers || providers.length === 0) {
+      return `(ID: ${providerId})`;
+    }
+    const provider = providers.find((p: Provider) => p.id === providerId);
     if (provider && provider.name) {
       return provider.name;
-    } else if (providerId) {
-      return `(ID: ${providerId})`;
     } else {
-      return 'Proveedor desconocido';
+      return `(ID: ${providerId})`;
     }
   };
   const handleCreateOrder = async (orderData: {
