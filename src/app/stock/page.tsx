@@ -387,6 +387,23 @@ function StockPage({ user }: StockPageProps) {
     window.URL.revokeObjectURL(url);
   }, [stockItems]);
 
+  const handleDownloadTemplate = useCallback(() => {
+    const templateContent = `productName,category,quantity,unit,restockFrequency,associatedProviders,preferredProvider,lastOrdered,nextOrder
+Harina de trigo,Harinas,50,kg,weekly,Proveedor A;Proveedor B,Proveedor A,2025-07-20,2025-07-27
+Aceite de oliva,Aceites,20,lt,monthly,Proveedor C,Proveedor C,2025-07-15,2025-08-15
+Sal fina,Especias,100,kg,daily,Proveedor A,Proveedor A,2025-07-25,2025-07-26
+Azúcar blanca,Endulzantes,75,kg,weekly,Proveedor B,Proveedor B,2025-07-18,2025-07-25
+Huevos,Proteínas,200,unidades,daily,Proveedor D,Proveedor D,2025-07-25,2025-07-26`;
+    
+    const blob = new Blob([templateContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'stock_template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
 
@@ -454,7 +471,7 @@ function StockPage({ user }: StockPageProps) {
       const required = ['productName', 'category', 'quantity', 'unit', 'restockFrequency'];
       const missing = required.filter(r => !headers.includes(r));
       if (missing.length > 0) {
-        setImportMessage('Faltan columnas requeridas: ' + missing.join(', '));
+        setImportMessage(`Faltan columnas requeridas: ${missing.join(', ')}. El archivo debe contener las columnas: productName, category, quantity, unit, restockFrequency. Puedes descargar la plantilla desde el botón "Descargar plantilla" para ver el formato correcto.`);
         return;
       }
       const importedStock = lines.slice(1).map(line => {

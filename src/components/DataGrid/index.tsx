@@ -343,6 +343,42 @@ export default function DataGrid({
                 {'Export'}
               </button>
             )}
+
+            {/* Botón de descargar plantilla - solo mostrar si hay onImport */}
+            {onImport && (
+              <button
+                onClick={() => {
+                  // Crear contenido de plantilla basado en las columnas
+                  const templateHeaders = columns.map(col => col.key).join(',');
+                  const templateRow = columns.map(col => {
+                    // Valores de ejemplo según el tipo de columna
+                    if (col.key === 'productName') return 'Harina de trigo';
+                    if (col.key === 'category') return 'Harinas';
+                    if (col.key === 'quantity') return '50';
+                    if (col.key === 'unit') return 'kg';
+                    if (col.key === 'restockFrequency') return 'weekly';
+                    if (col.key === 'associatedProviders') return 'Proveedor A;Proveedor B';
+                    if (col.key === 'preferredProvider') return 'Proveedor A';
+                    if (col.key === 'lastOrdered') return '2025-07-20';
+                    if (col.key === 'nextOrder') return '2025-07-27';
+                    return '';
+                  }).join(',');
+                  
+                  const templateContent = `${templateHeaders}\n${templateRow}`;
+                  const blob = new Blob([templateContent], { type: 'text/csv;charset=utf-8;' });
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'template.csv';
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                }}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                {'Descargar plantilla'}
+              </button>
+            )}
           </div>
         </div>
       </div>
