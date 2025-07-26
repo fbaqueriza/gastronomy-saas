@@ -145,15 +145,17 @@ function DashboardPageContent({
   const totalProviders = providers.length;
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "pending":
+      case 'pending':
         return <Clock className="h-4 w-4 text-yellow-500" />;
-      case "sent":
+      case 'enviado':
         return <Send className="h-4 w-4 text-blue-500" />;
-      case "confirmed":
+      case 'factura_recibida':
+        return <FileText className="h-4 w-4 text-purple-500" />;
+      case 'pagado':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case "delivered":
+      case 'finalizado':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case "cancelled":
+      case 'cancelled':
         return <AlertCircle className="h-4 w-4 text-red-500" />;
       default:
         return <Clock className="h-4 w-4 text-gray-500" />;
@@ -278,6 +280,8 @@ function DashboardPageContent({
         if (order) {
           await updateOrder({ ...order, receiptUrl: dataUrl, status: 'pagado' });
           console.log('DEBUG: Orden actualizada con comprobante');
+          // Refetch para actualizar los datos en la UI
+          await fetchAll();
         }
       };
       
@@ -291,6 +295,8 @@ function DashboardPageContent({
     const order = orders.find(o => o.id === orderId);
     if (order) {
       await updateOrder({ ...order, status: 'finalizado' });
+      // Refetch para actualizar los datos en la UI
+      await fetchAll();
     }
   };
 
