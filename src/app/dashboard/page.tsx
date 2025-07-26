@@ -318,6 +318,26 @@ function DashboardPageContent({
     console.log('DEBUG: Chat clicked for order:', order.id);
   };
 
+  const openReceipt = (receiptUrl: string) => {
+    // Función para abrir comprobantes (data URLs o URLs normales)
+    if (receiptUrl && receiptUrl.startsWith('data:')) {
+      // Para data URLs, crear un blob y abrirlo
+      const byteString = atob(receiptUrl.split(',')[1]);
+      const mimeString = receiptUrl.split(',')[0].split(':')[1].split(';')[0];
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([ab], { type: mimeString });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } else if (receiptUrl) {
+      // Para URLs normales
+      window.open(receiptUrl, '_blank');
+    }
+  };
+
   const showPaymentOrder = (order: Order) => {
     if (order.status !== 'factura_recibida' || !order.bankInfo) return null;
     
@@ -435,7 +455,7 @@ function DashboardPageContent({
                           {/* Descargar factura - cuando hay factura disponible */}
                           {['factura_recibida','pagado','enviado','finalizado'].includes(order.status) && (
                             <a
-                              href={order.receiptUrl || '/mock-factura.pdf'}
+                              href="/mock-factura.pdf"
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
@@ -449,20 +469,18 @@ function DashboardPageContent({
                             <ComprobanteButton
                               comprobante={null}
                               onUpload={(file) => handleUploadPaymentProof(order.id, file)}
-                              onView={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
+                              onView={() => { if(order.receiptUrl) openReceipt(order.receiptUrl); }}
                             />
                           )}
                           
                           {/* Ver comprobante - cuando hay comprobante disponible */}
                           {['pagado','finalizado'].includes(order.status) && order.receiptUrl && (
-                            <a
-                              href={order.receiptUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              onClick={() => openReceipt(order.receiptUrl)}
                               className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
                             >
                               <Upload className="h-4 w-4 mr-1" /> Ver comprobante
-                            </a>
+                            </button>
                           )}
                           
                           {/* Confirmar recepción - solo en estado pagado */}
@@ -547,7 +565,7 @@ function DashboardPageContent({
                               <button
                                 className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={!order.receiptUrl}
-                                onClick={() => { if(order.receiptUrl) window.open(order.receiptUrl, '_blank'); }}
+                                onClick={() => { if(order.receiptUrl) openReceipt(order.receiptUrl); }}
                               >
                                 {order.receiptUrl ? 'Ver comprobante' : 'Comprobante no disponible'}
                               </button>
