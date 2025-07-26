@@ -579,7 +579,7 @@ function DashboardPageContent({
                         <div className="text-xs text-gray-600 mt-2">
                           {order.items.slice(0, 3).map((item, index) => (
                             <span key={index} className="mr-2">
-                              {item.product}: {item.quantity} {item.unit}
+                              {item.productName}: {item.quantity} {item.unit}
                             </span>
                           ))}
                           {order.items.length > 3 && (
