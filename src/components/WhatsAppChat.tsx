@@ -141,8 +141,8 @@ export default function WhatsAppChat({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md h-[600px] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md h-[600px] flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="bg-green-500 text-white p-4 rounded-t-lg">
           <div className="flex items-center justify-between">

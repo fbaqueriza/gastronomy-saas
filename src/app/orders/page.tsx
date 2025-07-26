@@ -7,6 +7,7 @@ import WhatsAppChat from '../../components/WhatsAppChat';
 import SuggestedOrders from '../../components/SuggestedOrders';
 import CreateOrderModal from '../../components/CreateOrderModal';
 import ComprobanteButton from '../../components/ComprobanteButton';
+import ChatPreview from '../../components/ChatPreview';
 import { Order, OrderItem, Provider, StockItem } from '../../types';
 import {
   Plus,
@@ -392,6 +393,24 @@ function OrdersPage({ user }: OrdersPageProps) {
                           <span>•</span>
                           <span>{formatDate(order.createdAt || order.orderDate)}</span>
                         </div>
+                        
+                        {/* Chat Preview - debajo de la fecha */}
+                        <div className="mb-1">
+                          <ChatPreview
+                            providerName={getProviderName(order.providerId)}
+                            orderId={order.id}
+                            onOpenChat={() => handleOrderClick(order)}
+                            hasUnreadMessages={false}
+                            lastMessage={{
+                              id: '1',
+                              type: 'received',
+                              content: '¡Hola! Tu pedido está siendo procesado. ¿Necesitas algo más?',
+                              timestamp: new Date(Date.now() - 3600000),
+                              status: 'read'
+                            }}
+                          />
+                        </div>
+                        
                         <div className="flex flex-col gap-1 mt-1 text-xs text-gray-600">
                           {order.items.slice(0, 2).map((item, index) => (
                             <span key={index}>{item.productName} - {item.quantity} {item.unit}</span>
@@ -406,13 +425,6 @@ function OrdersPage({ user }: OrdersPageProps) {
                       </div>
                       {/* Lado derecho: botones de acción */}
                       <div className="flex flex-col items-end gap-2 sm:w-5/12 min-w-[160px]">
-                        {/* Chat - siempre visible */}
-                        <button
-                          onClick={() => handleOrderClick(order)}
-                          className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                        >
-                          <MessageSquare className="h-4 w-4 mr-1" /> Chat
-                        </button>
                         
                         {/* Enviar pedido - solo en estado pending */}
                         {order.status === 'pending' && (
@@ -620,32 +632,7 @@ function OrdersPage({ user }: OrdersPageProps) {
             </div>
           </div>
         </div>
-        {/* Instructions */}
-        <div className="mt-8 px-4 sm:px-0">
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <MessageSquare className="h-5 w-5 text-blue-400" />
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-blue-800">
-                  {es.orders.whatsAppFlowTitle}
-                </h3>
-                <div className="mt-2 text-sm text-blue-700">
-                  <ol className="list-decimal list-inside space-y-1">
-                    <li>{es.orders.createOrderStep}</li>
-                    <li>{es.orders.sendWhatsAppStep}</li>
-                    <li>{es.orders.sendOrderStep}</li>
-                    <li>{es.orders.sendReceiptStep}</li>
-                    <li>{es.orders.uploadReceiptStep}</li>
-                    <li>{es.orders.reviewDataStep}</li>
-                    <li>{es.orders.processPaymentStep}</li>
-                  </ol>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+
         
         {/* Tabla de Pedidos */}
         <div className="mt-8 px-4 sm:px-0">
@@ -738,6 +725,43 @@ function OrdersPage({ user }: OrdersPageProps) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Instructions */}
+        <div className="mt-8 px-4 sm:px-0">
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <ShoppingCart className="h-5 w-5 text-blue-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800">
+                  ¿Cómo gestionar pedidos?
+                </h3>
+                                    <div className="mt-2 text-sm text-blue-700">
+                      <ul className="list-disc list-inside space-y-1">
+                        <li><strong>Crear pedido:</strong> Haz clic en "Crear nuevo pedido" para iniciar un pedido</li>
+                        <li><strong>Enviar pedido:</strong> Una vez creado, haz clic en "Enviar pedido" para notificar al proveedor</li>
+                        <li><strong>Descargar factura:</strong> Cuando recibas la factura, descárgala y revisa los detalles de pago</li>
+                        <li><strong>Subir comprobante:</strong> Después de pagar, sube el comprobante de pago</li>
+                        <li><strong>Confirmar recepción:</strong> Una vez recibido el pedido, confirma la recepción</li>
+                        <li><strong>Chat con proveedor:</strong> Usa el botón de chat para comunicarte directamente</li>
+                        <li><strong>Ver detalles:</strong> En pedidos finalizados, haz clic en "Ver detalles" para expandir la información</li>
+                        <li><strong>Estados del pedido:</strong> 
+                          <ul className="ml-4 mt-1 space-y-1">
+                            <li>• <strong>Pendiente:</strong> Pedido creado, listo para enviar</li>
+                            <li>• <strong>Enviado:</strong> Pedido enviado al proveedor</li>
+                            <li>• <strong>Factura recibida:</strong> Proveedor envió la factura</li>
+                            <li>• <strong>Pagado:</strong> Comprobante de pago subido</li>
+                            <li>• <strong>Enviado por proveedor:</strong> Proveedor confirmó envío</li>
+                            <li>• <strong>Finalizado:</strong> Pedido recibido y confirmado</li>
+                          </ul>
+                        </li>
+                      </ul>
+                    </div>
+              </div>
             </div>
           </div>
         </div>

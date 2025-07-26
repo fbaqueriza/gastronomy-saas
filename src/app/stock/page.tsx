@@ -778,17 +778,16 @@ Huevos,Proteínas,200,unidades,daily,Proveedor D,Proveedor D,2025-07-25,2025-07-
               </div>
               <div className="ml-3">
                 <h3 className="text-sm font-medium text-blue-800">
-                  {es.stock.managementTips}
+                  ¿Cómo usar la gestión de stock?
                 </h3>
                 <div className="mt-2 text-sm text-blue-700">
                   <ul className="list-disc list-inside space-y-1">
-                    <li>{es.stock.setMinQuantities}</li>
-                    <li>{es.stock.updateStockLevels}</li>
-                    <li>
-                      {es.stock.associateProducts}
-                    </li>
-                    <li>{es.stock.useRestockFrequency}</li>
-                    <li>{es.stock.exportData}</li>
+                    <li><strong>Agregar productos:</strong> Haz clic en "Agregar" para crear nuevos productos de stock</li>
+                    <li><strong>Editar información:</strong> Haz doble clic en cualquier celda para editar los datos</li>
+                    <li><strong>Asociar proveedores:</strong> En la columna "Proveedores asociados" puedes vincular múltiples proveedores separados por punto y coma (;)</li>
+                    <li><strong>Frecuencia de reposición:</strong> Selecciona diaria, semanal, mensual o personalizada según tus necesidades</li>
+                    <li><strong>Importar datos:</strong> Usa "Descargar plantilla" para obtener el formato correcto, luego "Import" para cargar tus productos</li>
+                    <li><strong>Exportar datos:</strong> Usa "Export" para descargar tu inventario actual</li>
                   </ul>
                 </div>
               </div>

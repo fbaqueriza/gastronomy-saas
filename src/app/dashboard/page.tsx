@@ -21,6 +21,7 @@ import {
   Package,
   CreditCard,
   Calendar,
+  BarChart3,
 } from "lucide-react";
 import {
   DataProvider,
@@ -30,6 +31,7 @@ import es from "../../locales/es";
 import WhatsAppChat from "../../components/WhatsAppChat";
 import PendingOrderList from '../../components/PendingOrderList';
 import ComprobanteButton from '../../components/ComprobanteButton';
+import ChatPreview from '../../components/ChatPreview';
 import { Menu } from '@headlessui/react';
 import { useRouter } from 'next/navigation';
 import supabase from '../../lib/supabaseClient';
@@ -313,9 +315,12 @@ function DashboardPageContent({
     });
   };
 
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);
+  
   const handleOrderClick = (order: Order) => {
-    // Función para manejar el clic en el pedido (chat)
-    console.log('DEBUG: Chat clicked for order:', order.id);
+    setSelectedOrder(order);
+    setIsWhatsAppOpen(true);
   };
 
   const openReceipt = (receiptUrl: string | undefined) => {
@@ -411,13 +416,33 @@ function DashboardPageContent({
               {currentOrders.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="text-gray-500 mb-4">No hay pedidos pendientes</div>
-                  <button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Crear nuevo pedido
-                  </button>
+                  <div className="flex justify-center space-x-3">
+                    <button
+                      onClick={() => setIsCreateModalOpen(true)}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crear nuevo pedido
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Abrir chat con el primer proveedor disponible
+                        const firstProvider = providers[0];
+                        if (firstProvider) {
+                          setSelectedOrder({
+                            id: 'general-chat',
+                            providerId: firstProvider.id,
+                            status: 'pending'
+                          } as Order);
+                          setIsWhatsAppOpen(true);
+                        }
+                      }}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Chat general
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -426,23 +451,35 @@ function DashboardPageContent({
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center space-x-3">
                           {getStatusIcon(order.status)}
-                          <div>
-                            <div className="font-medium text-gray-900">
-                              {getProviderName(order.providerId)}
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <div className="font-medium text-gray-900">
+                                {getProviderName(order.providerId)}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {formatDate(order.createdAt || order.orderDate)}
+                              </div>
                             </div>
-                            <div className="text-sm text-gray-500">
-                              {formatDate(order.createdAt || order.orderDate)}
+                            
+                            {/* Chat Preview - sin tiempo duplicado */}
+                            <div className="mt-1">
+                              <ChatPreview
+                                providerName={getProviderName(order.providerId)}
+                                orderId={order.id}
+                                onOpenChat={() => handleOrderClick(order)}
+                                hasUnreadMessages={false}
+                                lastMessage={{
+                                  id: '1',
+                                  type: 'received',
+                                  content: '¡Hola! Tu pedido está siendo procesado. ¿Necesitas algo más?',
+                                  timestamp: new Date(Date.now() - 3600000),
+                                  status: 'read'
+                                }}
+                              />
                             </div>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          {/* Chat - siempre visible */}
-                          <button
-                            onClick={() => handleOrderClick(order)}
-                            className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                          >
-                            <MessageSquare className="h-4 w-4 mr-1" /> Chat
-                          </button>
                           
                           {/* Enviar pedido - solo en estado pending */}
                           {order.status === 'pending' && (
@@ -534,15 +571,15 @@ function DashboardPageContent({
               {finishedOrders.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="text-gray-500">No hay pedidos finalizados recientes</div>
-                </div>
+                    </div>
               ) : (
                 <div className="space-y-4">
                   {finishedOrders.slice(0, 5).map((order) => (
                     <div key={order.id} className="bg-gray-50 rounded-lg p-4">
-                      <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           {getStatusIcon(order.status)}
-                          <div>
+                            <div>
                             <div className="font-medium text-gray-900">
                               {getProviderName(order.providerId)}
                             </div>
@@ -550,31 +587,31 @@ function DashboardPageContent({
                               {formatDate(order.createdAt || order.orderDate)}
                             </div>
                           </div>
-                        </div>
-                        <Menu as="div" className="relative inline-block text-left">
-                          <Menu.Button className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400">
-                            Ver documentos
-                          </Menu.Button>
+                  </div>
+                            <Menu as="div" className="relative inline-block text-left">
+  <Menu.Button className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium transition border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400">
+    Ver documentos
+  </Menu.Button>
                           <Menu.Items className="absolute right-0 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-[9999]" style={{ top: 'auto', bottom: '100%', marginBottom: '0.5rem' }}>
-                            <div className="py-1 flex flex-col gap-1">
-                              <button
-                                className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={!order.invoiceNumber}
-                                onClick={() => { if(order.invoiceNumber) window.open('/mock-factura.pdf', '_blank'); }}
-                              >
-                                {order.invoiceNumber ? 'Descargar factura' : 'Factura no disponible'}
-                              </button>
-                              <button
-                                className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+    <div className="py-1 flex flex-col gap-1">
+      <button
+        className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={!order.invoiceNumber}
+        onClick={() => { if(order.invoiceNumber) window.open('/mock-factura.pdf', '_blank'); }}
+      >
+        {order.invoiceNumber ? 'Descargar factura' : 'Factura no disponible'}
+      </button>
+      <button
+        className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={!order.receiptUrl}
                                 onClick={() => { if(order.receiptUrl) openReceipt(order.receiptUrl); }}
-                              >
+      >
                                 {order.receiptUrl ? 'Ver comprobante' : 'Comprobante no disponible'}
-                              </button>
-                            </div>
-                          </Menu.Items>
-                        </Menu>
-                      </div>
+      </button>
+    </div>
+  </Menu.Items>
+</Menu>
+                  </div>
                       {order.items && order.items.length > 0 && (
                         <div className="text-xs text-gray-600 mt-2">
                           {order.items.slice(0, 3).map((item, index) => (
@@ -689,7 +726,7 @@ function DashboardPageContent({
                   <tr>
                     <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
                     <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Última orden</th>
-                    <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
+                    <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
                     </tr>
                   </thead>
                 <tbody>
@@ -702,7 +739,8 @@ function DashboardPageContent({
                         <tr key={provider.id} className="hover:bg-gray-50">
                         <td className="py-2 font-medium text-gray-900">{provider.name}</td>
                         <td className="py-2 text-xs text-gray-500">{lastOrderDate ? lastOrderDate.toLocaleDateString() : '-'}</td>
-                        <td className="py-2 text-right">
+                        <td className="py-2 text-center">
+                          <div className="flex justify-center space-x-1">
                           <button
                             onClick={() => handleProviderOrder(provider.id)}
                             className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -710,12 +748,54 @@ function DashboardPageContent({
                           >
                             <Plus className="h-4 w-4" />
                             </button>
+                            <button
+                              onClick={() => {
+                                setSelectedOrder({
+                                  id: `chat-${provider.id}`,
+                                  providerId: provider.id,
+                                  status: 'pending'
+                                } as Order);
+                                setIsWhatsAppOpen(true);
+                              }}
+                              className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                              title="Chat con proveedor"
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                            </button>
+                          </div>
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Instructions */}
+        <div className="mt-8 px-4 sm:px-0">
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <BarChart3 className="h-5 w-5 text-blue-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800">
+                  ¿Cómo usar el dashboard?
+                </h3>
+                <div className="mt-2 text-sm text-blue-700">
+                  <ul className="list-disc list-inside space-y-1">
+                    <li><strong>Vista general:</strong> Aquí puedes ver todos tus pedidos, proveedores y stock en un solo lugar</li>
+                    <li><strong>Pedidos pendientes:</strong> Gestiona pedidos que necesitan atención inmediata</li>
+                    <li><strong>Pedidos recientes:</strong> Revisa el historial de pedidos finalizados</li>
+                    <li><strong>Próximos pedidos:</strong> Ve qué pedidos están programados para los próximos días</li>
+                    <li><strong>Proveedores:</strong> Accede rápidamente a tus proveedores y crea nuevos pedidos</li>
+                    <li><strong>Chat integrado:</strong> Comunícate directamente con proveedores desde el dashboard</li>
+                    <li><strong>Acciones rápidas:</strong> Todos los botones funcionan igual que en las páginas específicas</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -735,22 +815,19 @@ function DashboardPageContent({
         suggestedOrder={suggestedOrder}
         selectedProviderId={typeof selectedProviderId === 'string' ? selectedProviderId : null}
       />
-      {/* Split-pane chat UI */}
-      {false && (
-        <div className="fixed top-0 right-0 h-full w-full md:w-1/2 lg:w-1/3 z-40 bg-white shadow-xl flex flex-col">
+      {/* WhatsApp Chat Modal */}
+      {selectedOrder && (
           <WhatsAppChat
-            orderId={orders[0]?.id || ""}
-            providerName={
-              providers.find((p: Provider) => p.id === selectedProviderId)?.name ||
-              "Proveedor"
-            }
-            providerPhone={
-              providers.find((p: Provider) => p.id === selectedProviderId)?.phone || ""
-            }
-            isOpen={!!selectedProviderId}
-            onClose={() => setSelectedProviderId(null)}
-          />
-        </div>
+          orderId={selectedOrder.id}
+          providerName={getProviderName(selectedOrder.providerId)}
+          providerPhone={providers.find(p => p.id === selectedOrder.providerId)?.phone || ""}
+          isOpen={isWhatsAppOpen}
+          onClose={() => {
+            setIsWhatsAppOpen(false);
+            setSelectedOrder(null);
+          }}
+          orderStatus={selectedOrder.status}
+        />
       )}
     </div>
   );

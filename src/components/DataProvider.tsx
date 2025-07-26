@@ -13,7 +13,7 @@ interface DataContextType {
   deleteOrder: (id: string, user_id: string) => Promise<void>;
   addProvider: (provider: Partial<Provider> | Partial<Provider>[], user_id: string, batch?: boolean) => Promise<any>;
   updateProvider: (provider: Provider) => Promise<void>;
-  deleteProvider: (id: string | string[], user_id: string, batch?: boolean) => Promise<void>;
+  deleteProvider: (id: string | string[], user_id: string, batch?: boolean, forceDelete?: boolean) => Promise<void>;
   addStockItem: (item: Partial<StockItem> | Partial<StockItem>[], user_id: string, batch?: boolean) => Promise<void>;
   updateStockItem: (item: StockItem) => Promise<void>;
   deleteStockItem: (id: string | string[], user_id: string, batch?: boolean) => Promise<void>;
@@ -69,6 +69,9 @@ function mapOrderFromDb(order: any): Order {
 function mapProviderFromDb(provider: any): Provider {
   return {
     ...provider,
+    contactName: provider.contact_name,
+    razonSocial: provider.razon_social,
+    cuitCuil: provider.cuit_cuil,
     createdAt: provider.created_at,
     updatedAt: provider.updated_at,
     id: provider.id,
@@ -219,15 +222,99 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
   }, [fetchAll]);
 
   // Permitir batch delete
-  const deleteProvider = useCallback(async (idOrIds: string | string[], user_id: string, batch = false) => {
-    if (batch && Array.isArray(idOrIds)) {
-      await supabase.from('providers').delete().in('id', idOrIds).eq('user_id', user_id);
+  const deleteProvider = useCallback(async (idOrIds: string | string[], user_id: string, batch = false, forceDelete = false) => {
+    try {
+      if (batch && Array.isArray(idOrIds)) {
+        // Borrar uno por uno para evitar errores 409
+        let successCount = 0;
+        let errorCount = 0;
+        let deletedOrdersCount = 0;
+        
+        for (const id of idOrIds) {
+          try {
+            // Primero verificar si el proveedor existe y pertenece al usuario
+            const { data: provider, error: checkError } = await supabase
+              .from('providers')
+              .select('id, name')
+              .eq('id', id)
+              .eq('user_id', user_id)
+              .single();
+            
+            if (checkError || !provider) {
+              console.error(`Provider ${id} no encontrado o no pertenece al usuario:`, checkError);
+              errorCount++;
+              continue;
+            }
+            
+            // Verificar si tiene pedidos asociados
+            const { data: orders, error: ordersError } = await supabase
+              .from('orders')
+              .select('id')
+              .eq('provider_id', id);
+            
+            if (ordersError) {
+              console.error(`Error checking orders for provider ${id}:`, ordersError);
+            } else if (orders && orders.length > 0) {
+              if (forceDelete) {
+                // Borrar pedidos asociados primero
+                console.log(`Borrando ${orders.length} pedidos asociados al proveedor ${id} (${provider.name})`);
+                const { error: deleteOrdersError } = await supabase
+                  .from('orders')
+                  .delete()
+                  .eq('provider_id', id)
+                  .eq('user_id', user_id);
+                
+                if (deleteOrdersError) {
+                  console.error(`Error deleting orders for provider ${id}:`, deleteOrdersError);
+                  errorCount++;
+                  continue;
+                } else {
+                  deletedOrdersCount += orders.length;
+                  console.log(`${orders.length} pedidos eliminados para el proveedor ${id} (${provider.name})`);
+                }
+              } else {
+                console.error(`Provider ${id} (${provider.name}) tiene ${orders.length} pedidos asociados y no puede ser eliminado`);
+                errorCount++;
+                continue;
+              }
+            }
+            
+            // Intentar borrar el proveedor
+            const { error } = await supabase.from('providers').delete().eq('id', id).eq('user_id', user_id);
+            if (error) {
+              console.error(`Error deleting provider ${id} (${provider.name}):`, error);
+              errorCount++;
+            } else {
+              console.log(`Provider ${id} (${provider.name}) eliminado exitosamente`);
+              successCount++;
+            }
+          } catch (err) {
+            console.error(`Error deleting provider ${id}:`, err);
+            errorCount++;
+          }
+        }
+        
+        console.log(`Borrado completado: ${successCount} proveedores exitosos, ${errorCount} errores, ${deletedOrdersCount} pedidos eliminados`);
+        
+        if (errorCount > 0) {
+          console.warn(`⚠️ ${errorCount} proveedores no pudieron ser eliminados. Revisa los logs anteriores para más detalles.`);
+        }
+        
+        await fetchAll();
+        return;
+      }
+      
+      const id = Array.isArray(idOrIds) ? idOrIds[0] : idOrIds;
+      const { error } = await supabase.from('providers').delete().eq('id', id).eq('user_id', user_id);
+      if (error) {
+        console.error('Error deleting provider:', error);
+        throw error;
+      }
       await fetchAll();
-      return;
+    } catch (error) {
+      console.error('Error in deleteProvider:', error);
+      throw error;
     }
-    const id = Array.isArray(idOrIds) ? idOrIds[0] : idOrIds;
-    await supabase.from('providers').delete().eq('id', id).eq('user_id', user_id);
-    await fetchAll();
   }, [fetchAll]);
 
   // CRUD: Stock

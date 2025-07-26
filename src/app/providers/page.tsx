@@ -39,7 +39,7 @@ export default function ProvidersPageWrapper() {
 
 function ProvidersPage() {
   const { user, loading: authLoading } = useSupabaseAuth();
-  const { providers, addProvider, deleteProvider } = useData();
+  const { providers, orders, addProvider, deleteProvider } = useData();
   const isSeedUser = user?.email === 'test@test.com';
 
   // Debug log for loading and user
@@ -265,45 +265,61 @@ function ProvidersPage() {
   const handleDataChange = useCallback(
     (newData: any[]) => {
       if (!user) return;
-      // setProviders( // This line was removed
-      //   newData.map((row) => ({
-      //     ...row,
-      //     user_id: row.user_id || user.uid,
-      //     categories:
-      //       typeof row.categories === 'string'
-      //         ? row.categories.split(',').map((c: string) => c.trim())
-      //         : row.categories || [],
-      //     tags:
-      //       typeof row.tags === 'string'
-      //         ? row.tags.split(',').map((t: string) => t.trim())
-      //         : row.tags || [],
-      //     updatedAt: new Date(),
-      //   })),
-      // );
+      // Esta función se usa para actualizaciones en línea, pero ahora usamos el contexto
+      // Los cambios se manejan directamente en el DataGrid
     },
-    [providers, user], // Updated to use context providers/setProviders
+    [user],
   );
 
   const handleAddRow = useCallback(() => {
     if (!user) return;
     const newProvider = createNewProvider();
     newProvider.user_id = user.id;
-    // setProviders([newProvider, ...providers]); // This line was removed
-  }, [user]);
+    addProvider(newProvider, user.id);
+  }, [user, addProvider]);
 
   const handleDeleteRows = useCallback(
     async (rowsToDelete: Provider[]) => {
       if (!rowsToDelete || rowsToDelete.length === 0 || !user) return;
+      
+      // Verificar si alguno tiene pedidos asociados
+      const providersWithOrders = [];
+      for (const provider of rowsToDelete) {
+        const providerOrders = orders.filter(order => order.providerId === provider.id);
+        if (providerOrders.length > 0) {
+          providersWithOrders.push({
+            provider,
+            orderCount: providerOrders.length
+          });
+        }
+      }
+      
+      let forceDelete = false;
+      if (providersWithOrders.length > 0) {
+        const providerNames = providersWithOrders.map(p => `${p.provider.name} (${p.orderCount} pedidos)`).join('\n• ');
+        const confirmMessage = `Los siguientes proveedores tienen pedidos asociados:\n\n• ${providerNames}\n\n¿Deseas eliminarlos junto con todos sus pedidos?\n\n⚠️ Esta acción no se puede deshacer.`;
+        forceDelete = confirm(confirmMessage);
+        
+        if (!forceDelete) {
+          console.log('Borrado cancelado por el usuario');
+          return;
+        }
+      }
+      
       setLoading(true);
       try {
         const ids = rowsToDelete.map(row => row.id);
-        await deleteProvider(ids, user.id, true); // batch delete
+        console.log('Intentando borrar proveedores:', ids, forceDelete ? '(con pedidos)' : '(sin pedidos)');
+        await deleteProvider(ids, user.id, true, forceDelete); // batch delete
+        console.log('Proveedores eliminados exitosamente:', ids);
       } catch (err) {
         console.error('Error deleting providers:', rowsToDelete, err);
+        // Mostrar mensaje de error al usuario
+        alert('Algunos proveedores no pudieron ser eliminados. Esto puede deberse a:\n\n• Tienen pedidos asociados\n• No pertenecen a tu cuenta\n• Ya fueron eliminados\n\nRevisa la consola para más detalles.');
       }
       setLoading(false);
     },
-    [deleteProvider, user]
+    [deleteProvider, user, orders]
   );
 
   const csvEscape = (value: string) => {
@@ -375,6 +391,16 @@ function ProvidersPage() {
     'name': 'name',
     'contacto': 'contactName',
     'contactname': 'contactName',
+    'contact_name': 'contactName',
+    'contacto_nombre': 'contactName',
+    'nombre_contacto': 'contactName',
+    'contact': 'contactName',
+    'nombrecontacto': 'contactName',
+    'contactonombre': 'contactName',
+    'contactopersona': 'contactName',
+    'personacontacto': 'contactName',
+    'contactperson': 'contactName',
+    'personcontact': 'contactName',
     'categoría': 'categories',
     'categoria': 'categories',
     'categorias': 'categories',
@@ -390,6 +416,7 @@ function ProvidersPage() {
     'cuitcuil': 'cuitCuil',
     'email': 'email',
     'phone': 'phone',
+    'telefono': 'phone',
     'direccion': 'address',
     'address': 'address',
     'catalogos': 'catalogs',
@@ -408,16 +435,40 @@ function ProvidersPage() {
       // Usar parseCsvRow para headers y filas
       const rawHeaders = parseCsvRow(lines[0]).map(h => normalizeHeader(h));
       const headers = rawHeaders.map(h => headerMap[h] || h);
+      
+      // Debug: mostrar headers procesados
+      console.log('Headers originales:', parseCsvRow(lines[0]));
+      console.log('Headers normalizados:', rawHeaders);
+      console.log('Headers mapeados:', headers);
+      console.log('HeaderMap keys disponibles:', Object.keys(headerMap));
+      
+      // Verificar si contactName está en los headers
+      const hasContactName = headers.includes('contactName');
+      console.log('¿Incluye contactName?', hasContactName);
+      if (!hasContactName) {
+        console.log('Headers que podrían ser contactName:', rawHeaders.filter(h => h.includes('contact') || h.includes('persona') || h.includes('nombre')));
+      }
+      
       const required = ['name', 'categories'];
       const missing = required.filter(r => !headers.includes(r));
       if (missing.length > 0) {
         setImportMessage('Faltan columnas requeridas: ' + missing.join(', '));
         return;
       }
-      const importedProviders = lines.slice(1).map(line => {
+      const importedProviders = lines.slice(1).map((line, index) => {
         const values = parseCsvRow(line);
         const row: any = {};
         headers.forEach((h, i) => { row[h] = values[i] ?? ''; });
+        
+        // Debug para la primera fila
+        if (index === 0) {
+          console.log('Primera fila de datos:');
+          console.log('Headers:', headers);
+          console.log('Values:', values);
+          console.log('Row procesado:', row);
+          console.log('contactName value:', row.contactName);
+        }
+        
         const categories = row.categories ? String(row.categories).split(';').map((c: string) => c.trim()).filter(Boolean) : [];
         return {
           name: row.name || '',
@@ -443,7 +494,7 @@ function ProvidersPage() {
       try {
         const safeItems = importedProviders.map(item => ({
           name: item.name,
-          contact_name: item.contactName,
+          contact_name: item.contactName || '',
           categories: item.categories,
           tags: item.tags,
           notes: item.notes,
@@ -609,25 +660,17 @@ function ProvidersPage() {
               </div>
               <div className="ml-3">
                 <h3 className="text-sm font-medium text-blue-800">
-                  {es.providers.tips}
+                  ¿Cómo gestionar proveedores?
                 </h3>
                 <div className="mt-2 text-sm text-blue-700">
                   <ul className="list-disc list-inside space-y-1">
-                    <li>
-                      {es.providers.clickAnyCell}
-                    </li>
-                    <li>
-                      {es.providers.ctrlCv}
-                    </li>
-                    <li>
-                      {es.providers.importCsv}
-                    </li>
-                    <li>
-                      {es.providers.categoriesTags}
-                    </li>
-                    <li>
-                      {es.providers.selectMultipleRows}
-                    </li>
+                    <li><strong>Agregar proveedor:</strong> Haz clic en "Agregar" para crear un nuevo proveedor</li>
+                    <li><strong>Editar información:</strong> Haz doble clic en cualquier celda para editar los datos</li>
+                    <li><strong>Copiar y pegar:</strong> Usa Ctrl+C y Ctrl+V para copiar datos entre celdas</li>
+                    <li><strong>Categorías y etiquetas:</strong> Separa múltiples categorías o etiquetas con punto y coma (;)</li>
+                    <li><strong>Importar datos:</strong> Usa "Import" para cargar proveedores desde un archivo CSV</li>
+                    <li><strong>Exportar datos:</strong> Usa "Export" para descargar tu lista de proveedores</li>
+                    <li><strong>Chat con proveedor:</strong> Haz clic en el botón de chat para comunicarte directamente</li>
                   </ul>
                 </div>
               </div>

@@ -385,17 +385,17 @@ export default function DataGrid({
 
       {/* Table */}
       <div className="overflow-auto">
-        <colgroup>
-          {table.getAllColumns().map((col, idx) => {
-            let width = 150;
-            if (col.id === 'select') width = 50;
-            else if (col.id === 'acciones') width = 120;
-            else if (col.id === 'notes') width = 250;
-            else if ((col.columnDef as any).width) width = (col.columnDef as any).width;
-            return <col key={col.id} style={{ width }} />;
-          })}
-        </colgroup>
         <table className="min-w-full divide-y divide-gray-200" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            {table.getAllColumns().map((col, idx) => {
+              let width = 150;
+              if (col.id === 'select') width = 50;
+              else if (col.id === 'acciones') width = 120;
+              else if (col.id === 'notes') width = 250;
+              else if ((col.columnDef as any).width) width = (col.columnDef as any).width;
+              return <col key={col.id} style={{ width }} />;
+            })}
+          </colgroup>
           <thead className="bg-gray-50">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
