@@ -63,17 +63,19 @@ export default function DataGrid({
           if (colDef && typeof colDef.render === 'function') {
             // Support both (value, rowData) and (value, rowData, extra)
             if (colDef.render.length === 3) {
+              const extraProps = {
+                editing: isEditing,
+                setEditingValue: (v: any) => setEditingValue(v),
+                providers: rowData.providers || (typeof window !== 'undefined' && (window as any).__GLOBAL_PROVIDERS__) || [],
+                editingCell,
+                setEditingCell,
+                editingValue: isEditing ? editingValue : undefined,
+              };
+              
               return colDef.render(
                 value,
                 rowData,
-                {
-                  editing: isEditing,
-                  setEditingValue: (v: any) => setEditingValue(v),
-                  providers: (typeof window !== 'undefined' && (window as any).__GLOBAL_PROVIDERS__) || [],
-                  editingCell,
-                  setEditingCell,
-                  editingValue: isEditing ? editingValue : undefined,
-                }
+                extraProps
               );
             } else {
               return colDef.render(value, rowData);
@@ -123,8 +125,8 @@ export default function DataGrid({
             <div
               className={`px-2 py-1 ${colDef?.editable !== false ? 'cursor-pointer hover:bg-gray-100' : ''}`}
               onClick={() => {
-                console.log('DEBUG: DataGrid cell click', { colDef, value, rowId: row.id, columnId: column.id });
-                if (colDef?.editable !== false) {
+                // Solo manejar click para columnas sin render personalizado
+                if (colDef?.editable !== false && !colDef?.render) {
                   setEditingCell({ rowId: row.id, columnKey: column.id });
                   setEditingValue(String(value || ''));
                 }
@@ -234,12 +236,13 @@ export default function DataGrid({
 
   // Handle delete selected rows
   const handleDeleteSelected = useCallback(() => {
-    if (!Array.isArray(data) || data.length === 0) return;
     const rowsToDelete = Array.from(selectedRows).map(id => data.find((row: any) => row.id === id)).filter(Boolean);
     if (rowsToDelete.length === 0) return;
     if (typeof onDeleteRows === 'function') {
       try {
         onDeleteRows(rowsToDelete);
+        // Limpiar las filas seleccionadas después de eliminar
+        setSelectedRows(new Set());
       } catch (err) {
         alert('Error al eliminar filas. Revisa la consola para más detalles.');
         console.error('Error al eliminar filas:', err);
@@ -252,7 +255,8 @@ export default function DataGrid({
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    // Deshabilitar ordenamiento automático para mantener el orden original
+    // getSortedRowModel: getSortedRowModel(),
   });
 
   if (loading) {
@@ -272,7 +276,7 @@ export default function DataGrid({
             {onAddRow && (
               <button
                 onClick={onAddRow}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               >
                 <Plus className="h-4 w-4 mr-1" />
                 {'Agregar'}

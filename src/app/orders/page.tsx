@@ -208,29 +208,28 @@ function OrdersPage({ user }: OrdersPageProps) {
         console.log('DEBUG: Simulando recepción de factura...');
         // Refetch orders para obtener el estado actualizado
         await fetchAll();
-        // Buscar el pedido actualizado después del fetchAll
-        const updatedOrders = await supabase.from('orders').select('*').eq('id', orderId).single();
-        if (updatedOrders.data && updatedOrders.data.status === 'enviado') {
-          // Obtener datos del proveedor para la orden de pago
-          const provider = providers.find(p => p.id === order.providerId);
-          const bankInfo = {
-            accountNumber: provider?.cbu || '1234567890'
-          };
-          const totalAmount = 1000; // Monto extraído de la factura PDF
-          
-          const orderWithInvoice = {
-            ...updatedOrders.data,
-            status: 'factura_recibida' as 'factura_recibida',
-            invoiceNumber: 'INV-MOCK-001',
-            receiptUrl: '/mock-factura.pdf',
-            bankInfo: bankInfo,
-            totalAmount: totalAmount,
-          } as Order;
-          console.log('DEBUG: Actualizando pedido con factura y orden de pago:', orderWithInvoice);
-          await updateOrder(orderWithInvoice);
-        } else {
-          console.log('DEBUG: Pedido no encontrado o estado incorrecto:', updatedOrders.data?.status);
-        }
+        
+        // Obtener datos del proveedor para la orden de pago
+        const provider = providers.find(p => p.id === order.providerId);
+        const bankInfo = {
+          accountNumber: provider?.cbu || '1234567890'
+        };
+        const totalAmount = 1000; // Monto extraído de la factura PDF
+        
+        const orderWithInvoice = {
+          ...order,
+          status: 'factura_recibida' as 'factura_recibida',
+          invoiceNumber: 'INV-MOCK-001',
+          receiptUrl: '/mock-factura.pdf',
+          bankInfo: bankInfo,
+          totalAmount: totalAmount,
+        } as Order;
+        
+        console.log('DEBUG: Actualizando pedido con factura y orden de pago:', orderWithInvoice);
+        await updateOrder(orderWithInvoice);
+        
+        // Refetch para asegurar que se actualice la UI
+        await fetchAll();
       }, 2000);
     }
   };

@@ -26,6 +26,7 @@ export default function Navigation() {
     { name: 'Stock', href: '/stock' },
     { name: 'Pedidos', href: '/orders' },
     { name: 'Pagos', href: '/payments' },
+    { name: 'WhatsApp', href: '/whatsapp' },
   ];
 
   return (

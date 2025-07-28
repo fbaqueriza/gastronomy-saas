@@ -39,7 +39,7 @@ export default function ProvidersPageWrapper() {
 
 function ProvidersPage() {
   const { user, loading: authLoading } = useSupabaseAuth();
-  const { providers, orders, addProvider, deleteProvider } = useData();
+  const { providers, orders, addProvider, deleteProvider, updateProvider, fetchAll } = useData();
   const isSeedUser = user?.email === 'test@test.com';
 
   // Debug log for loading and user
@@ -48,6 +48,7 @@ function ProvidersPage() {
   }
 
   const [loading, setLoading] = useState(false);
+  const [addingProvider, setAddingProvider] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
@@ -91,6 +92,7 @@ function ProvidersPage() {
           >
             <MessageSquare className="h-4 w-4 text-green-600" />
           </button>
+
         </div>
       ),
     },
@@ -101,67 +103,12 @@ function ProvidersPage() {
       name: es.providers.category,
       width: 140,
       editable: true,
-      render: (value: any, rowData: any, extra: { editingCell: any; setEditingCell: (cell: any) => void; setEditingValue: (v: any) => void }) => {
-        const { editingCell, setEditingCell, setEditingValue } = extra;
-        const isEditing = editingCell?.rowId === rowData.id && editingCell?.columnKey === 'categories';
-        if (!isEditing) {
-          return (
-            <span
-              style={{ cursor: 'pointer', display: 'block', width: 140, minWidth: 140, maxWidth: 140 }}
-              onClick={() => {
-                setEditingCell({ rowId: rowData.id, columnKey: 'categories' });
-                setEditingValue(value || '');
-              }}
-            >
-              {value}
-            </span>
-          );
-        }
-        return (
-          <input
-            className="w-full border rounded px-1 py-0.5 align-middle"
-            value={value || ''}
-            onChange={e => setEditingValue(e.target.value)}
-            autoFocus
-            style={{ width: 140, minWidth: 140, maxWidth: 140 }}
-            onBlur={() => setEditingCell(null)}
-          />
-        );
-      },
     },
     {
       key: 'notes',
       name: es.providers.notes,
       width: 250,
       editable: true,
-      render: (value: any, rowData: any, extra: { editingCell: any; setEditingCell: (cell: any) => void; setEditingValue: (v: any) => void }) => {
-        const { editingCell, setEditingCell, setEditingValue } = extra;
-        const isEditing = editingCell?.rowId === rowData.id && editingCell?.columnKey === 'notes';
-        if (!isEditing) {
-          return (
-            <div
-              style={{ whiteSpace: 'normal', wordBreak: 'break-word', minHeight: '3em', width: 250, minWidth: 250, maxWidth: 250, cursor: 'pointer' }}
-              onClick={() => {
-                setEditingCell({ rowId: rowData.id, columnKey: 'notes' });
-                setEditingValue(value || '');
-              }}
-            >
-              {value}
-            </div>
-          );
-        }
-        return (
-          <textarea
-            className="w-full border rounded px-1 py-0.5 align-middle"
-            value={value || ''}
-            onChange={e => setEditingValue(e.target.value)}
-            rows={3}
-            style={{ resize: 'vertical', minHeight: '3em', width: 250, minWidth: 250, maxWidth: 250 }}
-            autoFocus
-            onBlur={() => setEditingCell(null)}
-          />
-        );
-      },
     },
     { key: 'cbu', name: es.providers.cbu, width: 140, editable: true },
     { key: 'alias', name: es.providers.alias, width: 100, editable: true },
@@ -263,20 +210,79 @@ function ProvidersPage() {
   // ] : []);
 
   const handleDataChange = useCallback(
-    (newData: any[]) => {
+    async (newData: any[]) => {
       if (!user) return;
-      // Esta función se usa para actualizaciones en línea, pero ahora usamos el contexto
-      // Los cambios se manejan directamente en el DataGrid
+      console.log('handleDataChange called with:', newData);
+      
+      // Solo actualizar si hay cambios reales
+      const changedProviders = newData.filter((provider, index) => {
+        const originalProvider = providers[index];
+        return originalProvider && (
+          provider.name !== originalProvider.name ||
+          provider.contactName !== originalProvider.contactName ||
+          provider.phone !== originalProvider.phone ||
+          provider.email !== originalProvider.email ||
+          provider.address !== originalProvider.address ||
+          provider.categories !== originalProvider.categories ||
+          provider.notes !== originalProvider.notes ||
+          provider.cbu !== originalProvider.cbu ||
+          provider.alias !== originalProvider.alias ||
+          provider.cuitCuil !== originalProvider.cuitCuil ||
+          provider.razonSocial !== originalProvider.razonSocial
+        );
+      });
+      
+      console.log('🔄 Proveedores con cambios detectados:', changedProviders.length);
+      if (changedProviders.length > 0) {
+        console.log('📝 Detalles de cambios:', changedProviders.map(p => ({
+          id: p.id,
+          name: p.name,
+          cbu: p.cbu,
+          alias: p.alias,
+          cuitCuil: p.cuitCuil,
+          razonSocial: p.razonSocial
+        })));
+      }
+      
+      // Actualizar solo los proveedores modificados
+      for (const provider of changedProviders) {
+        try {
+          console.log('🔄 Actualizando proveedor:', provider.id, provider.name);
+          await updateProvider(provider);
+          console.log('✅ Proveedor actualizado exitosamente:', provider.id);
+        } catch (error) {
+          console.error('❌ Error updating provider:', provider.id, error);
+        }
+      }
     },
-    [user],
+    [user, updateProvider, providers],
   );
 
   const handleAddRow = useCallback(() => {
-    if (!user) return;
+    if (!user || addingProvider) {
+      console.error('No user available for adding provider or already adding');
+      return;
+    }
+    
+    setAddingProvider(true);
+    console.log('Adding new provider for user:', user.id);
     const newProvider = createNewProvider();
     newProvider.user_id = user.id;
-    addProvider(newProvider, user.id);
-  }, [user, addProvider]);
+    console.log('New provider:', newProvider);
+    
+    // Forzar actualización inmediata del estado
+    addProvider(newProvider, user.id).then(() => {
+      console.log('Provider added successfully');
+      setAddingProvider(false);
+      // Forzar re-render del DataGrid
+      setTimeout(() => {
+        fetchAll();
+      }, 100);
+    }).catch(error => {
+      console.error('Error adding provider:', error);
+      setAddingProvider(false);
+    });
+  }, [user, addProvider, addingProvider, fetchAll]);
 
   const handleDeleteRows = useCallback(
     async (rowsToDelete: Provider[]) => {
@@ -521,6 +527,10 @@ function ProvidersPage() {
       setLoading(false);
       if (errorCount === 0) {
         setImportMessage(`¡Importación exitosa! Se importaron ${successCount} proveedores.`);
+        // Actualizar los datos después de la importación exitosa
+        setTimeout(() => {
+          fetchAll();
+        }, 500);
       } else {
         setImportMessage(`Importación completada con ${successCount} éxitos y ${errorCount} errores. Revisa la consola para detalles.`);
       }
@@ -622,33 +632,35 @@ function ProvidersPage() {
               </p>
             </div>
 
-            {/* Remove the top right '+ Agregar' button (the one outside the table area) */}
-            {/* <div className="flex items-center space-x-3">
-              <button
-                onClick={handleAddRow}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar
-              </button>
-            </div> */}
+            <div className="flex items-center space-x-3">
+              {/* Botón de agregar movido a la tabla */}
+            </div>
           </div>
         </div>
 
+
+
         {/* Spreadsheet Grid */}
         <div className="px-4 sm:px-0">
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-800">
+              💡 <strong>¿Necesitas agregar muchos proveedores?</strong> Usa "Export" para descargar la planilla, 
+              completa tus datos y luego "Import" para cargarlos de manera masiva.
+            </p>
+          </div>
           <DataGrid
-            columns={columns}
-            data={providers}
-            onDataChange={handleDataChange}
-            onAddRow={handleAddRow}
-            onDeleteRows={handleDeleteRows}
-            onExport={handleExport}
-            onImport={handleImport}
-            searchable={true}
-            selectable={true}
-            loading={loading}
-          />
+              key={`providers-${providers.length}-${Date.now()}`} // Forzar re-render completo
+              columns={columns}
+              data={providers}
+              onDataChange={handleDataChange}
+              onAddRow={addingProvider ? undefined : handleAddRow}
+              onDeleteRows={handleDeleteRows}
+              onExport={handleExport}
+              onImport={handleImport}
+              searchable={true}
+              selectable={true}
+              loading={loading || addingProvider}
+            />
         </div>
 
         {/* Instructions */}
@@ -679,20 +691,18 @@ function ProvidersPage() {
         </div>
       </main>
 
-      {/* WhatsApp Chat Split Panel */}
+      {/* WhatsApp Chat Modal */}
       {selectedProvider && (
-        <div className={`fixed top-0 right-0 h-full w-full md:w-1/2 lg:w-1/3 z-40 transition-transform duration-300 ${isWhatsAppOpen ? 'translate-x-0' : 'translate-x-full'} bg-white shadow-xl flex flex-col`}>
-          <WhatsAppChat
-            orderId={''}
-            providerName={selectedProvider.name}
-            providerPhone={selectedProvider.phone}
-            isOpen={isWhatsAppOpen}
-            onClose={() => {
-              setIsWhatsAppOpen(false);
-              setSelectedProvider(null);
-            }}
-          />
-        </div>
+        <WhatsAppChat
+          providerId={selectedProvider.id}
+          providerName={selectedProvider.name}
+          providerPhone={selectedProvider.phone}
+          isOpen={isWhatsAppOpen}
+          onClose={() => {
+            setIsWhatsAppOpen(false);
+            setSelectedProvider(null);
+          }}
+        />
       )}
       {importMessage && (
         <div className="fixed top-4 right-4 z-50 bg-blue-100 border border-blue-400 text-blue-800 px-4 py-2 rounded shadow">

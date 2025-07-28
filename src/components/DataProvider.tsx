@@ -17,6 +17,7 @@ interface DataContextType {
   addStockItem: (item: Partial<StockItem> | Partial<StockItem>[], user_id: string, batch?: boolean) => Promise<void>;
   updateStockItem: (item: StockItem) => Promise<void>;
   deleteStockItem: (id: string | string[], user_id: string, batch?: boolean) => Promise<void>;
+  setStockItems: React.Dispatch<React.SetStateAction<StockItem[]>>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -31,17 +32,17 @@ export const useData = () => {
 function mapStockItemFromDb(item: any): StockItem {
   return {
     ...item,
-    productName: item.product_name,
-    category: item.category,
-    quantity: item.quantity,
-    unit: item.unit,
-    restockFrequency: item.restock_frequency,
-    associatedProviders: item.associated_providers,
-    preferredProvider: item.preferred_provider,
-    lastOrdered: item.last_ordered,
-    nextOrder: item.next_order,
-    createdAt: item.created_at,
-    updatedAt: item.updated_at,
+    productName: item.product_name || '',
+    category: item.category || 'Other',
+    quantity: item.quantity || 0,
+    unit: item.unit || '',
+    restockFrequency: item.restock_frequency || 'weekly',
+    associatedProviders: Array.isArray(item.associated_providers) ? item.associated_providers : [],
+    preferredProvider: item.preferred_provider || '',
+    lastOrdered: item.last_ordered ? new Date(item.last_ordered) : null,
+    nextOrder: item.next_order ? new Date(item.next_order) : null,
+    createdAt: item.created_at ? new Date(item.created_at) : new Date(),
+    updatedAt: item.updated_at ? new Date(item.updated_at) : new Date(),
     id: item.id,
     user_id: item.user_id,
   };
@@ -137,15 +138,27 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
   const fetchAll = useCallback(async () => {
     if (!currentUserId) return;
     setLoading(true);
-    const [{ data: provs }, { data: ords }, { data: stocks }] = await Promise.all([
-      supabase.from('providers').select('*').eq('user_id', currentUserId),
-      supabase.from('orders').select('*').eq('user_id', currentUserId),
-      supabase.from('stock').select('*').eq('user_id', currentUserId),
-    ]);
-    setProviders((provs || []).map(mapProviderFromDb));
-    setOrders((ords || []).map(mapOrderFromDb));
-    setStockItems((stocks || []).map(mapStockItemFromDb));
-    setLoading(false);
+    setErrorMsg(null);
+    try {
+      const [{ data: provs, error: provError }, { data: ords, error: ordError }, { data: stocks, error: stockError }] = await Promise.all([
+        supabase.from('providers').select('*').eq('user_id', currentUserId).order('created_at', { ascending: false }),
+        supabase.from('orders').select('*').eq('user_id', currentUserId).order('created_at', { ascending: false }),
+        supabase.from('stock').select('*').eq('user_id', currentUserId).order('preferred_provider', { ascending: true }).order('created_at', { ascending: false }),
+      ]);
+      
+      if (provError) console.error('Error fetching providers:', provError);
+      if (ordError) console.error('Error fetching orders:', ordError);
+      if (stockError) console.error('Error fetching stock:', stockError);
+      
+      setProviders((provs || []).map(mapProviderFromDb));
+      setOrders((ords || []).map(mapOrderFromDb));
+      setStockItems((stocks || []).map(mapStockItemFromDb));
+    } catch (error) {
+      console.error('Error in fetchAll:', error);
+      setErrorMsg('Error al cargar los datos. Por favor, recarga la página.');
+    } finally {
+      setLoading(false);
+    }
   }, [currentUserId]);
 
   useEffect(() => {
@@ -154,72 +167,206 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
 
   // CRUD: Orders
   const addOrder = useCallback(async (order: Partial<Order>, user_id: string) => {
-    // Mapear campos a snake_case
-    const snakeCaseOrder = {
-      provider_id: (order as any).providerId,
-      user_id,
-      items: order.items,
-      status: order.status,
-      total_amount: (order as any).totalAmount,
-      currency: order.currency,
-      order_date: (order as any).orderDate,
-      due_date: (order as any).dueDate,
-      invoice_number: (order as any).invoiceNumber,
-      bank_info: (order as any).bankInfo,
-      receipt_url: (order as any).receiptUrl,
-      notes: order.notes,
-      created_at: (order as any).createdAt,
-      updated_at: (order as any).updatedAt,
-    };
-    await supabase.from('orders').insert([snakeCaseOrder]);
-    await fetchAll();
+    try {
+      // Mapear campos a snake_case
+      const snakeCaseOrder = {
+        provider_id: (order as any).providerId,
+        user_id,
+        items: order.items,
+        status: order.status,
+        total_amount: (order as any).totalAmount,
+        currency: order.currency,
+        order_date: (order as any).orderDate,
+        due_date: (order as any).dueDate,
+        invoice_number: (order as any).invoiceNumber,
+        bank_info: (order as any).bankInfo,
+        receipt_url: (order as any).receiptUrl,
+        notes: order.notes,
+        created_at: (order as any).createdAt,
+        updated_at: (order as any).updatedAt,
+      };
+      const { error } = await supabase.from('orders').insert([snakeCaseOrder]);
+      if (error) {
+        console.error('Error adding order:', error);
+        setErrorMsg('Error al agregar pedido: ' + (error.message || error.details || ''));
+        throw error;
+      }
+      await fetchAll();
+    } catch (error) {
+      console.error('Error in addOrder:', error);
+      throw error;
+    }
   }, [fetchAll]);
 
   const updateOrder = useCallback(async (order: Order) => {
-    // Mapear campos a snake_case para Supabase
-    const snakeCaseOrder = {
-      provider_id: (order as any).providerId,
-      user_id: order.user_id,
-      items: order.items,
-      status: order.status,
-      total_amount: (order as any).totalAmount,
-      currency: order.currency,
-      order_date: (order as any).orderDate,
-      due_date: (order as any).dueDate,
-      invoice_number: (order as any).invoiceNumber,
-      bank_info: (order as any).bankInfo,
-      receipt_url: (order as any).receiptUrl,
-      notes: order.notes,
-      created_at: (order as any).createdAt,
-      updated_at: (order as any).updatedAt,
-    };
-    await supabase.from('orders').update(snakeCaseOrder).eq('id', order.id);
-    await fetchAll();
+    try {
+      // Mapear campos a snake_case para Supabase
+      const snakeCaseOrder = {
+        provider_id: (order as any).providerId,
+        user_id: order.user_id,
+        items: order.items,
+        status: order.status,
+        total_amount: (order as any).totalAmount,
+        currency: order.currency,
+        order_date: (order as any).orderDate,
+        due_date: (order as any).dueDate,
+        invoice_number: (order as any).invoiceNumber,
+        bank_info: (order as any).bankInfo,
+        receipt_url: (order as any).receiptUrl,
+        notes: order.notes,
+        created_at: (order as any).createdAt,
+        updated_at: (order as any).updatedAt,
+      };
+      const { error } = await supabase.from('orders').update(snakeCaseOrder).eq('id', order.id);
+      if (error) {
+        console.error('Error updating order:', error);
+        setErrorMsg('Error al actualizar pedido: ' + (error.message || error.details || ''));
+        throw error;
+      }
+      await fetchAll();
+    } catch (error) {
+      console.error('Error in updateOrder:', error);
+      throw error;
+    }
   }, [fetchAll]);
 
   const deleteOrder = useCallback(async (id: string, user_id: string) => {
-    await supabase.from('orders').delete().eq('id', id).eq('user_id', user_id);
-    await fetchAll();
+    try {
+      const { error } = await supabase.from('orders').delete().eq('id', id).eq('user_id', user_id);
+      if (error) {
+        console.error('Error deleting order:', error);
+        setErrorMsg('Error al eliminar pedido: ' + (error.message || error.details || ''));
+        throw error;
+      }
+      await fetchAll();
+    } catch (error) {
+      console.error('Error in deleteOrder:', error);
+      throw error;
+    }
   }, [fetchAll]);
 
   // CRUD: Providers
   // Permitir batch insert
   const addProvider = useCallback(async (providerOrProviders: Partial<Provider>|Partial<Provider>[], user_id: string, batch = false) => {
-    if (batch && Array.isArray(providerOrProviders)) {
-      const result = await supabase.from('providers').insert(providerOrProviders);
-      await fetchAll();
+    try {
+      console.log('addProvider called with:', { providerOrProviders, user_id, batch });
+      
+      if (batch && Array.isArray(providerOrProviders)) {
+        const result = await supabase.from('providers').insert(providerOrProviders);
+        if (result.error) {
+          console.error('Error adding providers (batch):', result.error);
+          setErrorMsg('Error al agregar proveedores: ' + (result.error.message || result.error.details || ''));
+          throw result.error;
+        }
+        
+        // Agregar las nuevas filas al principio en lugar de recargar todo
+        if (result.data && result.data.length > 0) {
+          const newProviders = result.data.map(mapProviderFromDb);
+          console.log('Adding batch providers to state:', newProviders);
+          setProviders(prev => [...newProviders, ...prev]);
+        }
+        
+        return result;
+      }
+      const provider = Array.isArray(providerOrProviders) ? providerOrProviders[0] : providerOrProviders;
+      console.log('Processing single provider:', provider);
+      
+      // Manejar campos que pueden ser arrays o strings
+      const categories = Array.isArray(provider.categories) ? provider.categories : 
+                       (typeof provider.categories === 'string' ? [provider.categories] : []);
+      const tags = Array.isArray(provider.tags) ? provider.tags : 
+                  (typeof provider.tags === 'string' ? [provider.tags] : []);
+      
+      const snakeCaseProvider = {
+        name: provider.name,
+        email: provider.email,
+        contact_name: provider.contactName,
+        phone: provider.phone,
+        address: provider.address,
+        categories: categories,
+        tags: tags,
+        notes: provider.notes,
+        cbu: provider.cbu || '',
+        alias: provider.alias || '',
+        razon_social: provider.razonSocial || '',
+        cuit_cuil: provider.cuitCuil || '',
+        created_at: provider.createdAt,
+        updated_at: provider.updatedAt,
+        user_id: user_id,
+      };
+      
+      console.log('📝 Datos a insertar en Supabase:', snakeCaseProvider);
+      console.log('Inserting snakeCaseProvider:', snakeCaseProvider);
+      
+      const result = await supabase.from('providers').insert([snakeCaseProvider]);
+      console.log('Supabase result:', result);
+      
+      if (result.error) {
+        console.error('Error adding provider:', result.error);
+        setErrorMsg('Error al agregar proveedor: ' + (result.error.message || result.error.details || ''));
+        throw result.error;
+      }
+      
+      // Agregar la nueva fila al principio de la lista en lugar de recargar todo
+      if (result.data && result.data.length > 0) {
+        const newProvider = mapProviderFromDb(result.data[0]);
+        console.log('Adding new provider to state:', newProvider);
+        setProviders(prev => {
+          console.log('Previous providers:', prev);
+          const updated = [newProvider, ...prev];
+          console.log('Updated providers:', updated);
+          return updated;
+        });
+      }
+      
       return result;
+    } catch (error) {
+      console.error('Error in addProvider:', error);
+      throw error;
     }
-    const provider = Array.isArray(providerOrProviders) ? providerOrProviders[0] : providerOrProviders;
-    const result = await supabase.from('providers').insert([{ ...provider, user_id }]);
-    await fetchAll();
-    return result;
-  }, [fetchAll]);
+  }, []);
 
   const updateProvider = useCallback(async (provider: Provider) => {
-    await supabase.from('providers').update(provider).eq('id', provider.id);
-    await fetchAll();
-  }, [fetchAll]);
+    try {
+      console.log('🔄 Actualizando proveedor:', provider);
+      
+      // Manejar campos que pueden ser arrays o strings
+      const categories = Array.isArray(provider.categories) ? provider.categories : 
+                       (typeof provider.categories === 'string' ? [provider.categories] : []);
+      const tags = Array.isArray(provider.tags) ? provider.tags : 
+                  (typeof provider.tags === 'string' ? [provider.tags] : []);
+      
+      const snakeCaseProvider = {
+        name: provider.name,
+        email: provider.email,
+        contact_name: provider.contactName,
+        phone: provider.phone,
+        address: provider.address,
+        categories: categories,
+        tags: tags,
+        notes: provider.notes,
+        cbu: provider.cbu || '',
+        alias: provider.alias || '',
+        razon_social: provider.razonSocial || '',
+        cuit_cuil: provider.cuitCuil || '',
+        updated_at: new Date(),
+      };
+      
+      console.log('📝 Datos a enviar a Supabase:', snakeCaseProvider);
+      const { error } = await supabase.from('providers').update(snakeCaseProvider).eq('id', provider.id);
+      if (error) {
+        console.error('Error updating provider:', error);
+        setErrorMsg('Error al actualizar proveedor: ' + (error.message || error.details || ''));
+        throw error;
+      }
+      
+      // Actualizar solo el proveedor específico en lugar de recargar todo
+      setProviders(prev => prev.map(p => p.id === provider.id ? provider : p));
+    } catch (error) {
+      console.error('Error in updateProvider:', error);
+      throw error;
+    }
+  }, []);
 
   // Permitir batch delete
   const deleteProvider = useCallback(async (idOrIds: string | string[], user_id: string, batch = false, forceDelete = false) => {
@@ -320,57 +467,155 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
   // CRUD: Stock
   // Permitir batch insert
   const addStockItem = useCallback(async (itemOrItems: Partial<StockItem>|Partial<StockItem>[], user_id: string, batch = false) => {
-    if (batch && Array.isArray(itemOrItems)) {
-      // Insertar todos los items en un solo llamado
-      const { error } = await supabase.from('stock').insert(itemOrItems);
-      if (error) {
-        console.error('Supabase error al insertar stock (batch):', error, itemOrItems);
-        setErrorMsg('Error al insertar stock: ' + (error.message || error.details || ''));
-        throw error;
+    try {
+      if (batch && Array.isArray(itemOrItems)) {
+        // Validar y convertir quantity para todos los items
+        const validatedItems = itemOrItems.map(item => ({
+          ...item,
+          quantity: item.quantity === '' || item.quantity === null || item.quantity === undefined ? 0 : Number(item.quantity),
+          associatedProviders: Array.isArray(item.associatedProviders) ? item.associatedProviders : [],
+          lastOrdered: item.lastOrdered && !isNaN(Date.parse(String(item.lastOrdered))) ? new Date(item.lastOrdered) : null,
+          nextOrder: item.nextOrder && !isNaN(Date.parse(String(item.nextOrder))) ? new Date(item.nextOrder) : null,
+        }));
+        
+        // Convertir a snake_case para Supabase
+        const snakeCaseItems = validatedItems.map(item => ({
+          product_name: item.productName || '',
+          category: item.category || 'Other',
+          quantity: item.quantity,
+          unit: item.unit || '',
+          restock_frequency: item.restockFrequency || 'weekly',
+          associated_providers: item.associatedProviders,
+          preferred_provider: item.preferredProvider || '',
+          last_ordered: item.lastOrdered,
+          next_order: item.nextOrder,
+          created_at: item.createdAt || new Date(),
+          updated_at: item.updatedAt || new Date(),
+          user_id: user_id,
+        }));
+        
+        // Insertar todos los items en un solo llamado
+        const result = await supabase.from('stock').insert(snakeCaseItems);
+        if (result.error) {
+          console.error('Supabase error al insertar stock (batch):', result.error, itemOrItems);
+          setErrorMsg('Error al insertar stock: ' + (result.error.message || result.error.details || ''));
+          throw result.error;
+        }
+        
+        // Agregar las nuevas filas al principio en lugar de recargar todo
+        if (result.data && result.data.length > 0) {
+          const newStockItems = result.data.map(mapStockItemFromDb);
+          setStockItems(prev => [...newStockItems, ...prev]);
+        }
+        
+        return;
       }
-      await fetchAll();
-      return;
-    }
-    // Comportamiento original: uno por uno
-    const item = Array.isArray(itemOrItems) ? itemOrItems[0] : itemOrItems;
-    const snakeCaseItem = {
-      product_name: item.productName,
-      category: item.category,
-      quantity: item.quantity,
-      unit: item.unit,
-      restock_frequency: item.restockFrequency,
-      associated_providers: item.associatedProviders,
-      preferred_provider: item.preferredProvider,
-      last_ordered: item.lastOrdered,
-      next_order: item.nextOrder,
-      created_at: item.createdAt,
-      updated_at: item.updatedAt,
-      user_id: user_id,
-    };
-    const { error } = await supabase.from('stock').insert([snakeCaseItem]);
-    if (error) {
-      console.error('Supabase error al insertar stock:', error, snakeCaseItem);
-      setErrorMsg('Error al insertar stock: ' + (error.message || error.details || ''));
+      
+      // Comportamiento original: uno por uno
+      const item = Array.isArray(itemOrItems) ? itemOrItems[0] : itemOrItems;
+      
+      // Validaciones mejoradas
+      const quantity = item.quantity === '' || item.quantity === null || item.quantity === undefined ? 0 : Number(item.quantity);
+      const associatedProviders = Array.isArray(item.associatedProviders) ? item.associatedProviders : [];
+      const lastOrdered = item.lastOrdered && !isNaN(Date.parse(String(item.lastOrdered))) ? new Date(item.lastOrdered) : null;
+      const nextOrder = item.nextOrder && !isNaN(Date.parse(String(item.nextOrder))) ? new Date(item.nextOrder) : null;
+      
+      const snakeCaseItem = {
+        product_name: item.productName || '',
+        category: item.category || 'Other',
+        quantity: quantity,
+        unit: item.unit || '',
+        restock_frequency: item.restockFrequency || 'weekly',
+        associated_providers: associatedProviders,
+        preferred_provider: item.preferredProvider || '',
+        last_ordered: lastOrdered,
+        next_order: nextOrder,
+        created_at: item.createdAt || new Date(),
+        updated_at: item.updatedAt || new Date(),
+        user_id: user_id,
+      };
+      
+      const result = await supabase.from('stock').insert([snakeCaseItem]);
+      if (result.error) {
+        console.error('Supabase error al insertar stock:', result.error, snakeCaseItem);
+        setErrorMsg('Error al insertar stock: ' + (result.error.message || result.error.details || ''));
+        throw result.error;
+      }
+      
+      // Agregar la nueva fila al principio de la lista en lugar de recargar todo
+      if (result.data && result.data.length > 0) {
+        const newStockItem = mapStockItemFromDb(result.data[0]);
+        setStockItems(prev => [newStockItem, ...prev]);
+      }
+    } catch (error) {
+      console.error('Error in addStockItem:', error);
       throw error;
     }
-    await fetchAll();
-  }, [fetchAll]);
+  }, []);
 
   const updateStockItem = useCallback(async (item: StockItem) => {
-    await supabase.from('stock').update(item).eq('id', item.id);
-    await fetchAll();
-  }, [fetchAll]);
+    try {
+      // Validaciones mejoradas
+      const quantity = item.quantity === '' || item.quantity === null || item.quantity === undefined ? 0 : Number(item.quantity);
+      const associatedProviders = Array.isArray(item.associatedProviders) ? item.associatedProviders : [];
+      const lastOrdered = item.lastOrdered && !isNaN(Date.parse(String(item.lastOrdered))) ? new Date(item.lastOrdered) : null;
+      const nextOrder = item.nextOrder && !isNaN(Date.parse(String(item.nextOrder))) ? new Date(item.nextOrder) : null;
+      
+      const snakeCaseItem = {
+        product_name: item.productName || '',
+        category: item.category || 'Other',
+        quantity: quantity,
+        unit: item.unit || '',
+        restock_frequency: item.restockFrequency || 'weekly',
+        associated_providers: associatedProviders,
+        preferred_provider: item.preferredProvider || '',
+        last_ordered: lastOrdered,
+        next_order: nextOrder,
+        updated_at: new Date(),
+      };
+      
+      const { error } = await supabase.from('stock').update(snakeCaseItem).eq('id', item.id);
+      if (error) {
+        console.error('Error updating stock item:', error);
+        setErrorMsg('Error al actualizar producto: ' + (error.message || error.details || ''));
+        throw error;
+      }
+      
+      // Actualizar solo el item específico en lugar de recargar todo
+      setStockItems(prev => prev.map(s => s.id === item.id ? item : s));
+    } catch (error) {
+      console.error('Error in updateStockItem:', error);
+      throw error;
+    }
+  }, []);
 
   // Permitir batch delete
   const deleteStockItem = useCallback(async (idOrIds: string | string[], user_id: string, batch = false) => {
-    if (batch && Array.isArray(idOrIds)) {
-      await supabase.from('stock').delete().in('id', idOrIds).eq('user_id', user_id);
-      await fetchAll();
-      return;
+    try {
+      if (batch && Array.isArray(idOrIds)) {
+        const { error } = await supabase.from('stock').delete().in('id', idOrIds).eq('user_id', user_id);
+        if (error) {
+          console.error('Error deleting stock items (batch):', error);
+          setErrorMsg('Error al eliminar productos: ' + (error.message || error.details || ''));
+          throw error;
+        }
+        // Remover items del estado en lugar de recargar todo
+        setStockItems(prev => prev.filter(item => !idOrIds.includes(item.id)));
+        return;
+      }
+      const id = Array.isArray(idOrIds) ? idOrIds[0] : idOrIds;
+      const { error } = await supabase.from('stock').delete().eq('id', id).eq('user_id', user_id);
+      if (error) {
+        console.error('Error deleting stock item:', error);
+        setErrorMsg('Error al eliminar producto: ' + (error.message || error.details || ''));
+        throw error;
+      }
+      // Remover item del estado en lugar de recargar todo
+      setStockItems(prev => prev.filter(item => item.id !== id));
+    } catch (error) {
+      console.error('Error in deleteStockItem:', error);
+      throw error;
     }
-    const id = Array.isArray(idOrIds) ? idOrIds[0] : idOrIds;
-    await supabase.from('stock').delete().eq('id', id).eq('user_id', user_id);
-    await fetchAll();
   }, [fetchAll]);
 
   return (
@@ -389,6 +634,7 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
       addStockItem,
       updateStockItem,
       deleteStockItem,
+      setStockItems,
     }}>
       {loading ? (
         <div className="min-h-screen flex items-center justify-center">
@@ -401,7 +647,21 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
       ) : errorMsg ? (
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <p className="text-red-500">{errorMsg}</p>
+            <div className="text-red-500 mb-4">
+              <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <p className="text-red-600 font-medium">{errorMsg}</p>
+            <button 
+              onClick={() => {
+                setErrorMsg(null);
+                fetchAll();
+              }}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Reintentar
+            </button>
           </div>
         </div>
       ) : (

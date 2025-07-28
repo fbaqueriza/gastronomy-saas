@@ -11,64 +11,54 @@ interface WhatsAppMessage {
   status?: 'sent' | 'delivered' | 'read';
 }
 
+interface Contact {
+  id: string;
+  name: string;
+  phoneNumber: string;
+  lastMessage?: string;
+  lastMessageTime?: string;
+  unreadCount: number;
+}
+
 interface WhatsAppChatProps {
-  orderId: string;
+  providerId: string;
   providerName: string;
   providerPhone: string;
   isOpen: boolean;
   onClose: () => void;
-  orderStatus?: string; // Nuevo prop opcional para saber el estado del pedido
 }
 
 export default function WhatsAppChat({
-  orderId,
+  providerId,
   providerName,
   providerPhone,
   isOpen,
-  onClose,
-  orderStatus, // Nuevo prop
+  onClose
 }: WhatsAppChatProps) {
-  
-  // Asegurar que providerName nunca sea nulo o vacío
-  const safeProviderName = providerName && providerName.trim() ? providerName : 'Proveedor desconocido';
-
-  const [messages, setMessages] = useState<WhatsAppMessage[]>([
-    {
-      id: '1',
-      type: 'sent',
-      content: `Hola ${safeProviderName}! Necesito hacer un pedido. ¿Podés confirmar disponibilidad?`,
-      timestamp: new Date(Date.now() - 3600000),
-      status: 'read',
-    },
-    {
-      id: '2',
-      type: 'received',
-      content: '¡Hola! Sí, tenemos todo en stock. ¿Qué necesitás?',
-      timestamp: new Date(Date.now() - 3500000),
-    },
-    {
-      id: '3',
-      type: 'sent',
-      content: '¡Perfecto! Necesito:\n• 7kg Bife de Chorizo\n• 7kg Asado de Tira\n\n¿Me podés pasar el total?',
-      timestamp: new Date(Date.now() - 3400000),
-      status: 'delivered',
-    },
-    {
-      id: '4',
-      type: 'received',
-      content: '¡Excelente! Acá tenés tu pedido:\n\n🥩 Bife de Chorizo: 7kg × $8.500 = $59.500\n🥩 Asado de Tira: 7kg × $7.200 = $50.400\n\nTotal: $109.900\n\n¿Cuándo necesitás la entrega?',
-      timestamp: new Date(Date.now() - 3300000),
-    },
-    {
-      id: '5',
-      type: 'sent',
-      content: 'Mañana a la mañana estaría perfecto. Por favor enviame la factura cuando esté lista.',
-      timestamp: new Date(Date.now() - 3200000),
-      status: 'sent',
-    },
-  ]);
+  const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Cargar mensajes específicos para este proveedor
+  useEffect(() => {
+    const savedMessages = localStorage.getItem(`whatsapp-messages-${providerId}`);
+    if (savedMessages) {
+      const parsedMessages = JSON.parse(savedMessages);
+      // Convertir timestamps de string a Date
+      const messagesWithDates = parsedMessages.map((msg: any) => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp)
+      }));
+      setMessages(messagesWithDates);
+    }
+  }, [providerId]);
+
+  // Guardar mensajes cuando cambien
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem(`whatsapp-messages-${providerId}`, JSON.stringify(messages));
+    }
+  }, [messages, providerId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -78,26 +68,7 @@ export default function WhatsAppChat({
     scrollToBottom();
   }, [messages]);
 
-  useEffect(() => {
-    // Si el chat está abierto y el pedido está en estado 'sent', agregar mensaje de factura mock si no existe
-    if (isOpen && orderStatus === 'sent') {
-      setMessages((prev) => {
-        const alreadySent = prev.some(m => m.type === 'received' && m.content.includes('Descargar factura'));
-        if (alreadySent) return prev;
-        return [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            type: 'received',
-            content: 'Adjunto la factura correspondiente a tu pedido. Puedes descargarla aquí: [Descargar factura](/mock-factura.pdf)',
-            timestamp: new Date(),
-          },
-        ];
-      });
-    }
-  }, [isOpen, orderStatus]);
-
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
 
     const message: WhatsAppMessage = {
@@ -111,24 +82,38 @@ export default function WhatsAppChat({
     setMessages((prev) => [...prev, message]);
     setNewMessage('');
 
-    // Simulate provider response after 2 seconds
-    setTimeout(() => {
-      const responses = [
-        '¡Perfecto! Ya procesamos tu pedido.',
-        '¡Excelente! Te mando la factura en un rato.',
-        '¡Pedido confirmado! La entrega será mañana a la mañana.',
-        '¡Gracias! Te aviso cuando salga el camión.',
-      ];
-      
-      const response: WhatsAppMessage = {
-        id: (Date.now() + 1).toString(),
-        type: 'received',
-        content: responses[Math.floor(Math.random() * responses.length)],
-        timestamp: new Date(),
-      };
+    // Enviar mensaje real a través de la API
+    try {
+      const response = await fetch('/api/whatsapp/test-send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          to: providerPhone, 
+          message: newMessage 
+        }),
+      });
 
-      setMessages((prev) => [...prev, response]);
-    }, 2000);
+      const result = await response.json();
+      
+      if (result.success) {
+        // Actualizar estado del mensaje
+        setMessages((prev) => 
+          prev.map(msg => 
+            msg.id === message.id 
+              ? { ...msg, status: 'delivered' as const }
+              : msg
+          )
+        );
+      } else {
+        console.error('Error sending message:', result.error);
+        alert(`Error enviando mensaje: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Error enviando mensaje');
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -141,15 +126,15 @@ export default function WhatsAppChat({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md h-[600px] flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md h-[600px] flex flex-col">
         {/* Header */}
         <div className="bg-green-500 text-white p-4 rounded-t-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
                 <span className="text-green-500 font-bold text-lg">
-                  {providerName ? providerName.charAt(0) : '?'}
+                  {providerName.charAt(0).toUpperCase()}
                 </span>
               </div>
               <div>
@@ -157,23 +142,26 @@ export default function WhatsAppChat({
                 <p className="text-sm text-green-100">{providerPhone}</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <button className="p-2 hover:bg-green-600 rounded-full">
-                <Video className="h-5 w-5" />
-              </button>
-              <button className="p-2 hover:bg-green-600 rounded-full">
-                <Phone className="h-5 w-5" />
-              </button>
-              <button className="p-2 hover:bg-green-600 rounded-full">
-                <MoreVertical className="h-5 w-5" />
-              </button>
-            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-green-600 rounded-full"
+            >
+              <span className="text-white text-xl">×</span>
+            </button>
           </div>
         </div>
 
         {/* Messages */}
         <div className="flex-1 bg-gray-100 p-4 overflow-y-auto">
           <div className="space-y-4">
+            {messages.length === 0 && (
+              <div className="text-center text-gray-500 py-8">
+                <div className="text-4xl mb-2">💬</div>
+                <p>No hay mensajes aún</p>
+                <p className="text-sm">Comienza la conversación enviando un mensaje</p>
+              </div>
+            )}
+            
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -187,14 +175,7 @@ export default function WhatsAppChat({
                   }`}
                 >
                   <div className="whitespace-pre-line">
-                    {/* Renderizar enlaces en el mensaje */}
-                    {message.content.includes('[Descargar factura]') ? (
-                      <span>
-                        Adjunto la factura correspondiente a tu pedido. Puedes descargarla aquí: <a href="/mock-factura.pdf" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Descargar factura</a>
-                      </span>
-                    ) : (
-                      message.content
-                    )}
+                    {message.content}
                   </div>
                   <div
                     className={`text-xs mt-1 ${
@@ -231,7 +212,7 @@ export default function WhatsAppChat({
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Type a message..."
+                placeholder="Escribe un mensaje..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 rows={1}
               />
@@ -245,16 +226,6 @@ export default function WhatsAppChat({
             </button>
           </div>
         </div>
-
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-white hover:text-gray-200"
-        >
-          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
       </div>
     </div>
   );

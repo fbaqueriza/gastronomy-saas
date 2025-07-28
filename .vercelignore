@@ -1,0 +1,19 @@
+# Excluir página de WhatsApp del deploy
+src/app/whatsapp/
+src/app/whatsapp-simple/
+
+# Archivos de configuración de WhatsApp
+TWILIO_*.md
+WHATSAPP_*.md
+setup-whatsapp*.bat
+setup-whatsapp*.sh
+setup-webhook.bat
+setup-existing-whatsapp.bat
+setup-new-twilio-line.bat
+setup-whatsapp-db.sql
+setup-whatsapp-test.bat
+setup-whatsapp-test.sh
+setup-whatsapp-twilio.bat
+
+# Variables de entorno de WhatsApp
+env.whatsapp.example 

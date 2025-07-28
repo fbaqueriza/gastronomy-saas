@@ -3,11 +3,37 @@ import { Column } from './types';
 export const filterDataBySearchTerm = (data: any[], searchTerm: string): any[] => {
   if (!searchTerm) return data;
 
-  return data.filter((row) =>
-    Object.values(row).some((value) =>
+  return data.filter((row) => {
+    // Búsqueda en valores directos del row
+    const directMatch = Object.values(row).some((value) =>
       String(value).toLowerCase().includes(searchTerm.toLowerCase()),
-    ),
-  );
+    );
+
+    // Búsqueda en proveedores si están disponibles
+    if (row.providers && Array.isArray(row.providers)) {
+      const providerMatch = row.providers.some((provider: any) =>
+        provider.name && provider.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      if (providerMatch) return true;
+    }
+
+    // Búsqueda en proveedores asociados y preferidos
+    if (row.associatedProviders) {
+      const associatedMatch = Array.isArray(row.associatedProviders) 
+        ? row.associatedProviders.some((provider: any) =>
+            String(provider).toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        : String(row.associatedProviders).toLowerCase().includes(searchTerm.toLowerCase());
+      if (associatedMatch) return true;
+    }
+
+    if (row.preferredProvider) {
+      const preferredMatch = String(row.preferredProvider).toLowerCase().includes(searchTerm.toLowerCase());
+      if (preferredMatch) return true;
+    }
+
+    return directMatch;
+  });
 };
 
 export const generateCSVContent = (
