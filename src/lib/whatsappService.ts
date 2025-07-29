@@ -58,7 +58,7 @@ export class WhatsAppService {
         id: this.generateId(),
         from: this.config!.phoneNumberId,
         to,
-        type: 'text',
+        type: 'sent',
         content,
         timestamp: new Date(),
         status: 'sent',
