@@ -260,8 +260,8 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
         }
         
         // Agregar las nuevas filas al principio en lugar de recargar todo
-        if (result.data && Array.isArray(result.data) && result.data.length > 0) {
-          const newProviders = result.data.map(mapProviderFromDb);
+        if (result.data && Array.isArray(result.data) && (result.data as any[]).length > 0) {
+          const newProviders = (result.data as any[]).map(mapProviderFromDb);
           console.log('Adding batch providers to state:', newProviders);
           setProviders(prev => [...newProviders, ...prev]);
         }
@@ -308,8 +308,8 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
       }
       
       // Agregar la nueva fila al principio de la lista en lugar de recargar todo
-      if (result.data && Array.isArray(result.data) && result.data.length > 0) {
-        const newProvider = mapProviderFromDb(result.data[0]);
+      if (result.data && Array.isArray(result.data) && (result.data as any[]).length > 0) {
+        const newProvider = mapProviderFromDb((result.data as any[])[0]);
         console.log('Adding new provider to state:', newProvider);
         setProviders(prev => {
           console.log('Previous providers:', prev);
@@ -503,8 +503,8 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
         }
         
         // Agregar las nuevas filas al principio en lugar de recargar todo
-        if (result.data && Array.isArray(result.data) && result.data.length > 0) {
-          const newStockItems = result.data.map(mapStockItemFromDb);
+        if (result.data && Array.isArray(result.data) && (result.data as any[]).length > 0) {
+          const newStockItems = (result.data as any[]).map(mapStockItemFromDb);
           setStockItems(prev => [...newStockItems, ...prev]);
         }
         
@@ -543,8 +543,8 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
       }
       
       // Agregar la nueva fila al principio de la lista en lugar de recargar todo
-      if (result.data && Array.isArray(result.data) && result.data.length > 0) {
-        const newStockItem = mapStockItemFromDb(result.data[0]);
+      if (result.data && Array.isArray(result.data) && (result.data as any[]).length > 0) {
+        const newStockItem = mapStockItemFromDb((result.data as any[])[0]);
         setStockItems(prev => [newStockItem, ...prev]);
       }
     } catch (error) {
