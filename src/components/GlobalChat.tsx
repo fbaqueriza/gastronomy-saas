@@ -20,10 +20,7 @@ export default function GlobalChat() {
         isOpen={isChatOpen}
         onClose={closeChat}
       />
-      <ChatFloatingButton
-        onToggleChat={() => isChatOpen ? closeChat() : openChat()}
-        isChatOpen={isChatOpen}
-      />
+      <ChatFloatingButton />
     </>
   );
 }
