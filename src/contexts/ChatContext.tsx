@@ -80,20 +80,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   // Función para agregar un mensaje
   const addMessage = useCallback((contactId: string, message: WhatsAppMessage) => {
-    // Solo loggear en desarrollo y si es un mensaje nuevo
-    if (process.env.NODE_ENV === 'development') {
-      console.log('📝 Agregando mensaje al contexto:', { contactId, messageId: message.id });
-    }
+    console.log('📝 addMessage - Iniciando:', { contactId, messageId: message.id, messageType: message.type });
     
     setMessagesByContact(prev => {
       const contactMessages = prev[contactId] || [];
       const existingIds = new Set(contactMessages.map(msg => msg.id));
       
+      console.log('📊 addMessage - Estado actual:', { 
+        contactId, 
+        existingMessages: contactMessages.length,
+        existingIds: Array.from(existingIds)
+      });
+      
       if (existingIds.has(message.id)) {
-        // Solo loggear en desarrollo
-        if (process.env.NODE_ENV === 'development') {
-          console.log('⚠️ Mensaje duplicado, ignorando:', message.id);
-        }
+        console.log('⚠️ addMessage - Mensaje duplicado, ignorando:', message.id);
         return prev;
       }
       
@@ -101,10 +101,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
       );
       
-      // Solo loggear en desarrollo
-      if (process.env.NODE_ENV === 'development') {
-        console.log('✅ Mensaje agregado al contexto:', { contactId, messageCount: updatedMessages.length });
-      }
+      console.log('✅ addMessage - Mensaje agregado al contexto:', { 
+        contactId, 
+        messageCount: updatedMessages.length,
+        newMessageId: message.id 
+      });
       
       return {
         ...prev,
@@ -114,6 +115,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     // Incrementar contador de no leídos si es un mensaje recibido
     if (message.type === 'received') {
+      console.log('📈 addMessage - Incrementando contador de no leídos para:', contactId);
       setUnreadCounts(prev => ({
         ...prev,
         [contactId]: (prev[contactId] || 0) + 1
