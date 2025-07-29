@@ -144,44 +144,44 @@ export default function IntegratedChatPanel({
   }, [messages, scrollToBottom]);
 
   const handleSendMessage = async () => {
+    console.log('🔍 DEBUG handleSendMessage - Iniciando:', { 
+      newMessage: newMessage, 
+      selectedContact: selectedContact,
+      hasMessage: !!newMessage.trim(),
+      hasContact: !!selectedContact
+    });
+    
     if (!newMessage.trim() || !selectedContact) {
-      // Solo loggear en desarrollo
-      if (process.env.NODE_ENV === 'development') {
-        console.log('❌ No se puede enviar mensaje:', { 
-          hasMessage: !!newMessage.trim(), 
-          hasContact: !!selectedContact,
-          messageLength: newMessage.length,
-          contact: selectedContact 
-        });
-      }
+      console.log('❌ handleSendMessage - No se puede enviar mensaje:', { 
+        hasMessage: !!newMessage.trim(), 
+        hasContact: !!selectedContact,
+        messageLength: newMessage.length,
+        contact: selectedContact 
+      });
       return;
     }
 
     const messageToSend = newMessage.trim();
-    // Solo loggear en desarrollo
-    if (process.env.NODE_ENV === 'development') {
-      console.log('📤 Enviando mensaje desde panel integrado:', { 
-        message: messageToSend, 
-        to: selectedContact.phone,
-        contact: selectedContact 
-      });
-    }
+    console.log('📤 handleSendMessage - Enviando mensaje desde panel integrado:', { 
+      message: messageToSend, 
+      to: selectedContact.phone,
+      contact: selectedContact 
+    });
     
     // Limpiar el input inmediatamente para mejor UX
     setNewMessage('');
-    // Solo loggear en desarrollo
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🧹 Input limpiado inmediatamente');
-    }
+    console.log('🧹 handleSendMessage - Input limpiado inmediatamente');
     
     try {
+      console.log('📞 handleSendMessage - Llamando a sendMessage con:', {
+        contactId: selectedContact.phone,
+        content: messageToSend
+      });
+      
       await sendMessage(selectedContact.phone, messageToSend);
-      // Solo loggear en desarrollo
-      if (process.env.NODE_ENV === 'development') {
-        console.log('✅ Mensaje enviado exitosamente desde panel integrado');
-      }
+      console.log('✅ handleSendMessage - Mensaje enviado exitosamente desde panel integrado');
     } catch (error) {
-      console.error('💥 Error sending message from integrated panel:', error);
+      console.error('💥 handleSendMessage - Error sending message from integrated panel:', error);
       // Restaurar el mensaje si falla
       setNewMessage(messageToSend);
       alert('Error al enviar mensaje. Inténtalo de nuevo.');
