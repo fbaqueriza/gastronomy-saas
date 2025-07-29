@@ -15,8 +15,7 @@ const supabase = supabaseUrl && supabaseServiceKey
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const contactId = searchParams.get('contactId');
+    const contactId = request.nextUrl.searchParams.get('contactId');
     
     console.log('🔍 Verificando estado SSE para contacto:', contactId);
     
