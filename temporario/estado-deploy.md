@@ -27,6 +27,7 @@ curl http://localhost:3001/api/whatsapp/status
 - **Error TypeScript Vercel (webhook)**: ✅ Corregido (for...of → Array.from())
 - **Error TypeScript DataProvider (type assertion)**: ✅ Corregido (`as any[]`)
 - **Error TypeScript DataProvider (comparación)**: ✅ Corregido (remover comparación con string)
+- **Error TypeScript GlobalChat**: ✅ Corregido (props innecesarias removidas)
 - **Sincronización de estado**: ✅ Entre páginas
 - **Botones de chat**: ✅ Funcionando
 - **Mensajes únicos**: ✅ Sin duplicados
@@ -56,11 +57,12 @@ curl http://localhost:3001/api/whatsapp/status
 3. ✅ **Error TypeScript webhook corregido**: for...of → Array.from()
 4. ✅ **Error TypeScript DataProvider (type assertion)**: `as any[]`
 5. ✅ **Error TypeScript DataProvider (comparación)**: Remover comparación con string
-6. ✅ **Configuración de webhooks**: vercel.json optimizado
-7. ✅ **Documentación creada**: Guía completa de configuración
-8. ✅ **Deploy final**: Con configuración de webhooks
-9. 🔄 **Deploy automático**: Vercel detectará cambios
-10. ⏳ **Build en progreso**: Automático
+6. ✅ **Error TypeScript GlobalChat**: Props innecesarias removidas
+7. ✅ **Configuración de webhooks**: vercel.json optimizado
+8. ✅ **Documentación creada**: Guía completa de configuración
+9. ✅ **Deploy final**: Con configuración de webhooks
+10. 🔄 **Deploy automático**: Vercel detectará cambios
+11. ⏳ **Build en progreso**: Automático
 
 ## 📱 **Configuración de Twilio para Producción**
 
@@ -122,6 +124,7 @@ NEXT_PUBLIC_APP_URL=https://tu-app.vercel.app
 - **Push**: Enviado ✅
 - **Error TypeScript webhook**: Corregido ✅
 - **Error TypeScript DataProvider**: Corregido ✅
+- **Error TypeScript GlobalChat**: Corregido ✅
 - **Configuración de webhooks**: Optimizada ✅
 - **Documentación**: Completa ✅
 - **Build**: Automático ⏳
