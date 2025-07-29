@@ -153,45 +153,41 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   // Función para enviar mensaje
   const sendMessage = useCallback(async (contactId: string, content: string) => {
-    // Log temporal para debug
-    console.log('🔍 DEBUG sendMessage:', { contactId, content, timestamp: new Date().toISOString() });
+    console.log('🔍 DEBUG sendMessage - Iniciando envío:', { contactId, content });
     
-    // Solo loggear en desarrollo
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🚀 sendMessage llamado con:', { contactId, content });
-    }
-    
-    if (!content.trim()) {
-      // Solo loggear en desarrollo
-      if (process.env.NODE_ENV === 'development') {
-        console.log('❌ Contenido vacío, cancelando envío');
-      }
+    if (!contactId || !content.trim()) {
+      console.error('❌ sendMessage - Parámetros inválidos:', { contactId, content });
       return;
     }
 
-    const messageId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const message: WhatsAppMessage = {
+    // Normalizar número de teléfono
+    let normalizedPhone = contactId.replace(/[\s\-\(\)]/g, '');
+    if (!normalizedPhone.startsWith('+')) {
+      normalizedPhone = `+${normalizedPhone}`;
+    }
+    
+    console.log('📞 sendMessage - Teléfono normalizado:', { original: contactId, normalized: normalizedPhone });
+
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Crear mensaje temporal
+    const tempMessage: WhatsAppMessage = {
       id: messageId,
       type: 'sent',
-      content: content,
+      content: content.trim(),
       timestamp: new Date(),
-      status: 'sent',
+      status: 'sent'
     };
 
-    // Solo loggear en desarrollo
-    if (process.env.NODE_ENV === 'development') {
-      console.log('📝 Agregando mensaje al contexto:', message);
-    }
+    console.log('📝 sendMessage - Mensaje temporal creado:', tempMessage);
 
-    // Agregar mensaje inmediatamente
-    addMessage(contactId, message);
+    // Agregar mensaje al estado inmediatamente
+    addMessage(normalizedPhone, tempMessage);
+    
+    console.log('✅ sendMessage - Mensaje agregado al estado local');
 
-    // Enviar mensaje a través de la API correcta
     try {
-      // Solo loggear en desarrollo
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🌐 Enviando mensaje a la API:', { to: contactId, message: content });
-      }
+      console.log('🌐 sendMessage - Enviando a la API:', { to: normalizedPhone, message: content });
       
       const response = await fetch('/api/whatsapp/send', {
         method: 'POST',
@@ -199,44 +195,35 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          to: contactId,
+          to: normalizedPhone,
           message: content
         }),
       });
 
-      // Solo loggear en desarrollo
-      if (process.env.NODE_ENV === 'development') {
-        console.log('📡 Respuesta de la API:', response.status, response.statusText);
-      }
+      console.log('📡 sendMessage - Respuesta de la API:', response.status, response.statusText);
 
       const result = await response.json();
       
-      // Solo loggear en desarrollo
-      if (process.env.NODE_ENV === 'development') {
-        console.log('📋 Resultado de la API:', result);
-      }
+      console.log('📋 sendMessage - Resultado de la API:', result);
 
       if (result.success) {
-        // Solo loggear en desarrollo
-        if (process.env.NODE_ENV === 'development') {
-          console.log('✅ Mensaje enviado exitosamente:', result);
-        }
+        console.log('✅ sendMessage - Mensaje enviado exitosamente:', result);
         
         // Actualizar estado del mensaje
         setMessagesByContact(prev => ({
           ...prev,
-          [contactId]: (prev[contactId] || []).map(msg =>
+          [normalizedPhone]: (prev[normalizedPhone] || []).map(msg =>
             msg.id === messageId
               ? { ...msg, status: 'delivered' as const }
               : msg
           )
         }));
       } else {
-        console.error('❌ Error sending message:', result.error);
+        console.error('❌ sendMessage - Error sending message:', result.error);
         // Marcar mensaje como fallido
         setMessagesByContact(prev => ({
           ...prev,
-          [contactId]: (prev[contactId] || []).map(msg =>
+          [normalizedPhone]: (prev[normalizedPhone] || []).map(msg =>
             msg.id === messageId
               ? { ...msg, status: 'failed' as const }
               : msg
@@ -244,11 +231,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }));
       }
     } catch (error) {
-      console.error('💥 Error sending message:', error);
+      console.error('💥 sendMessage - Error sending message:', error);
       // Marcar mensaje como fallido
       setMessagesByContact(prev => ({
         ...prev,
-        [contactId]: (prev[contactId] || []).map(msg =>
+        [normalizedPhone]: (prev[normalizedPhone] || []).map(msg =>
           msg.id === messageId
             ? { ...msg, status: 'failed' as const }
             : msg
