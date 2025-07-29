@@ -93,7 +93,7 @@ export class WhatsAppService {
         to: messageData.to,
         type: messageData.type,
         content: messageData.text?.body || '',
-        mediaUrl: messageData.image?.link || messageData.document?.link,
+        documentUrl: messageData.image?.link || messageData.document?.link,
         timestamp: new Date(messageData.timestamp * 1000),
         status: 'delivered',
         isAutomated: false
