@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Verificar que las variables de entorno estén disponibles
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.warn('⚠️ Supabase no configurado para twilio/webhook');
+}
+
+const supabase = supabaseUrl && supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
 
 // Array global para mensajes en memoria (temporal)
 let incomingMessages: any[] = [];
@@ -15,6 +22,11 @@ const clients = new Map<string, any>();
 // Función para obtener clientes activos desde la base de datos
 async function getActiveClientsFromDB() {
   try {
+    if (!supabase) {
+      console.warn('⚠️ Supabase no configurado, retornando clientes vacíos');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('whatsapp_clients')
       .select('*')
@@ -35,6 +47,11 @@ async function getActiveClientsFromDB() {
 // Función para registrar cliente activo en BD
 async function registerActiveClient(contactId: string) {
   try {
+    if (!supabase) {
+      console.warn('⚠️ Supabase no configurado, no se puede registrar cliente');
+      return;
+    }
+    
     const { error } = await supabase
       .from('whatsapp_clients')
       .upsert({
@@ -57,6 +74,11 @@ async function registerActiveClient(contactId: string) {
 // Función para marcar cliente como inactivo
 async function markClientInactive(contactId: string) {
   try {
+    if (!supabase) {
+      console.warn('⚠️ Supabase no configurado, no se puede marcar cliente como inactivo');
+      return;
+    }
+    
     const { error } = await supabase
       .from('whatsapp_clients')
       .update({ 
@@ -162,8 +184,8 @@ async function addIncomingMessage(phoneNumber: string, content: string, messageS
   console.log('💾 Mensaje entrante agregado al array:', message);
   console.log('📊 Total de mensajes en memoria:', incomingMessages.length);
   
-  // Guardar en base de datos si tenemos userId
-  if (userId) {
+  // Guardar en base de datos si tenemos userId y Supabase está configurado
+  if (userId && supabase) {
     try {
       const { error } = await supabase
         .from('whatsapp_messages')
@@ -185,6 +207,8 @@ async function addIncomingMessage(phoneNumber: string, content: string, messageS
     } catch (error) {
       console.error('Error en addIncomingMessage:', error);
     }
+  } else if (userId && !supabase) {
+    console.warn('⚠️ Supabase no configurado, no se puede guardar mensaje en BD');
   }
   
   // Limpiar clientes desconectados antes de enviar mensajes
@@ -193,27 +217,31 @@ async function addIncomingMessage(phoneNumber: string, content: string, messageS
   // Enviar mensaje a clientes SSE
   await sendMessageToClients(message, phoneNumber);
   
-  // Guardar mensaje en BD para persistencia
-  try {
-    const { error } = await supabase
-      .from('whatsapp_messages')
-      .insert([{
-        message_sid: message.id,
-        contact_id: phoneNumber,
-        content: message.content,
-        message_type: 'received',
-        status: 'received',
-        user_id: 'default-user',
-        timestamp: new Date().toISOString()
-      }]);
-    
-    if (error) {
-      console.error('Error guardando mensaje en BD:', error);
-    } else {
-      console.log('✅ Mensaje guardado en BD para persistencia');
+  // Guardar mensaje en BD para persistencia si Supabase está configurado
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('whatsapp_messages')
+        .insert([{
+          message_sid: message.id,
+          contact_id: phoneNumber,
+          content: message.content,
+          message_type: 'received',
+          status: 'received',
+          user_id: 'default-user',
+          timestamp: new Date().toISOString()
+        }]);
+      
+      if (error) {
+        console.error('Error guardando mensaje en BD:', error);
+      } else {
+        console.log('✅ Mensaje guardado en BD para persistencia');
+      }
+    } catch (error) {
+      console.error('Error en persistencia de mensaje:', error);
     }
-  } catch (error) {
-    console.error('Error en persistencia de mensaje:', error);
+  } else {
+    console.warn('⚠️ Supabase no configurado, no se puede guardar mensaje para persistencia');
   }
   
   return message;
