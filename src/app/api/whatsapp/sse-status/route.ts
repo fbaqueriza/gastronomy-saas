@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Verificar que las variables de entorno estén disponibles
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.warn('⚠️ Supabase no configurado para sse-status');
+}
+
+const supabase = supabaseUrl && supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,16 +20,22 @@ export async function GET(request: NextRequest) {
     
     console.log('🔍 Verificando estado SSE para contacto:', contactId);
     
-    // Verificar variables de entorno
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error('❌ Variables de entorno faltantes para Supabase');
+    if (!supabase) {
+      console.warn('⚠️ Supabase no configurado, retornando estado vacío');
       return NextResponse.json({ 
-        error: 'Configuración de Supabase incompleta',
-        missing: {
-          url: !process.env.NEXT_PUBLIC_SUPABASE_URL,
-          key: !process.env.SUPABASE_SERVICE_ROLE_KEY
+        success: true,
+        status: {
+          timestamp: new Date().toISOString(),
+          totalActiveClients: 0,
+          contactSpecific: contactId ? {
+            contactId,
+            isActive: false,
+            lastSeen: null
+          } : null,
+          allClients: [],
+          tableError: 'Supabase no configurado'
         }
-      }, { status: 500 });
+      });
     }
     
     // Verificar si la tabla existe y obtener clientes activos
