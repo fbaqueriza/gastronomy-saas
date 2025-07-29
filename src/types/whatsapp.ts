@@ -14,7 +14,7 @@ export interface WhatsAppMessage {
   type: 'sent' | 'received';
   content: string;
   timestamp: Date;
-  status?: 'sent' | 'delivered' | 'read';
+  status?: 'sent' | 'delivered' | 'read' | 'failed';
   // Soporte para documentos
   messageType?: 'text' | 'document' | 'image' | 'audio' | 'video';
   documentUrl?: string;
