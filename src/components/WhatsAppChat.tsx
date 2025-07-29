@@ -37,6 +37,8 @@ export default function WhatsAppChat({
 }: WhatsAppChatProps) {
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [isSimulationMode, setIsSimulationMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Cargar mensajes específicos para este proveedor
@@ -52,6 +54,23 @@ export default function WhatsAppChat({
       setMessages(messagesWithDates);
     }
   }, [providerId]);
+
+  // Verificar modo de simulación
+  useEffect(() => {
+    const checkSimulationMode = async () => {
+      try {
+        const response = await fetch('/api/whatsapp/status');
+        const data = await response.json();
+        if (data.success) {
+          setIsSimulationMode(data.service.mode === 'simulation');
+        }
+      } catch (error) {
+        console.error('Error checking simulation mode:', error);
+      }
+    };
+    
+    checkSimulationMode();
+  }, []);
 
   // Guardar mensajes cuando cambien
   useEffect(() => {
@@ -69,7 +88,7 @@ export default function WhatsAppChat({
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || isLoading) return;
 
     const message: WhatsAppMessage = {
       id: Date.now().toString(),
@@ -80,18 +99,20 @@ export default function WhatsAppChat({
     };
 
     setMessages((prev) => [...prev, message]);
+    const messageToSend = newMessage;
     setNewMessage('');
+    setIsLoading(true);
 
     // Enviar mensaje real a través de la API
     try {
-      const response = await fetch('/api/whatsapp/test-send', {
+      const response = await fetch('/api/whatsapp/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
           to: providerPhone, 
-          message: newMessage 
+          message: messageToSend 
         }),
       });
 
@@ -106,6 +127,11 @@ export default function WhatsAppChat({
               : msg
           )
         );
+        
+        // Mostrar notificación si está en modo simulación
+        if (result.simulated) {
+          console.log('📱 Mensaje enviado en modo simulación');
+        }
       } else {
         console.error('Error sending message:', result.error);
         alert(`Error enviando mensaje: ${result.error}`);
@@ -113,6 +139,8 @@ export default function WhatsAppChat({
     } catch (error) {
       console.error('Error sending message:', error);
       alert('Error enviando mensaje');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -140,6 +168,11 @@ export default function WhatsAppChat({
               <div>
                 <h3 className="font-semibold">{providerName}</h3>
                 <p className="text-sm text-green-100">{providerPhone}</p>
+                {isSimulationMode && (
+                  <p className="text-xs text-green-200 mt-1">
+                    🔧 Modo simulación
+                  </p>
+                )}
               </div>
             </div>
             <button
@@ -159,6 +192,11 @@ export default function WhatsAppChat({
                 <div className="text-4xl mb-2">💬</div>
                 <p>No hay mensajes aún</p>
                 <p className="text-sm">Comienza la conversación enviando un mensaje</p>
+                {isSimulationMode && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Los mensajes se simulan para pruebas
+                  </p>
+                )}
               </div>
             )}
             
@@ -215,16 +253,26 @@ export default function WhatsAppChat({
                 placeholder="Escribe un mensaje..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 rows={1}
+                disabled={isLoading}
               />
             </div>
             <button
               onClick={handleSendMessage}
-              disabled={!newMessage.trim()}
+              disabled={!newMessage.trim() || isLoading}
               className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Send className="h-5 w-5" />
+              {isLoading ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
             </button>
           </div>
+          {isSimulationMode && (
+            <p className="text-xs text-gray-400 mt-2 text-center">
+              🔧 Modo simulación - Los mensajes se simulan para pruebas
+            </p>
+          )}
         </div>
       </div>
     </div>

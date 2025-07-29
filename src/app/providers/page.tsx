@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
-import Navigation from '../../components/Navigation';
-import DataGrid from '../../components/DataGrid';
+import SpreadsheetGrid from '../../components/DataGrid';
 import { Provider } from '../../types';
-import { Plus, Upload, Download, FileText, Eye, MessageSquare } from 'lucide-react';
+import { Plus, Upload, Download, FileText, Eye } from 'lucide-react';
 import { useUndo } from '../../hooks/useUndo';
 import { useCSV } from '../../hooks/useCSV';
 import {
@@ -15,7 +14,8 @@ import {
   csvEscape,
   parseCsvRow,
 } from '../../features/providers/providerUtils';
-import WhatsAppChat from '../../components/WhatsAppChat';
+import IntegratedChatPanel from '../../components/IntegratedChatPanel';
+import { useChat } from '../../contexts/ChatContext';
 import { DataProvider, useData } from '../../components/DataProvider';
 import es from '../../locales/es';
 import { useRouter } from 'next/navigation';
@@ -50,8 +50,18 @@ function ProvidersPage() {
   const [loading, setLoading] = useState(false);
   const [addingProvider, setAddingProvider] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
-  const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
+  
+  // Chat state
+  const { openChat, isChatOpen } = useChat();
+  const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
+
+  // Sincronizar el estado local con el contexto
+  useEffect(() => {
+    if (isChatOpen !== isChatPanelOpen) {
+      setIsChatPanelOpen(isChatOpen);
+    }
+  }, [isChatOpen, isChatPanelOpen]);
 
   // PDF upload handler
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -63,10 +73,10 @@ function ProvidersPage() {
     {
       key: 'acciones',
       name: 'Acciones',
-      width: 120,
+      width: 80,
       editable: false,
       render: (row: Provider) => (
-        <div className="flex gap-1 justify-center items-center" style={{ width: 120, minWidth: 120, maxWidth: 120 }}>
+        <div className="flex gap-1 justify-center items-center" style={{ width: 80, minWidth: 80, maxWidth: 80 }}>
           <button
             className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
             title="Ver catálogo del proveedor"
@@ -80,19 +90,6 @@ function ProvidersPage() {
           >
             <Eye className="h-4 w-4 text-blue-600" />
           </button>
-          <button
-            className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-400"
-            onClick={() => {
-              setSelectedProvider(row);
-              setIsWhatsAppOpen(true);
-            }}
-            title="Abrir chat con el proveedor"
-            aria-label="Abrir chat con el proveedor"
-            tabIndex={0}
-          >
-            <MessageSquare className="h-4 w-4 text-green-600" />
-          </button>
-
         </div>
       ),
     },
@@ -617,8 +614,6 @@ function ProvidersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
-
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="px-4 py-6 sm:px-0">
@@ -648,7 +643,7 @@ function ProvidersPage() {
               completa tus datos y luego "Import" para cargarlos de manera masiva.
             </p>
           </div>
-          <DataGrid
+          <SpreadsheetGrid
               key={`providers-${providers.length}-${Date.now()}`} // Forzar re-render completo
               columns={columns}
               data={providers}
@@ -691,19 +686,13 @@ function ProvidersPage() {
         </div>
       </main>
 
-      {/* WhatsApp Chat Modal */}
-      {selectedProvider && (
-        <WhatsAppChat
-          providerId={selectedProvider.id}
-          providerName={selectedProvider.name}
-          providerPhone={selectedProvider.phone}
-          isOpen={isWhatsAppOpen}
-          onClose={() => {
-            setIsWhatsAppOpen(false);
-            setSelectedProvider(null);
-          }}
-        />
-      )}
+      {/* Chat Integrado */}
+      <IntegratedChatPanel
+        providers={providers}
+        isOpen={isChatPanelOpen}
+        onClose={() => setIsChatPanelOpen(false)}
+      />
+      
       {importMessage && (
         <div className="fixed top-4 right-4 z-50 bg-blue-100 border border-blue-400 text-blue-800 px-4 py-2 rounded shadow">
           {importMessage}

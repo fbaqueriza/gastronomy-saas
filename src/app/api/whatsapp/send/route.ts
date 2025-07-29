@@ -14,15 +14,17 @@ export async function POST(request: NextRequest) {
 
     const result = await twilioWhatsAppService.sendMessage(to, message);
     
-    if (result && result.sid) {
+    if (result && (result.sid || result.simulated)) {
       return NextResponse.json({
         success: true,
         messageId: result.sid,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        simulated: result.simulated || false,
+        mode: twilioWhatsAppService.isSimulationModeEnabled() ? 'simulation' : 'production'
       });
     } else {
       return NextResponse.json(
-        { error: 'Failed to send message - Twilio service not available' },
+        { error: 'Failed to send message - Service not available' },
         { status: 500 }
       );
     }

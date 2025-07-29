@@ -11,17 +11,37 @@ export interface WhatsAppConfig {
 
 export interface WhatsAppMessage {
   id: string;
-  from: string;
-  to: string;
-  type: 'text' | 'image' | 'document' | 'audio' | 'video';
+  type: 'sent' | 'received';
   content: string;
-  mediaUrl?: string;
   timestamp: Date;
-  status: 'sent' | 'delivered' | 'read' | 'failed';
+  status?: 'sent' | 'delivered' | 'read';
+  // Soporte para documentos
+  messageType?: 'text' | 'document' | 'image' | 'audio' | 'video';
+  documentUrl?: string;
+  documentName?: string;
+  documentSize?: number;
+  documentType?: string;
+  // Campos adicionales para compatibilidad
+  from?: string;
+  to?: string;
   orderId?: string;
   providerId?: string;
-  isAutomated: boolean;
+  isAutomated?: boolean;
   aiAnalysis?: AIAnalysis;
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  lastMessage?: string;
+  lastMessageTime?: Date;
+  unreadCount?: number;
+  // Campos adicionales para proveedores
+  providerId?: string;
+  email?: string;
+  address?: string;
+  category?: string;
 }
 
 export interface AIAnalysis {
@@ -123,4 +143,24 @@ export interface AIInsights {
   sentimentTrend: 'improving' | 'declining' | 'stable';
   recommendations: string[];
   generatedAt: Date;
+}
+
+// Tipos para el chat integrado
+export interface ChatState {
+  selectedContact: Contact | null;
+  messages: WhatsAppMessage[];
+  unreadCounts: Record<string, number>;
+  isChatOpen: boolean;
+  isConnected: boolean;
+  connectionStatus: 'connected' | 'connecting' | 'disconnected';
+}
+
+export interface ChatActions {
+  setSelectedContact: (contact: Contact | null) => void;
+  addMessage: (contactId: string, message: WhatsAppMessage) => void;
+  markAsRead: (contactId: string) => void;
+  openChat: (contact?: Contact) => void;
+  closeChat: () => void;
+  sendMessage: (contactId: string, content: string) => Promise<void>;
+  sendDocument: (contactId: string, file: File) => Promise<void>;
 } 

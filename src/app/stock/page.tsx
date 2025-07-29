@@ -2,7 +2,6 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
-import Navigation from '../../components/Navigation';
 import SpreadsheetGrid from '../../components/DataGrid';
 import { StockItem } from '../../types';
 import {
@@ -15,6 +14,8 @@ import {
   Upload,
 } from 'lucide-react';
 import { DataProvider, useData } from '../../components/DataProvider';
+import IntegratedChatPanel from '../../components/IntegratedChatPanel';
+import { useChat } from '../../contexts/ChatContext';
 import es from '../../locales/es';
 import { useRouter } from 'next/navigation';
 
@@ -63,6 +64,17 @@ function StockPage({ user }: StockPageProps) {
     rowData: any;
     currentValue: any;
   } | null>(null);
+  
+  // Chat state
+  const { openChat, isChatOpen } = useChat();
+  const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
+
+  // Sincronizar el estado local con el contexto
+  useEffect(() => {
+    if (isChatOpen !== isChatPanelOpen) {
+      setIsChatPanelOpen(isChatOpen);
+    }
+  }, [isChatOpen, isChatPanelOpen]);
 
   // Remove minimumQuantity and currentStock columns
   const columns = [
@@ -609,7 +621,6 @@ Huevos,Proteínas,200,unidades,daily,Proveedor D,Proveedor D,2025-07-25,2025-07-
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200">
@@ -757,6 +768,19 @@ Huevos,Proteínas,200,unidades,daily,Proveedor D,Proveedor D,2025-07-25,2025-07-
           </div>
         </div>
       )}
+      
+      {/* Chat Integrado */}
+      <IntegratedChatPanel
+        providers={providers}
+        isOpen={isChatPanelOpen}
+        onClose={() => setIsChatPanelOpen(false)}
+      />
+      
+      {/* Botón flotante del chat */}
+      {/* ChatFloatingButton
+        onToggleChat={() => setIsChatPanelOpen(!isChatPanelOpen)}
+        isChatOpen={isChatPanelOpen}
+      /> */}
     </div>
   );
 }

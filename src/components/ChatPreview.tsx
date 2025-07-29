@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { MessageSquare, Bell } from 'lucide-react';
+import { useChat } from '../contexts/ChatContext';
+import { Contact } from '../types/whatsapp';
 
 interface ChatMessage {
   id: string;
@@ -13,19 +15,24 @@ interface ChatMessage {
 
 interface ChatPreviewProps {
   providerName: string;
+  providerPhone?: string;
+  providerId?: string;
   orderId?: string;
-  onOpenChat: () => void;
+  onOpenChat?: () => void;
   hasUnreadMessages?: boolean;
   lastMessage?: ChatMessage;
 }
 
 export default function ChatPreview({
   providerName,
+  providerPhone,
+  providerId,
   orderId,
   onOpenChat,
   hasUnreadMessages = false,
   lastMessage,
 }: ChatPreviewProps) {
+  const { openChat, unreadCounts } = useChat();
   const [previewText, setPreviewText] = useState('');
   const [timeAgo, setTimeAgo] = useState('');
 
@@ -59,6 +66,32 @@ export default function ChatPreview({
     }
   }, [lastMessage]);
 
+  const handleOpenChat = () => {
+    if (providerPhone && providerId) {
+      // Normalizar el número de teléfono para que coincida con el webhook
+      const normalizedPhone = providerPhone.startsWith('+') ? providerPhone : `+${providerPhone}`;
+      
+      // Crear contacto para el contexto global
+      const contact: Contact = {
+        id: providerId,
+        name: providerName,
+        phone: normalizedPhone,
+        providerId: providerId,
+        lastMessage: previewText,
+        lastMessageTime: lastMessage?.timestamp,
+        unreadCount: unreadCounts[normalizedPhone] || 0
+      };
+      
+      // Abrir el chat global
+      openChat(contact);
+    }
+    
+    // Llamar al callback original si existe
+    if (onOpenChat) {
+      onOpenChat();
+    }
+  };
+
   return (
     <div 
       className={`relative p-1 rounded border cursor-pointer transition-all duration-200 hover:shadow-sm ${
@@ -66,7 +99,7 @@ export default function ChatPreview({
           ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' 
           : 'bg-white border-gray-200 hover:bg-gray-50'
       }`}
-      onClick={onOpenChat}
+      onClick={handleOpenChat}
     >
       {/* Indicador de mensajes no leídos */}
       {hasUnreadMessages && (

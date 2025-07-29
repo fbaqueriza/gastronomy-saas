@@ -103,72 +103,47 @@ function cleanupDisconnectedClients() {
   }
 }
 
-// Función para enviar mensaje a clientes SSE
+// Función para enviar mensaje a todos los clientes SSE
 async function sendMessageToClients(message: any, phoneNumber: string) {
+  console.log(`📤 Enviando mensaje SSE a clientes: ${clients.size} clientes conectados`);
+  
   const eventData = `data: ${JSON.stringify(message)}\n\n`;
-  console.log('📤 Enviando mensaje SSE a clientes:', clients.size, 'clientes conectados');
-  console.log('📤 Event data:', eventData);
   
   let sentCount = 0;
-  console.log('🔍 Debugging clientes SSE:');
-  console.log(`📊 Total de clientes conectados: ${clients.size}`);
-  
-  // Normalizar número de teléfono entrante
-  const normalizedPhoneNumber = phoneNumber.trim().replace(/^\+/, '');
-  
-  // Enviar a clientes en memoria
   clients.forEach((client, contactId) => {
-    console.log(`\n🔍 Cliente en memoria para contacto: ${contactId}`);
-    console.log(`  - contactId original: "${contactId}"`);
-    console.log(`  - phoneNumber original: "${phoneNumber}"`);
-    
-    // Normalizar números de teléfono para comparación
-    const normalizedClientId = contactId.trim().replace(/^\+/, '');
-    
-    console.log(`  - contactId normalizado: "${normalizedClientId}"`);
-    console.log(`  - phoneNumber normalizado: "${normalizedPhoneNumber}"`);
-    console.log(`  - ¿Coinciden?: ${normalizedClientId === normalizedPhoneNumber}`);
-    
-    // Solo enviar a clientes que estén escuchando este contacto
-    if (normalizedClientId === normalizedPhoneNumber) {
-      try {
+    try {
+      if (client.write && typeof client.write === 'function') {
         client.write(eventData);
-        console.log('✅ Mensaje enviado a cliente SSE en memoria para contacto:', phoneNumber);
         sentCount++;
-      } catch (error) {
-        console.error('Error enviando mensaje a cliente en memoria:', error);
-        clients.delete(contactId);
+        console.log(`✅ Mensaje enviado a cliente: ${contactId}`);
       }
-    } else {
-      console.log('❌ No coinciden, no se envía mensaje');
+    } catch (error) {
+      console.log(`❌ Error enviando mensaje a cliente ${contactId}:`, error);
     }
   });
   
-  // Si no hay clientes en memoria, verificar en BD
-  if (clients.size === 0) {
+  console.log(`📤 Mensaje enviado a ${sentCount} clientes para contacto: ${phoneNumber}`);
+  
+  // Si no hay clientes conectados, guardar en BD para persistencia
+  if (sentCount === 0) {
     console.log('⚠️ No hay clientes SSE en memoria, verificando BD...');
-    try {
-      const activeClients = await getActiveClientsFromDB();
-      console.log(`📊 Clientes activos en BD: ${activeClients.length}`);
-      
-      // Buscar clientes que coincidan con el número de teléfono
-      const matchingClients = activeClients.filter(client => {
-        const normalizedClientId = client.contact_id.trim().replace(/^\+/, '');
-        return normalizedClientId === normalizedPhoneNumber;
-      });
-      
-      console.log(`📊 Clientes que coinciden en BD: ${matchingClients.length}`);
-      
-      if (matchingClients.length > 0) {
-        console.log('⚠️ Hay clientes activos en BD pero no en memoria. Esto puede indicar un reinicio del servidor.');
-        console.log('📝 Mensaje guardado en BD, se enviará cuando el cliente se reconecte.');
-      }
-    } catch (error) {
-      console.error('Error verificando clientes en BD:', error);
+    const activeClients = await getActiveClientsFromDB();
+    console.log(`📊 Clientes activos en BD: ${activeClients.length}`);
+    
+    const matchingClients = activeClients.filter(client => 
+      client.contact_id === phoneNumber || 
+      client.contact_id === `+${phoneNumber}` ||
+      client.contact_id === phoneNumber.replace('+', '')
+    );
+    
+    console.log(`📊 Clientes que coinciden en BD: ${matchingClients.length}`);
+    
+    if (matchingClients.length > 0) {
+      console.log('✅ Hay clientes activos en BD, mensaje será entregado cuando se reconecten');
+    } else {
+      console.log('⚠️ No hay clientes activos para este contacto');
     }
   }
-  
-  console.log(`📤 Mensaje enviado a ${sentCount} clientes para contacto: ${phoneNumber}`);
 }
 
 // Función para agregar mensaje entrante

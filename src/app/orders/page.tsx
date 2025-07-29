@@ -2,12 +2,12 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
-import Navigation from '../../components/Navigation';
-import WhatsAppChat from '../../components/WhatsAppChat';
 import SuggestedOrders from '../../components/SuggestedOrders';
 import CreateOrderModal from '../../components/CreateOrderModal';
 import ComprobanteButton from '../../components/ComprobanteButton';
 import ChatPreview from '../../components/ChatPreview';
+import IntegratedChatPanel from '../../components/IntegratedChatPanel';
+import { useChat } from '../../contexts/ChatContext';
 import { Order, OrderItem, Provider, StockItem } from '../../types';
 import {
   Plus,
@@ -55,6 +55,18 @@ function OrdersPage({ user }: OrdersPageProps) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [suggestedOrder, setSuggestedOrder] = useState<any>(null);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  
+  // Chat state
+  const { openChat, isChatOpen, closeChat } = useChat();
+  const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
+  
+  // Sincronizar el estado local con el contexto
+  useEffect(() => {
+    if (isChatOpen !== isChatPanelOpen) {
+      setIsChatPanelOpen(isChatOpen);
+    }
+  }, [isChatOpen, isChatPanelOpen, setIsChatPanelOpen]);
+  
   // Remove all other local state for orders/providers/stockItems
   // All handlers now use Supabase CRUD only
   const handleCreateOrder = async (orderData: {
@@ -63,6 +75,7 @@ function OrdersPage({ user }: OrdersPageProps) {
     notes: string;
   }) => {
     if (!user) return;
+    
     const newOrder: Partial<Order> = {
       providerId: orderData.providerId,
       user_id: user.id,
@@ -79,10 +92,47 @@ function OrdersPage({ user }: OrdersPageProps) {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+    
     console.log('DEBUG Pedido:', JSON.stringify(newOrder, null, 2));
-    await addOrder(newOrder, user.id);
+    const createdOrder = await addOrder(newOrder, user.id);
     setIsCreateModalOpen(false);
     setSuggestedOrder(null);
+
+    // Enviar mensaje automático al proveedor
+    try {
+      const provider = providers.find(p => p.id === orderData.providerId);
+      if (provider && provider.phone) {
+        const orderMessage = `🛒 *Nuevo Pedido*\n\n` +
+          `*Proveedor:* ${provider.name}\n` +
+          `*Fecha:* ${new Date().toLocaleDateString('es-AR')}\n` +
+          `*Total:* $${orderData.items.reduce((sum, item) => sum + item.total, 0).toLocaleString()}\n\n` +
+          `*Productos:*\n` +
+          orderData.items.map(item => 
+            `• ${item.productName}: ${item.quantity} ${item.unit} - $${item.total}`
+          ).join('\n') +
+          (orderData.notes ? `\n\n*Notas:* ${orderData.notes}` : '');
+
+        // Enviar mensaje a través de la API
+        const response = await fetch('/api/whatsapp/test-send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: provider.phone,
+            message: orderMessage
+          }),
+        });
+
+        if (response.ok) {
+          console.log('✅ Mensaje de pedido enviado al proveedor');
+        } else {
+          console.error('❌ Error enviando mensaje de pedido');
+        }
+      }
+    } catch (error) {
+      console.error('Error enviando mensaje de pedido:', error);
+    }
   };
 
   const handleSuggestedOrderCreate = (suggestedOrder: any) => {
@@ -164,11 +214,37 @@ function OrdersPage({ user }: OrdersPageProps) {
     }
   };
   // Add state and handlers for WhatsApp chat
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);
   const handleOrderClick = (order: Order) => {
-    setSelectedOrder(order);
-    setIsWhatsAppOpen(true);
+    // Encontrar el proveedor correspondiente
+    const provider = providers.find(p => p.id === order.providerId);
+    if (provider) {
+      // Normalizar el número de teléfono - remover espacios y guiones, agregar + si no tiene
+      let normalizedPhone = provider.phone || '';
+      
+      // Remover espacios, guiones y paréntesis
+      normalizedPhone = normalizedPhone.replace(/[\s\-\(\)]/g, '');
+      
+      // Agregar + si no tiene
+      if (!normalizedPhone.startsWith('+')) {
+        normalizedPhone = `+${normalizedPhone}`;
+      }
+      
+      console.log(`📞 Normalizando teléfono en orders: "${provider.phone}" -> "${normalizedPhone}"`);
+      
+      // Crear contacto para el chat
+      const contact = {
+        id: provider.id,
+        name: provider.name,
+        phone: normalizedPhone,
+        providerId: provider.id,
+        lastMessage: '',
+        lastMessageTime: new Date(),
+        unreadCount: 0
+      };
+      
+      // Abrir el chat usando el contexto
+      openChat(contact);
+    }
   };
   // Debug: mostrar datos de orders
   console.log('DEBUG: orders data:', orders);
@@ -314,7 +390,6 @@ function OrdersPage({ user }: OrdersPageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="px-4 py-6 sm:px-0">
@@ -397,6 +472,8 @@ function OrdersPage({ user }: OrdersPageProps) {
                         <div className="mb-1">
                           <ChatPreview
                             providerName={getProviderName(order.providerId)}
+                            providerPhone={providers.find(p => p.id === order.providerId)?.phone || ''}
+                            providerId={order.providerId}
                             orderId={order.id}
                             onOpenChat={() => handleOrderClick(order)}
                             hasUnreadMessages={false}
@@ -765,36 +842,25 @@ function OrdersPage({ user }: OrdersPageProps) {
           </div>
         </div>
       </main>
-      {/* WhatsApp Chat Split Panel */}
-      {selectedOrder && (
-        <div className={`fixed top-0 right-0 h-full w-full md:w-1/2 lg:w-1/3 z-40 transition-transform duration-300 ${isWhatsAppOpen ? 'translate-x-0' : 'translate-x-full'} bg-white shadow-xl flex flex-col`}>
-          <WhatsAppChat
-            orderId={selectedOrder.id}
-            providerName={getProviderName(selectedOrder.providerId)}
-            providerPhone={getProviderName(selectedOrder.providerId)} // This was removed
-            isOpen={isWhatsAppOpen}
-            onClose={() => {
-              setIsWhatsAppOpen(false);
-              setSelectedOrder(null);
-            }}
-            orderStatus={selectedOrder.status}
-          />
-        </div>
-      )}
+      
       {/* Create Order Modal */}
       <CreateOrderModal
         isOpen={isCreateModalOpen}
-        onClose={() => {
-          setIsCreateModalOpen(false);
-          setSuggestedOrder(null);
-        }}
+        onClose={() => setIsCreateModalOpen(false)}
         onCreateOrder={handleCreateOrder}
         providers={providers}
         stockItems={stockItems}
         suggestedOrder={suggestedOrder}
+        selectedProviderId={null}
       />
-      {/* Modal de resumen de carga masiva (estructura base) */}
-      {/* This section was removed as per the edit hint */}
+
+      {/* Integrated Chat Panel */}
+      <IntegratedChatPanel
+        providers={providers}
+        isOpen={isChatPanelOpen}
+        onClose={() => setIsChatPanelOpen(false)}
+      />
+      
     </div>
   );
 }

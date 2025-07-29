@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from 'react';
 import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
-import Navigation from "../../components/Navigation";
-import SuggestedOrders from "../../components/SuggestedOrders";
-import CreateOrderModal from "../../components/CreateOrderModal";
-import { Order, OrderItem, Provider, StockItem } from "../../types";
+import SuggestedOrders from '../../components/SuggestedOrders';
+import CreateOrderModal from '../../components/CreateOrderModal';
+import ComprobanteButton from '../../components/ComprobanteButton';
+import ChatPreview from '../../components/ChatPreview';
+import IntegratedChatPanel from '../../components/IntegratedChatPanel';
+import { useChat } from '../../contexts/ChatContext';
+import { Order, OrderItem, Provider, StockItem } from '../../types';
 import {
   Plus,
   ShoppingCart,
@@ -16,22 +19,15 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  Users,
-  TrendingUp,
-  Package,
-  CreditCard,
-  Calendar,
+  X,
+  Clipboard,
+  Check,
+  Download,
+  ChevronDown,
   BarChart3,
-} from "lucide-react";
-import {
-  DataProvider,
-  useData,
-} from "../../components/DataProvider";
-import es from "../../locales/es";
-import WhatsAppChat from "../../components/WhatsAppChat";
-import PendingOrderList from '../../components/PendingOrderList';
-import ComprobanteButton from '../../components/ComprobanteButton';
-import ChatPreview from '../../components/ChatPreview';
+} from 'lucide-react';
+import { DataProvider, useData } from '../../components/DataProvider';
+import es from '../../locales/es';
 import { Menu } from '@headlessui/react';
 import { useRouter } from 'next/navigation';
 import supabase from '../../lib/supabaseClient';
@@ -126,6 +122,14 @@ function DashboardPageContent({
   setPaymentProofs: (proofs: { [orderId: string]: { url: string; name: string } }) => void;
 }) {
   const { addOrder, updateOrder, fetchAll } = useData();
+  const { openChat, isChatOpen: contextIsChatOpen, closeChat } = useChat();
+  
+  // Sincronizar el estado local con el contexto
+  useEffect(() => {
+    if (contextIsChatOpen !== isChatOpen) {
+      setIsChatOpen(contextIsChatOpen);
+    }
+  }, [contextIsChatOpen, isChatOpen, setIsChatOpen]);
   
   // Ordenar órdenes por fecha descendente (created_at) - los más recientes primero
   const sortedOrders = [...orders].sort((a, b) => {
@@ -315,12 +319,37 @@ function DashboardPageContent({
     });
   };
 
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);
-  
   const handleOrderClick = (order: Order) => {
-    setSelectedOrder(order);
-    setIsWhatsAppOpen(true);
+    // Encontrar el proveedor correspondiente
+    const provider = providers.find(p => p.id === order.providerId);
+    if (provider) {
+      // Normalizar el número de teléfono - remover espacios y guiones, agregar + si no tiene
+      let normalizedPhone = provider.phone || '';
+      
+      // Remover espacios, guiones y paréntesis
+      normalizedPhone = normalizedPhone.replace(/[\s\-\(\)]/g, '');
+      
+      // Agregar + si no tiene
+      if (!normalizedPhone.startsWith('+')) {
+        normalizedPhone = `+${normalizedPhone}`;
+      }
+      
+      console.log(`📞 Normalizando teléfono en dashboard: "${provider.phone}" -> "${normalizedPhone}"`);
+      
+      // Crear contacto para el chat
+      const contact = {
+        id: provider.id,
+        name: provider.name,
+        phone: normalizedPhone,
+        providerId: provider.id,
+        lastMessage: '',
+        lastMessageTime: new Date(),
+        unreadCount: 0
+      };
+      
+      // Abrir el chat usando el contexto
+      openChat(contact);
+    }
   };
 
   const openReceipt = (receiptUrl: string | undefined) => {
@@ -403,7 +432,6 @@ function DashboardPageContent({
   });
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
       {/* Remove floating chat button */}
       {/* Header */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
@@ -429,12 +457,11 @@ function DashboardPageContent({
                         // Abrir chat con el primer proveedor disponible
                         const firstProvider = providers[0];
                         if (firstProvider) {
-                          setSelectedOrder({
+                          handleOrderClick({
                             id: 'general-chat',
                             providerId: firstProvider.id,
                             status: 'pending'
                           } as Order);
-                          setIsWhatsAppOpen(true);
                         }
                       }}
                       className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -465,6 +492,8 @@ function DashboardPageContent({
                             <div className="mt-1">
                               <ChatPreview
                                 providerName={getProviderName(order.providerId)}
+                                providerPhone={providers.find(p => p.id === order.providerId)?.phone || ''}
+                                providerId={order.providerId}
                                 orderId={order.id}
                                 onOpenChat={() => handleOrderClick(order)}
                                 hasUnreadMessages={false}
@@ -750,12 +779,17 @@ function DashboardPageContent({
                             </button>
                             <button
                               onClick={() => {
-                                setSelectedOrder({
-                                  id: `chat-${provider.id}`,
+                                const normalizedPhone = provider.phone.startsWith('+') ? provider.phone : `+${provider.phone}`;
+                                const contact = {
+                                  id: provider.id,
+                                  name: provider.name,
+                                  phone: normalizedPhone,
                                   providerId: provider.id,
-                                  status: 'pending'
-                                } as Order);
-                                setIsWhatsAppOpen(true);
+                                  lastMessage: '',
+                                  lastMessageTime: new Date(),
+                                  unreadCount: 0
+                                };
+                                openChat(contact);
                               }}
                               className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                               title="Chat con proveedor"
@@ -815,20 +849,13 @@ function DashboardPageContent({
         suggestedOrder={suggestedOrder}
         selectedProviderId={typeof selectedProviderId === 'string' ? selectedProviderId : null}
       />
-      {/* WhatsApp Chat Modal */}
-      {selectedOrder && (
-          <WhatsAppChat
-          orderId={selectedOrder.id}
-          providerName={getProviderName(selectedOrder.providerId)}
-          providerPhone={providers.find(p => p.id === selectedOrder.providerId)?.phone || ""}
-          isOpen={isWhatsAppOpen}
-          onClose={() => {
-            setIsWhatsAppOpen(false);
-            setSelectedOrder(null);
-          }}
-          orderStatus={selectedOrder.status}
-        />
-      )}
+
+      {/* Integrated Chat Panel */}
+      <IntegratedChatPanel
+        providers={providers}
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+      />
     </div>
   );
 }

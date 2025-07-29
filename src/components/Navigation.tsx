@@ -1,20 +1,26 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuth } from '../hooks/useSupabaseAuth';
-import { Menu, X, User, LogOut, Settings, Bell } from 'lucide-react';
+import { Menu, X, User, LogOut, Settings, Bell, MessageSquare } from 'lucide-react';
+import { useChat } from '../contexts/ChatContext';
 import es from '../locales/es';
 
 export default function Navigation() {
   const { user, signOut } = useSupabaseAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const { openChat, unreadCounts } = useChat();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const handleSignOut = async () => {
     try {
       await signOut();
       setIsUserMenuOpen(false);
-      window.location.href = '/auth/login';
+      router.push('/auth/login');
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
     }
@@ -25,9 +31,10 @@ export default function Navigation() {
     { name: 'Proveedores', href: '/providers' },
     { name: 'Stock', href: '/stock' },
     { name: 'Pedidos', href: '/orders' },
-    { name: 'Pagos', href: '/payments' },
-    { name: 'WhatsApp', href: '/whatsapp' },
   ];
+
+  // Calcular total de mensajes no leídos
+  const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
 
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200">
@@ -35,29 +42,50 @@ export default function Navigation() {
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <h1 className="text-xl font-bold text-gray-900">
+              <Link href="/dashboard" className="text-xl font-bold text-gray-900 hover:text-gray-700">
                 {es.appName}
-              </h1>
+              </Link>
             </div>
 
             {/* Desktop Navigation */}
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-              {navigation.map((item) => (
-                <a
-                  key={item.name}
-                  href={item.href}
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  title={item.name}
-                >
-                  {item.name}
-                </a>
-              ))}
+              {navigation.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                      isActive
+                        ? 'border-blue-500 text-gray-900'
+                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    }`}
+                    title={item.name}
+                  >
+                    {item.name}
+                  </Link>
+                );
+              })}
             </div>
           </div>
 
           <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-4">
+            {/* Chat Button */}
+            <button
+              onClick={() => openChat()}
+              className="relative p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              title="Abrir chat"
+            >
+              <MessageSquare className="h-6 w-6" />
+              {totalUnread > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {totalUnread > 99 ? '99+' : totalUnread}
+                </span>
+              )}
+            </button>
+
             {/* Notifications */}
-            <button className="p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" title={es.notificationsTooltip}>
+            <button className="p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
               <Bell className="h-6 w-6" />
               <span className="sr-only">{es.notificationsTooltip}</span>
             </button>
@@ -76,13 +104,13 @@ export default function Navigation() {
 
               {isUserMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                  <a
+                  <Link
                     href="/settings"
                     className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
                     <Settings className="h-4 w-4 mr-2" />
                     {es.settings}
-                  </a>
+                  </Link>
                   <button
                     onClick={handleSignOut}
                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -115,15 +143,22 @@ export default function Navigation() {
       {isMenuOpen && (
         <div className="sm:hidden">
           <div className="pt-2 pb-3 space-y-1">
-            {navigation.map((item) => (
-              <a
-                key={item.name}
-                href={item.href}
-                className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-              >
-                {item.name}
-              </a>
-            ))}
+            {navigation.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                    isActive
+                      ? 'bg-blue-50 border-blue-500 text-blue-700'
+                      : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
+                  }`}
+                >
+                  {item.name}
+                </Link>
+              );
+            })}
           </div>
 
           <div className="pt-4 pb-3 border-t border-gray-200">
@@ -142,13 +177,25 @@ export default function Navigation() {
             </div>
 
             <div className="mt-3 space-y-1">
-              <a
+              <button
+                onClick={() => openChat()}
+                className="flex items-center w-full px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Chat WhatsApp
+                {totalUnread > 0 && (
+                  <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1">
+                    {totalUnread}
+                  </span>
+                )}
+              </button>
+              <Link
                 href="/settings"
                 className="flex items-center px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
               >
                 <Settings className="h-4 w-4 mr-2" />
                 {es.settings}
-              </a>
+              </Link>
               <button
                 onClick={handleSignOut}
                 className="flex items-center w-full px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"

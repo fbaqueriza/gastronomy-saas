@@ -12,12 +12,15 @@ export class TwilioWhatsAppService {
   private client!: twilio.Twilio;
   private config!: TwilioConfig;
   private isEnabled: boolean = false;
+  private isSimulationMode: boolean = false;
+  private initialized: boolean = false;
 
   constructor() {
-    this.initializeIfConfigured();
+    // Inicialización síncrona básica
+    this.initializeBasic();
   }
 
-  private initializeIfConfigured() {
+  private initializeBasic() {
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
@@ -29,12 +32,54 @@ export class TwilioWhatsAppService {
         phoneNumber,
         openaiApiKey: process.env.OPENAI_API_KEY
       };
-      this.client = twilio(accountSid, authToken);
+      
+      // Por defecto, usar modo simulación hasta verificar credenciales
       this.isEnabled = true;
-      console.log('Twilio WhatsApp Service: Configuración detectada, servicio habilitado');
+      this.isSimulationMode = true;
+      console.log('Twilio WhatsApp Service: Inicializando en modo simulación');
     } else {
-      console.log('Twilio WhatsApp Service: Configuración no encontrada, servicio deshabilitado');
-      this.isEnabled = false;
+      console.log('Twilio WhatsApp Service: Configuración no encontrada, usando modo simulación');
+      this.isEnabled = true;
+      this.isSimulationMode = true;
+    }
+  }
+
+  private async initializeIfConfigured() {
+    if (this.initialized) return;
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
+
+    if (accountSid && authToken && phoneNumber) {
+      this.config = {
+        accountSid,
+        authToken,
+        phoneNumber,
+        openaiApiKey: process.env.OPENAI_API_KEY
+      };
+      
+      try {
+        this.client = twilio(accountSid, authToken);
+        
+        // Verificar si las credenciales son válidas
+        await this.client.api.accounts(accountSid).fetch();
+        
+        this.isEnabled = true;
+        this.isSimulationMode = false;
+        this.initialized = true;
+        console.log('Twilio WhatsApp Service: Configuración válida, servicio habilitado');
+      } catch (error: any) {
+        console.log('Twilio WhatsApp Service: Credenciales inválidas, usando modo simulación');
+        this.isEnabled = true;
+        this.isSimulationMode = true;
+        this.initialized = true;
+      }
+    } else {
+      console.log('Twilio WhatsApp Service: Configuración no encontrada, usando modo simulación');
+      this.isEnabled = true;
+      this.isSimulationMode = true;
+      this.initialized = true;
     }
   }
 
@@ -42,34 +87,77 @@ export class TwilioWhatsAppService {
     return this.isEnabled;
   }
 
+  public isSimulationModeEnabled(): boolean {
+    return this.isSimulationMode;
+  }
+
   // Enviar mensaje simple
   async sendMessage(to: string, content: string): Promise<any> {
+    // Asegurar que el servicio esté inicializado
+    await this.initializeIfConfigured();
+
     if (!this.isServiceEnabled()) {
       console.log('Twilio WhatsApp Service: Servicio deshabilitado');
       return null;
     }
 
     try {
-      const message = await this.client.messages
-        .create({
-          body: content,
-          from: `whatsapp:${this.config.phoneNumber}`,
-          to: `whatsapp:${to}`,
-          statusCallback: undefined // Evitar el error de callback URL
+      if (this.isSimulationMode) {
+        // Modo simulación
+        console.log('📤 [SIMULACIÓN] Enviando mensaje WhatsApp:', {
+          to,
+          content,
+          timestamp: new Date().toISOString()
         });
 
-      // Guardar en base de datos
-      await this.saveMessage({
-        id: message.sid,
-        from: this.config.phoneNumber,
-        to,
-        content,
-        timestamp: new Date(),
-        status: 'sent',
-        isAutomated: false
-      });
+        // Simular delay de envío
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-      return message;
+        const messageId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Guardar en base de datos
+        await this.saveMessage({
+          id: messageId,
+          from: this.config?.phoneNumber || '+1234567890',
+          to,
+          content,
+          timestamp: new Date(),
+          status: 'sent',
+          isAutomated: false,
+          isSimulated: true
+        });
+
+        console.log('✅ [SIMULACIÓN] Mensaje enviado exitosamente:', messageId);
+        
+        return {
+          sid: messageId,
+          status: 'sent',
+          simulated: true
+        };
+      } else {
+        // Modo real
+        const message = await this.client.messages
+          .create({
+            body: content,
+            from: `whatsapp:${this.config.phoneNumber}`,
+            to: `whatsapp:${to}`,
+            statusCallback: undefined
+          });
+
+        // Guardar en base de datos
+        await this.saveMessage({
+          id: message.sid,
+          from: this.config.phoneNumber,
+          to,
+          content,
+          timestamp: new Date(),
+          status: 'sent',
+          isAutomated: false,
+          isSimulated: false
+        });
+
+        return message;
+      }
     } catch (error) {
       console.error('Error sending Twilio WhatsApp message:', error);
       return null;
@@ -78,18 +166,22 @@ export class TwilioWhatsAppService {
 
   // Procesar mensaje entrante con IA automática
   async processIncomingMessage(messageData: any): Promise<void> {
+    // Asegurar que el servicio esté inicializado
+    await this.initializeIfConfigured();
+
     if (!this.isServiceEnabled()) return;
 
     try {
       // Guardar mensaje
       await this.saveMessage({
-        id: messageData.sid,
+        id: messageData.sid || `sim_${Date.now()}`,
         from: messageData.from,
         to: messageData.to,
         content: messageData.body,
-        timestamp: new Date(messageData.dateCreated),
+        timestamp: new Date(messageData.dateCreated || Date.now()),
         status: 'delivered',
-        isAutomated: false
+        isAutomated: false,
+        isSimulated: this.isSimulationMode
       });
 
       // Analizar con IA automáticamente
@@ -218,43 +310,94 @@ export class TwilioWhatsAppService {
     return complexKeywords.some(keyword => lowerMessage.includes(keyword));
   }
 
-  // Guardar mensaje en base de datos
+  // Guardar mensaje en base de datos (opcional)
   private async saveMessage(message: any): Promise<void> {
     try {
+      // Solo intentar guardar si Supabase está configurado correctamente
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.log('Supabase no configurado, saltando guardado de mensaje');
+        return;
+      }
+
       const { error } = await supabase
         .from('whatsapp_messages')
         .insert(message);
       
-      if (error) throw error;
+      if (error) {
+        console.log('Error saving WhatsApp message (no crítico):', error);
+        // No lanzar error para no interrumpir el flujo
+      }
     } catch (error) {
-      console.error('Error saving WhatsApp message:', error);
+      console.log('Error saving WhatsApp message (no crítico):', error);
+      // No lanzar error para no interrumpir el flujo
     }
   }
 
-  // Obtener estadísticas
+  // Obtener estadísticas (optimizado)
   async getStatistics(): Promise<any> {
+    // Asegurar que el servicio esté inicializado
+    await this.initializeIfConfigured();
+
     if (!this.isServiceEnabled()) return null;
 
     try {
+      // Solo intentar obtener estadísticas si Supabase está configurado correctamente
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.log('Supabase no configurado, retornando estadísticas básicas');
+        return {
+          totalMessages: 0,
+          automatedResponses: 0,
+          humanInterventions: 0,
+          simulatedMessages: 0,
+          averageResponseTime: 0,
+          mode: this.isSimulationModeEnabled() ? 'simulation' : 'production'
+        };
+      }
+
       const { data, error } = await supabase
         .from('whatsapp_messages')
         .select('*')
         .order('timestamp', { ascending: false })
         .limit(100);
 
-      if (error) throw error;
+      if (error) {
+        console.log('Error getting statistics (no crítico):', error);
+        return {
+          totalMessages: 0,
+          automatedResponses: 0,
+          humanInterventions: 0,
+          simulatedMessages: 0,
+          averageResponseTime: 0,
+          mode: this.isSimulationModeEnabled() ? 'simulation' : 'production'
+        };
+      }
 
       const stats = {
         totalMessages: data?.length || 0,
         automatedResponses: data?.filter(m => m.isAutomated).length || 0,
         humanInterventions: data?.filter(m => !m.isAutomated).length || 0,
-        averageResponseTime: this.calculateAverageResponseTime(data || [])
+        simulatedMessages: data?.filter(m => m.isSimulated).length || 0,
+        averageResponseTime: this.calculateAverageResponseTime(data || []),
+        mode: this.isSimulationModeEnabled() ? 'simulation' : 'production'
       };
 
       return stats;
     } catch (error) {
-      console.error('Error getting statistics:', error);
-      return null;
+      console.log('Error getting statistics (no crítico):', error);
+      return {
+        totalMessages: 0,
+        automatedResponses: 0,
+        humanInterventions: 0,
+        simulatedMessages: 0,
+        averageResponseTime: 0,
+        mode: this.isSimulationModeEnabled() ? 'simulation' : 'production'
+      };
     }
   }
 
