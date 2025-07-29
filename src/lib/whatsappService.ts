@@ -185,7 +185,9 @@ export class WhatsAppService {
           const responseContent = await this.generateResponse(response, message, analysis);
           
           // Enviar respuesta automática
-          await this.sendMessage(message.from, responseContent, message.orderId);
+          if (message.from) {
+            await this.sendMessage(message.from, responseContent, message.orderId);
+          }
           break;
         }
       }
