@@ -244,9 +244,9 @@ export async function POST(request: NextRequest) {
     
     // Log todos los campos del formData para debuggear
     console.log('🚨 Todos los campos del formData:');
-    for (const [key, value] of formData.entries()) {
+    Array.from(formData.entries()).forEach(([key, value]) => {
       console.log(`  ${key}: ${value}`);
-    }
+    });
 
     // Guardar mensaje entrante en localStorage (para el frontend)
     if (body && from && from.includes('whatsapp:')) {
