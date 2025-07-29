@@ -20,11 +20,7 @@ export async function GET(request: NextRequest) {
     const contactId = searchParams.get('contactId');
     const userId = searchParams.get('userId');
 
-    if (!contactId || !userId) {
-      return NextResponse.json({ error: 'contactId and userId required' }, { status: 400 });
-    }
-
-    console.log('📥 Obteniendo mensajes para contacto:', contactId, 'usuario:', userId);
+    console.log('📥 Obteniendo mensajes:', { contactId, userId });
 
     if (!supabase) {
       console.warn('⚠️ Supabase no configurado, retornando respuesta vacía');
@@ -32,6 +28,24 @@ export async function GET(request: NextRequest) {
         messages: [],
         error: 'Supabase no configurado'
       });
+    }
+
+    // Si no hay contactId o userId, devolver todos los mensajes
+    if (!contactId || !userId) {
+      console.log('📥 Obteniendo todos los mensajes (sin filtros)');
+      
+      const { data: messages, error } = await supabase
+        .from('whatsapp_messages')
+        .select('*')
+        .order('timestamp', { ascending: true });
+
+      if (error) {
+        console.error('Error obteniendo todos los mensajes:', error);
+        return NextResponse.json({ error: 'Error obteniendo mensajes' }, { status: 500 });
+      }
+
+      console.log('📋 Todos los mensajes obtenidos:', messages?.length || 0);
+      return NextResponse.json({ messages: messages || [] });
     }
 
     // Normalizar contactId para búsqueda (remover + si existe)
