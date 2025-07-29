@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Verificar que las variables de entorno estén disponibles
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.warn('⚠️ Supabase no configurado para messages');
+}
+
+const supabase = supabaseUrl && supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
 
 // GET: Obtener mensajes de un contacto
 export async function GET(request: NextRequest) {
@@ -18,6 +25,14 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('📥 Obteniendo mensajes para contacto:', contactId, 'usuario:', userId);
+
+    if (!supabase) {
+      console.warn('⚠️ Supabase no configurado, retornando respuesta vacía');
+      return NextResponse.json({ 
+        messages: [],
+        error: 'Supabase no configurado'
+      });
+    }
 
     // Normalizar contactId para búsqueda (remover + si existe)
     const normalizedContactId = contactId.replace(/^\+/, '');
@@ -56,6 +71,13 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('💾 Guardando mensaje:', { messageSid, contactId, content, messageType, userId });
+
+    if (!supabase) {
+      console.warn('⚠️ Supabase no configurado, no se puede guardar mensaje');
+      return NextResponse.json({ 
+        error: 'Supabase no configurado'
+      }, { status: 500 });
+    }
 
     const { data, error } = await supabase
       .from('whatsapp_messages')
