@@ -472,7 +472,7 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
         // Validar y convertir quantity para todos los items
         const validatedItems = itemOrItems.map(item => ({
           ...item,
-          quantity: item.quantity === '' || item.quantity === null || item.quantity === undefined ? 0 : Number(item.quantity),
+          quantity: item.quantity === null || item.quantity === undefined ? 0 : Number(item.quantity),
           associatedProviders: Array.isArray(item.associatedProviders) ? item.associatedProviders : [],
           lastOrdered: item.lastOrdered && !isNaN(Date.parse(String(item.lastOrdered))) ? new Date(item.lastOrdered) : null,
           nextOrder: item.nextOrder && !isNaN(Date.parse(String(item.nextOrder))) ? new Date(item.nextOrder) : null,
@@ -515,7 +515,7 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
       const item = Array.isArray(itemOrItems) ? itemOrItems[0] : itemOrItems;
       
       // Validaciones mejoradas
-      const quantity = item.quantity === '' || item.quantity === null || item.quantity === undefined ? 0 : Number(item.quantity);
+      const quantity = item.quantity === null || item.quantity === undefined ? 0 : Number(item.quantity);
       const associatedProviders = Array.isArray(item.associatedProviders) ? item.associatedProviders : [];
       const lastOrdered = item.lastOrdered && !isNaN(Date.parse(String(item.lastOrdered))) ? new Date(item.lastOrdered) : null;
       const nextOrder = item.nextOrder && !isNaN(Date.parse(String(item.nextOrder))) ? new Date(item.nextOrder) : null;
@@ -556,7 +556,7 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
   const updateStockItem = useCallback(async (item: StockItem) => {
     try {
       // Validaciones mejoradas
-      const quantity = item.quantity === '' || item.quantity === null || item.quantity === undefined ? 0 : Number(item.quantity);
+      const quantity = item.quantity === null || item.quantity === undefined ? 0 : Number(item.quantity);
       const associatedProviders = Array.isArray(item.associatedProviders) ? item.associatedProviders : [];
       const lastOrdered = item.lastOrdered && !isNaN(Date.parse(String(item.lastOrdered))) ? new Date(item.lastOrdered) : null;
       const nextOrder = item.nextOrder && !isNaN(Date.parse(String(item.nextOrder))) ? new Date(item.nextOrder) : null;
