@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Forzar que este endpoint sea dinámico
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const contactId = request.nextUrl.searchParams.get('contactId');
