@@ -39,8 +39,7 @@ export function useWhatsAppSync() {
               id: data.id || data.messageId || `msg_${Date.now()}`,
               type: 'received' as const,
               content: data.content,
-              timestamp: new Date(data.timestamp || Date.now()),
-              status: 'received' as const
+              timestamp: new Date(data.timestamp || Date.now())
             };
             
             console.log(`📨 Mensaje SSE recibido para ${data.contactId}:`, newMessage);
