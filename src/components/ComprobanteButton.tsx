@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { Upload } from 'lucide-react';
 
 interface ComprobanteButtonProps {
   comprobante: { url: string; name: string } | null;
@@ -26,14 +27,49 @@ const ComprobanteButton: React.FC<ComprobanteButtonProps> = ({ comprobante, onUp
     }
   };
 
+  const handleViewComprobante = () => {
+    if (!comprobante?.url) return;
+    
+    // Usar la función onView que maneja data URLs correctamente
+    onView();
+  };
+
+  // Si hay comprobante, mostrar botón que usa onView
+  if (comprobante) {
+    return (
+      <div className="relative inline-block">
+        <button
+          onClick={handleViewComprobante}
+          className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
+        >
+          <Upload className="h-4 w-4 mr-1" /> Ver comprobante
+        </button>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="ml-2 inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-2 focus:ring-blue-500"
+        >
+          Reemplazar
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      </div>
+    );
+  }
+
+  // Si no hay comprobante, mostrar solo el botón de cargar
   return (
     <div className="relative inline-block">
       <button
-        className={`px-4 py-2 rounded text-xs font-semibold w-full text-center transition bg-green-600 text-white hover:bg-green-700`}
+        className="px-4 py-2 rounded text-xs font-semibold w-full text-center transition bg-green-600 text-white hover:bg-green-700"
         onClick={handleButtonClick}
         type="button"
       >
-        Ver / Cargar comprobante
+        Cargar comprobante
       </button>
       <input
         ref={fileInputRef}
@@ -42,28 +78,6 @@ const ComprobanteButton: React.FC<ComprobanteButtonProps> = ({ comprobante, onUp
         className="hidden"
         onChange={handleFileChange}
       />
-             {comprobante && menuOpen && (
-         <div className="absolute right-0 w-44 bg-white border border-gray-200 rounded shadow-lg z-[9999]" style={{ top: 'auto', bottom: '100%', marginBottom: '0.5rem' }}>
-          <button
-            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            onClick={() => {
-              setMenuOpen(false);
-              onView();
-            }}
-          >
-            Ver comprobante
-          </button>
-          <button
-            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            onClick={() => {
-              setMenuOpen(false);
-              fileInputRef.current?.click();
-            }}
-          >
-            Reemplazar comprobante
-          </button>
-        </div>
-      )}
     </div>
   );
 };

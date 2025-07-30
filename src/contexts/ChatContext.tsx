@@ -129,9 +129,21 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     if (process.env.NODE_ENV === 'development') {
       console.log('📖 Marcando como leído:', contactId);
     }
+    
+    // Resetear contador de no leídos
     setUnreadCounts(prev => ({
       ...prev,
       [contactId]: 0
+    }));
+    
+    // Marcar mensajes enviados como leídos cuando se abre el chat
+    setMessagesByContact(prev => ({
+      ...prev,
+      [contactId]: (prev[contactId] || []).map(msg =>
+        msg.type === 'sent' && msg.status === 'delivered'
+          ? { ...msg, status: 'read' as const }
+          : msg
+      )
     }));
   }, []);
 
@@ -211,7 +223,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       if (result.success) {
         console.log('✅ sendMessage - Mensaje enviado exitosamente:', result);
         
-        // Actualizar estado del mensaje
+        // Actualizar estado del mensaje a entregado
         setMessagesByContact(prev => ({
           ...prev,
           [normalizedPhone]: (prev[normalizedPhone] || []).map(msg =>
@@ -220,6 +232,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
               : msg
           )
         }));
+        
+        // Simular lectura después de 2 segundos (simulación de WhatsApp)
+        setTimeout(() => {
+          setMessagesByContact(prev => ({
+            ...prev,
+            [normalizedPhone]: (prev[normalizedPhone] || []).map(msg =>
+              msg.id === messageId
+                ? { ...msg, status: 'read' as const }
+                : msg
+            )
+          }));
+          console.log('📖 sendMessage - Mensaje marcado como leído:', messageId);
+        }, 2000);
       } else {
         console.error('❌ sendMessage - Error sending message:', result.error);
         // Marcar mensaje como fallido

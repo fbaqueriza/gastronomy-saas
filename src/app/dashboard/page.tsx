@@ -544,7 +544,7 @@ function DashboardPageContent({
                           {/* Ver comprobante - cuando hay comprobante disponible */}
                           {['pagado','finalizado'].includes(order.status) && order.receiptUrl && (
                             <button
-                              onClick={() => openReceipt(order.receiptUrl!)}
+                              onClick={() => openReceipt(order.receiptUrl)}
                               className="inline-flex items-center px-4 py-2 rounded-md text-xs font-medium border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
                             >
                               <Upload className="h-4 w-4 mr-1" /> Ver comprobante
@@ -630,13 +630,18 @@ function DashboardPageContent({
       >
         {order.invoiceNumber ? 'Descargar factura' : 'Factura no disponible'}
       </button>
-      <button
-        className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={!order.receiptUrl}
-                                onClick={() => { if(order.receiptUrl) openReceipt(order.receiptUrl); }}
-      >
-                                {order.receiptUrl ? 'Ver comprobante' : 'Comprobante no disponible'}
-      </button>
+      {order.receiptUrl ? (
+        <button
+          onClick={() => openReceipt(order.receiptUrl)}
+          className="block px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 text-left"
+        >
+          Ver comprobante
+        </button>
+      ) : (
+        <span className="block px-4 py-2 text-xs text-gray-400 text-left cursor-not-allowed">
+          Comprobante no disponible
+        </span>
+      )}
     </div>
   </Menu.Items>
 </Menu>

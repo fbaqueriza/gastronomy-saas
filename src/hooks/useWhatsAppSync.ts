@@ -17,11 +17,13 @@ export function useWhatsAppSync() {
         return;
       }
 
-      // Solo conectar una vez para todos los mensajes
-      const eventSource = new EventSource(`/api/whatsapp/twilio/webhook`);
+      console.log('🔌 Conectando SSE para mensajes en tiempo real...');
+      
+      // Conectar al endpoint SSE específico
+      const eventSource = new EventSource(`/api/whatsapp/sse`);
       
       eventSource.onopen = () => {
-        console.log(`🔌 SSE conectado para todos los contactos`);
+        console.log(`✅ SSE conectado para mensajes en tiempo real`);
         isConnectedRef.current = true;
       };
       
@@ -29,7 +31,10 @@ export function useWhatsAppSync() {
         try {
           const data = JSON.parse(event.data);
           
-          if (data.type === 'test') {
+          console.log('📨 Mensaje SSE recibido:', data);
+          
+          if (data.type === 'test' || data.type === 'ping') {
+            console.log('🔄 SSE ping/test recibido');
             return;
           }
           
@@ -42,19 +47,30 @@ export function useWhatsAppSync() {
               timestamp: new Date(data.timestamp || Date.now())
             };
             
-            console.log(`📨 Mensaje SSE recibido para ${data.contactId}:`, newMessage);
+            console.log(`📨 Mensaje SSE procesado para ${data.contactId}:`, newMessage);
             
-            // Solo agregar al contacto específico que envió el mensaje
+            // Agregar al contacto específico que envió el mensaje
             addMessage(data.contactId, newMessage);
           }
         } catch (error) {
-          console.error('Error parsing SSE message:', error);
+          console.error('❌ Error parsing SSE message:', error);
         }
       };
       
       eventSource.onerror = (error) => {
         console.error(`❌ Error en SSE:`, error);
         isConnectedRef.current = false;
+        
+        // Reintentar conexión después de 5 segundos
+        setTimeout(() => {
+          console.log('🔄 Reintentando conexión SSE...');
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+          }
+          isConnectedRef.current = false;
+          connectSSE();
+        }, 5000);
       };
       
       eventSourceRef.current = eventSource;
@@ -68,6 +84,7 @@ export function useWhatsAppSync() {
     // Limpiar conexión al desmontar
     return () => {
       if (eventSourceRef.current) {
+        console.log('🔌 Cerrando conexión SSE');
         eventSourceRef.current.close();
         eventSourceRef.current = null;
         isConnectedRef.current = false;

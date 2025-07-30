@@ -137,11 +137,14 @@ export default function IntegratedChatPanel({
   }, []);
 
   useEffect(() => {
-    // Solo hacer scroll si hay mensajes
-    if (messages && messages.length > 0) {
-      scrollToBottom();
+    // Hacer scroll al final cuando se selecciona un contacto o hay nuevos mensajes
+    if (selectedContact && messages && messages.length > 0) {
+      // Pequeño delay para asegurar que el DOM se actualice
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
     }
-  }, [messages, scrollToBottom]);
+  }, [selectedContact, messages, scrollToBottom]);
 
   const handleSendMessage = async () => {
     console.log('🔍 DEBUG handleSendMessage - Iniciando:', { 
@@ -384,11 +387,24 @@ export default function IntegratedChatPanel({
                       ) : (
                         <p>{message.content}</p>
                       )}
-                      <p className={`text-xs mt-1 ${
+                      <div className={`text-xs mt-1 flex items-center justify-between ${
                         message.type === 'sent' ? 'text-green-100' : 'text-gray-500'
                       }`}>
-                        {message.timestamp.toLocaleTimeString()}
-                      </p>
+                        <span>
+                          {message.timestamp.toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                        {message.type === 'sent' && (
+                          <span className="ml-2">
+                            {message.status === 'sent' && '✓'}
+                            {message.status === 'delivered' && '✓✓'}
+                            {message.status === 'read' && '✓✓'}
+                            {message.status === 'failed' && '❌'}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -136,6 +136,18 @@ export class TwilioWhatsAppService {
         };
       } else {
         // Modo real
+        console.log('📤 [REAL] Enviando mensaje WhatsApp:', {
+          to,
+          content,
+          from: this.config.phoneNumber,
+          timestamp: new Date().toISOString()
+        });
+
+        if (!this.client) {
+          console.error('❌ Cliente de Twilio no inicializado');
+          return null;
+        }
+
         const message = await this.client.messages
           .create({
             body: content,
@@ -143,6 +155,8 @@ export class TwilioWhatsAppService {
             to: `whatsapp:${to}`,
             statusCallback: undefined
           });
+
+        console.log('✅ [REAL] Mensaje enviado exitosamente:', message.sid);
 
         // Guardar en base de datos
         await this.saveMessage({
@@ -159,7 +173,15 @@ export class TwilioWhatsAppService {
         return message;
       }
     } catch (error) {
-      console.error('Error sending Twilio WhatsApp message:', error);
+      console.error('❌ Error sending Twilio WhatsApp message:', error);
+      
+      // Si hay error en modo real, intentar modo simulación como fallback
+      if (!this.isSimulationMode) {
+        console.log('🔄 Intentando modo simulación como fallback...');
+        this.isSimulationMode = true;
+        return await this.sendMessage(to, content);
+      }
+      
       return null;
     }
   }

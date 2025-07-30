@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// Importar funciones del endpoint SSE
+import { sendMessageToContact } from '../../../../../lib/sseUtils';
+
+// Forzar que este endpoint sea dinámico
+export const dynamic = 'force-dynamic';
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -15,9 +21,6 @@ const supabase = supabaseUrl && supabaseServiceKey
 
 // Array global para mensajes en memoria (temporal)
 let incomingMessages: any[] = [];
-
-// Usar un Map para clientes SSE con mejor persistencia
-const clients = new Map<string, any>();
 
 // Función para obtener clientes activos desde la base de datos
 async function getActiveClientsFromDB() {
@@ -99,72 +102,34 @@ async function markClientInactive(contactId: string) {
 
 // Función para limpiar clientes desconectados
 function cleanupDisconnectedClients() {
-  const disconnectedClients: string[] = [];
-  
-  clients.forEach((client, contactId) => {
-    try {
-      // Verificar si el cliente sigue activo
-      if (client.write && typeof client.write === 'function') {
-        // Cliente activo, mantenerlo
-      } else {
-        disconnectedClients.push(contactId);
-      }
-    } catch (error) {
-      console.log(`🔌 Cliente desconectado para ${contactId}, removiendo...`);
-      disconnectedClients.push(contactId);
-    }
-  });
-  
-  // Remover clientes desconectados
-  disconnectedClients.forEach(contactId => {
-    clients.delete(contactId);
-  });
-  
-  if (disconnectedClients.length > 0) {
-    console.log(`🧹 Limpieza: ${disconnectedClients.length} clientes removidos`);
-  }
+  // Esta función ya no es necesaria con el nuevo sistema SSE
+  console.log('🧹 Limpieza de clientes no necesaria con nuevo sistema SSE');
 }
 
-// Función para enviar mensaje a todos los clientes SSE
+// Función para enviar mensaje a clientes usando el nuevo sistema SSE
 async function sendMessageToClients(message: any, phoneNumber: string) {
-  console.log(`📤 Enviando mensaje SSE a clientes: ${clients.size} clientes conectados`);
+  console.log(`📤 Enviando mensaje SSE a clientes para contacto: ${phoneNumber}`);
   
-  const eventData = `data: ${JSON.stringify(message)}\n\n`;
-  
-  let sentCount = 0;
-  clients.forEach((client, contactId) => {
-    try {
-      if (client.write && typeof client.write === 'function') {
-        client.write(eventData);
-        sentCount++;
-        console.log(`✅ Mensaje enviado a cliente: ${contactId}`);
-      }
-    } catch (error) {
-      console.log(`❌ Error enviando mensaje a cliente ${contactId}:`, error);
-    }
-  });
-  
-  console.log(`📤 Mensaje enviado a ${sentCount} clientes para contacto: ${phoneNumber}`);
+  // Usar el nuevo sistema SSE
+  sendMessageToContact(phoneNumber, message);
   
   // Si no hay clientes conectados, guardar en BD para persistencia
-  if (sentCount === 0) {
-    console.log('⚠️ No hay clientes SSE en memoria, verificando BD...');
-    const activeClients = await getActiveClientsFromDB();
-    console.log(`📊 Clientes activos en BD: ${activeClients.length}`);
-    
-    const matchingClients = activeClients.filter(client => 
-      client.contact_id === phoneNumber || 
-      client.contact_id === `+${phoneNumber}` ||
-      client.contact_id === phoneNumber.replace('+', '')
-    );
-    
-    console.log(`📊 Clientes que coinciden en BD: ${matchingClients.length}`);
-    
-    if (matchingClients.length > 0) {
-      console.log('✅ Hay clientes activos en BD, mensaje será entregado cuando se reconecten');
-    } else {
-      console.log('⚠️ No hay clientes activos para este contacto');
-    }
+  console.log('⚠️ Verificando clientes activos en BD...');
+  const activeClients = await getActiveClientsFromDB();
+  console.log(`📊 Clientes activos en BD: ${activeClients.length}`);
+  
+  const matchingClients = activeClients.filter(client => 
+    client.contact_id === phoneNumber || 
+    client.contact_id === `+${phoneNumber}` ||
+    client.contact_id === phoneNumber.replace('+', '')
+  );
+  
+  console.log(`📊 Clientes que coinciden en BD: ${matchingClients.length}`);
+  
+  if (matchingClients.length > 0) {
+    console.log('✅ Hay clientes activos en BD, mensaje será entregado cuando se reconecten');
+  } else {
+    console.log('⚠️ No hay clientes activos para este contacto');
   }
 }
 
@@ -211,10 +176,7 @@ async function addIncomingMessage(phoneNumber: string, content: string, messageS
     console.warn('⚠️ Supabase no configurado, no se puede guardar mensaje en BD');
   }
   
-  // Limpiar clientes desconectados antes de enviar mensajes
-  cleanupDisconnectedClients();
-  
-  // Enviar mensaje a clientes SSE
+  // Enviar mensaje a clientes SSE usando el nuevo sistema
   await sendMessageToClients(message, phoneNumber);
   
   // Guardar mensaje en BD para persistencia si Supabase está configurado
@@ -228,7 +190,7 @@ async function addIncomingMessage(phoneNumber: string, content: string, messageS
           content: message.content,
           message_type: 'received',
           status: 'received',
-          user_id: 'default-user',
+          user_id: userId || 'system',
           timestamp: new Date().toISOString()
         }]);
       
@@ -238,13 +200,11 @@ async function addIncomingMessage(phoneNumber: string, content: string, messageS
         console.log('✅ Mensaje guardado en BD para persistencia');
       }
     } catch (error) {
-      console.error('Error en persistencia de mensaje:', error);
+      console.error('Error guardando mensaje en BD:', error);
     }
-  } else {
-    console.warn('⚠️ Supabase no configurado, no se puede guardar mensaje para persistencia');
   }
   
-  return message;
+  console.log('✅ Mensaje procesado:', message);
 }
 
 export async function POST(request: NextRequest) {
@@ -328,90 +288,19 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-  // Verificación de webhook de Twilio
-  const url = new URL(request.url);
-  const challenge = url.searchParams.get('challenge');
-  
-  if (challenge) {
-    return new NextResponse(challenge, { status: 200 });
-  }
-  
-    // Endpoint para SSE
-    const contactId = url.searchParams.get('contactId');
+    // Verificación de webhook de Twilio
+    const url = new URL(request.url);
+    const challenge = url.searchParams.get('challenge');
     
-    if (!contactId) {
-      return new NextResponse('Contact ID required', { status: 400 });
+    if (challenge) {
+      console.log('🔐 Verificación de webhook de Twilio recibida');
+      return new NextResponse(challenge, { status: 200 });
     }
     
-    console.log('🔌 Cliente SSE conectado para contacto:', contactId);
+    // Si no es un challenge, redirigir al endpoint SSE
+    console.log('📡 Redirigiendo a endpoint SSE...');
+    return NextResponse.redirect(new URL('/api/whatsapp/sse', request.url));
     
-    // Configurar headers para SSE
-    const response = new NextResponse(
-      new ReadableStream({
-        start(controller) {
-          try {
-            // Enviar mensaje de prueba para mantener la conexión
-            const testEvent = `data: ${JSON.stringify({ 
-              id: 'test-connection', 
-              type: 'test', 
-              content: 'Conexión establecida', 
-              timestamp: new Date().toISOString(),
-              status: 'test'
-            })}\n\n`;
-            controller.enqueue(new TextEncoder().encode(testEvent));
-            
-            // Enviar mensajes existentes primero
-            const existingMessages = incomingMessages.filter(msg => msg.contactId === contactId);
-            if (existingMessages.length > 0) {
-              const eventData = `data: ${JSON.stringify({ type: 'existing', messages: existingMessages })}\n\n`;
-              controller.enqueue(new TextEncoder().encode(eventData));
-            }
-            
-            // Agregar cliente a la lista usando Map
-            const client = {
-              write: (data: string) => {
-                try {
-                  console.log('📤 Escribiendo datos al cliente SSE:', data.substring(0, 100) + '...');
-                  controller.enqueue(new TextEncoder().encode(data));
-                  console.log('✅ Datos enviados al cliente SSE');
-                } catch (error) {
-                  console.error('Error enviando datos al cliente:', error);
-                }
-              }
-            };
-            
-            clients.set(contactId, client);
-            console.log('✅ Cliente SSE registrado:', contactId);
-            
-            // Registrar cliente activo en BD
-            registerActiveClient(contactId);
-            
-
-            
-            // Limpiar cuando se desconecte
-            request.signal.addEventListener('abort', () => {
-              console.log('🔌 Cliente SSE desconectado (abort signal):', contactId);
-              clients.delete(contactId);
-              markClientInactive(contactId);
-            });
-          } catch (error) {
-            console.error('Error en SSE start:', error);
-            controller.close();
-          }
-        }
-      }),
-      {
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Cache-Control'
-        }
-      }
-    );
-    
-    return response;
   } catch (error) {
     console.error('Error en GET webhook:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
