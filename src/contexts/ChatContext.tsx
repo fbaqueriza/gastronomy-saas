@@ -101,7 +101,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       // Agrupar mensajes por contacto
       const messagesByContactNew: Record<string, WhatsAppMessage[]> = {};
       
-      convertedMessages.forEach(message => {
+      convertedMessages.forEach((message: WhatsAppMessage) => {
         // Determinar el contacto basado en el tipo de mensaje
         const contactId = message.type === 'sent' ? '670680919470999' : message.id.split('_')[0];
         
@@ -183,7 +183,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             
             // Agrupar por contacto
             const messagesByContactMap: Record<string, WhatsAppMessage[]> = {};
-            processedMessages.forEach(message => {
+            processedMessages.forEach((message: WhatsAppMessage) => {
               const contactId = message.type === 'sent' ? '670680919470999' : message.id.split('_')[0];
               if (!messagesByContactMap[contactId]) {
                 messagesByContactMap[contactId] = [];
@@ -256,7 +256,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             
             // Agrupar por contacto
             const messagesByContactMap: Record<string, WhatsAppMessage[]> = {};
-            processedMessages.forEach(message => {
+            processedMessages.forEach((message: WhatsAppMessage) => {
               const contactId = message.type === 'sent' ? '670680919470999' : message.id.split('_')[0];
               if (!messagesByContactMap[contactId]) {
                 messagesByContactMap[contactId] = [];
