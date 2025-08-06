@@ -25,6 +25,7 @@
     "react-hook-form": "^7.48.2",
     "tailwind-merge": "^2.1.0",
     "twilio": "^4.19.0",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5",
     "zod": "^3.22.4"
   },

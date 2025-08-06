@@ -75,35 +75,70 @@ export default function WhatsAppIntegratedChat({
   // Función para cargar mensajes desde la base de datos
   const loadMessagesFromDB = async (contactPhone: string) => {
     try {
-      // Obtener userId del localStorage o contexto
-      const userId = localStorage.getItem('currentUserId') || 'default-user';
+      console.log('🔄 loadMessagesFromDB - Iniciando carga para:', contactPhone);
       
-      const response = await fetch(`/api/whatsapp/messages?contactId=${contactPhone}&userId=${userId}`);
+      // Obtener todos los mensajes para poder filtrar tanto enviados como recibidos
+      const response = await fetch('/api/whatsapp/messages');
       const data = await response.json();
       
-      if (data.messages) {
-        const dbMessages: WhatsAppMessage[] = data.messages.map((msg: any) => ({
-          id: msg.message_sid || msg.id,
-          type: msg.message_type as 'sent' | 'received',
-          content: msg.content,
-          timestamp: new Date(msg.timestamp),
-          status: msg.status as 'sent' | 'delivered' | 'read'
-        }));
-        
-        console.log('📱 Mensajes de BD cargados:', dbMessages.length);
-        
-        // Actualizar tanto el estado local como el persistente
-        setMessages(dbMessages);
-        setMessagesByContact(prev => ({
-          ...prev,
-          [contactPhone]: dbMessages
-        }));
-      } else {
-        console.log('⚠️ No se encontraron mensajes en BD para:', contactPhone);
+      if (data.error) {
+        console.error('❌ loadMessagesFromDB - Error:', data.error);
         setMessages([]);
+        return;
       }
+      
+      console.log('📥 loadMessagesFromDB - Mensajes recibidos:', data.messages?.length || 0);
+      
+      // Filtrar mensajes relevantes para el contacto
+      const relevantMessages = (data.messages || []).filter((dbMessage: any) => {
+        // Incluir mensajes recibidos del contacto
+        if (dbMessage.contact_id === contactPhone) return true;
+        
+        // Incluir mensajes enviados al contacto (cuando contact_id es el número de WhatsApp Business)
+        if (dbMessage.contact_id === '670680919470999') return true;
+        
+        return false;
+      });
+      
+      console.log('🔍 loadMessagesFromDB - Mensajes relevantes:', relevantMessages.length);
+      
+      // Convertir mensajes de la BD al formato del frontend
+      const dbMessages: WhatsAppMessage[] = relevantMessages.map((dbMessage: any) => {
+        // Determinar si el mensaje es enviado o recibido basado en el campo 'contact_id'
+        const isFromBusiness = dbMessage.contact_id === '670680919470999'; // Tu número de WhatsApp Business
+        
+        console.log('🔄 Conversión de mensaje:', {
+          messageId: dbMessage.message_sid || dbMessage.id,
+          contactId: dbMessage.contact_id,
+          isFromBusiness,
+          content: dbMessage.content?.substring(0, 30) + '...'
+        });
+        
+        return {
+          id: dbMessage.message_sid || dbMessage.id,
+          type: isFromBusiness ? 'sent' : 'received',
+          content: dbMessage.content,
+          timestamp: new Date(dbMessage.timestamp || Date.now()),
+          status: dbMessage.status || 'delivered'
+        };
+      });
+      
+      console.log('🔄 loadMessagesFromDB - Mensajes convertidos:', dbMessages.length);
+      
+      // Ordenar mensajes por timestamp
+      dbMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+      
+      console.log('📱 loadMessagesFromDB - Mensajes de BD cargados:', dbMessages.length);
+      
+      // Actualizar tanto el estado local como el persistente
+      setMessages(dbMessages);
+      setMessagesByContact(prev => ({
+        ...prev,
+        [contactPhone]: dbMessages
+      }));
+      
     } catch (error) {
-      console.error('Error cargando mensajes de BD:', error);
+      console.error('💥 loadMessagesFromDB - Error cargando mensajes de BD:', error);
       setMessages([]);
     }
   };
@@ -244,7 +279,7 @@ export default function WhatsAppIntegratedChat({
         setReconnectAttempts(0);
       };
     }
-  }, [selectedContact?.phone, connectSSE]);
+  }, [selectedContact?.phone]); // Removido connectSSE de las dependencias
 
   // Limpiar conexión al desmontar el componente
   useEffect(() => {

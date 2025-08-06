@@ -45,6 +45,33 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+      {/* Descripción de la plataforma */}
+      <div className="mb-8 text-center max-w-2xl mx-auto px-4">
+        <h1 className="text-3xl font-bold text-gray-800 mb-4">
+          🍽️ Gastronomy SaaS
+        </h1>
+        <p className="text-lg text-gray-600 mb-4">
+          Plataforma integral para la gestión de restaurantes y servicios gastronómicos
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-500">
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="text-2xl mb-2">📱</div>
+            <h3 className="font-semibold mb-1">WhatsApp Business</h3>
+            <p>Gestión centralizada de mensajes y pedidos</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="text-2xl mb-2">📊</div>
+            <h3 className="font-semibold mb-1">Analytics</h3>
+            <p>Reportes y métricas en tiempo real</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="text-2xl mb-2">⚡</div>
+            <h3 className="font-semibold mb-1">Automatización</h3>
+            <p>Flujos de trabajo inteligentes</p>
+          </div>
+        </div>
+      </div>
+      
       <form onSubmit={handleLogin} className="bg-white p-8 rounded shadow-md w-full max-w-sm">
         <h2 className="text-2xl font-bold mb-6 text-center">Iniciar sesión</h2>
         {error && <div className="mb-4 text-red-500">{error}</div>}

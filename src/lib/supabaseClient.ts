@@ -9,11 +9,22 @@ console.log('DEBUG: supabaseUrl:', supabaseUrl);
 console.log('DEBUG: supabaseAnonKey:', supabaseAnonKey ? 'EXISTS' : 'MISSING');
 
 // Verificar que las variables estén disponibles
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('ERROR: Las variables de entorno de Supabase no están configuradas');
-  throw new Error('Supabase configuration missing');
-}
+let supabase;
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.log('WARNING: Las variables de entorno de Supabase no están configuradas - usando modo sin base de datos');
+  // Crear un cliente mock para evitar errores
+  supabase = {
+    from: () => ({
+      insert: async () => ({ error: null }),
+      select: async () => ({ data: [], error: null }),
+      order: () => ({
+        limit: () => ({ data: [], error: null })
+      })
+    })
+  };
+} else {
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
+}
 
 export default supabase; 

@@ -14,10 +14,12 @@ export function useWhatsAppSync() {
     const connectSSE = () => {
       // Evitar múltiples conexiones
       if (eventSourceRef.current || isConnectedRef.current) {
+        console.log('⚠️ connectSSE - Ya hay una conexión activa, evitando nueva conexión');
         return;
       }
 
       console.log('🔌 Conectando SSE para mensajes en tiempo real...');
+      console.log('📡 URL del SSE:', `/api/whatsapp/sse`);
       
       // Conectar al endpoint SSE específico
       const eventSource = new EventSource(`/api/whatsapp/sse`);
@@ -48,9 +50,19 @@ export function useWhatsAppSync() {
             };
             
             console.log(`📨 Mensaje SSE procesado para ${data.contactId}:`, newMessage);
+            console.log('📝 addMessage será llamado con:', { contactId: data.contactId, message: newMessage });
             
             // Agregar al contacto específico que envió el mensaje
             addMessage(data.contactId, newMessage);
+            
+            console.log('✅ addMessage llamado exitosamente');
+          } else {
+            console.log('⚠️ Mensaje SSE no procesado:', {
+              type: data.type,
+              hasContactId: !!data.contactId,
+              hasContent: !!data.content,
+              data: data
+            });
           }
         } catch (error) {
           console.error('❌ Error parsing SSE message:', error);

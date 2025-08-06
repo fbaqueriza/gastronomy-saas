@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { twilioWhatsAppService } from '../../../../lib/twilioWhatsAppService';
+import { metaWhatsAppService } from '../../../../lib/metaWhatsAppService';
 
 export async function GET() {
   try {
-    const isEnabled = twilioWhatsAppService.isServiceEnabled();
-    const isSimulationMode = twilioWhatsAppService.isSimulationModeEnabled();
+    const status = await metaWhatsAppService.getServiceStatus();
     
     return NextResponse.json({
       success: true,
       service: {
-        enabled: isEnabled,
-        mode: isSimulationMode ? 'simulation' : 'production',
+        enabled: status.enabled,
+        mode: status.simulationMode ? 'simulation' : 'production',
+        configured: status.configured,
+        phoneNumberId: status.phoneNumberId,
+        businessAccountId: status.businessAccountId,
         timestamp: new Date().toISOString()
       },
-      message: isSimulationMode 
+      message: status.simulationMode 
         ? 'WhatsApp service running in simulation mode (messages are simulated)'
-        : 'WhatsApp service running in production mode'
+        : 'WhatsApp service running in production mode with Meta Cloud API'
     });
   } catch (error) {
     console.error('Error checking WhatsApp service status:', error);

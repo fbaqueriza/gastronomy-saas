@@ -5,15 +5,15 @@ import { createClient } from '@supabase/supabase-js';
 export const dynamic = 'force-dynamic';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 // Verificar que las variables de entorno estén disponibles
-if (!supabaseUrl || !supabaseServiceKey) {
+if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('⚠️ Supabase no configurado para messages');
 }
 
-const supabase = supabaseUrl && supabaseServiceKey 
-  ? createClient(supabaseUrl, supabaseServiceKey)
+const supabase = supabaseUrl && supabaseAnonKey 
+  ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
 // GET: Obtener mensajes de un contacto
@@ -24,11 +24,43 @@ export async function GET(request: NextRequest) {
 
     console.log('📥 Obteniendo mensajes:', { contactId, userId });
 
-    // Por ahora, devolver mensajes vacíos ya que Supabase no está configurado correctamente
-    console.log('📥 Retornando mensajes vacíos (Supabase no configurado)');
+    if (!supabase) {
+      console.log('📥 Retornando mensajes vacíos (Supabase no configurado)');
+      return NextResponse.json({ 
+        messages: [],
+        error: 'Supabase no configurado correctamente'
+      });
+    }
+
+    let query = supabase
+      .from('whatsapp_messages')
+      .select('*')
+      .order('timestamp', { ascending: true });
+
+    // Filtrar por contacto si se especifica
+    if (contactId) {
+      // Normalizar el número de teléfono (remover + y espacios)
+      const normalizedContactId = contactId.replace(/[\s\+]/g, '');
+      console.log('📥 Normalizando contactId:', { original: contactId, normalized: normalizedContactId });
+      query = query.eq('contact_id', normalizedContactId);
+    }
+
+    // Filtrar por usuario si se especifica
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data: messages, error } = await query;
+
+    if (error) {
+      console.error('Error obteniendo mensajes:', error);
+      return NextResponse.json({ error: 'Error obteniendo mensajes' }, { status: 500 });
+    }
+
+    console.log('✅ Mensajes obtenidos:', messages?.length || 0);
     return NextResponse.json({ 
-      messages: [],
-      error: 'Supabase no configurado correctamente'
+      messages: messages || [],
+      count: messages?.length || 0
     });
 
   } catch (error) {

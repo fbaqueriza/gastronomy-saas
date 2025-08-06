@@ -12,9 +12,10 @@ Una plataforma completa para la gestión de proveedores, inventario, pedidos y p
 - **Dashboard**: Panel de control con métricas y análisis
 
 ### WhatsApp + IA (NUEVO)
-- **Integración WhatsApp Business API**: Conexión directa con WhatsApp
+- **Integración WhatsApp Business API**: Conexión directa con Meta Cloud API
 - **Análisis de IA**: Procesamiento inteligente de mensajes y documentos
 - **Respuestas Automáticas**: Sistema de respuestas personalizables
+- **Mensajes con Plantillas**: Soporte para plantillas de WhatsApp Business
 - **Análisis de Documentos**: OCR para facturas, catálogos y recibos
 - **Insights de Conversación**: Análisis de sentimiento y tendencias
 - **Dashboard de WhatsApp**: Interfaz completa para gestión de conversaciones
@@ -24,7 +25,7 @@ Una plataforma completa para la gestión de proveedores, inventario, pedidos y p
 - **Frontend**: Next.js 14, React 18, TypeScript
 - **Styling**: Tailwind CSS
 - **Backend**: Supabase (PostgreSQL, Auth, Storage)
-- **WhatsApp**: Meta WhatsApp Business API / Twilio
+- **WhatsApp**: Meta Cloud API (WhatsApp Business API)
 - **IA**: OpenAI GPT-4, Azure Cognitive Services
 - **OCR**: Azure Computer Vision / Google Cloud Vision
 
@@ -209,4 +210,22 @@ Para soporte técnico o preguntas sobre la integración de WhatsApp e IA, contac
 - [ ] App móvil nativa
 - [ ] Multiidioma
 - [ ] API pública para desarrolladores
+
+## 🔄 Migración a Meta Cloud API
+
+### ✅ Completado
+- [x] Nuevo servicio de Meta Cloud API
+- [x] Actualización de rutas de API
+- [x] Soporte para mensajes con plantillas
+- [x] Modo simulación para desarrollo
+- [x] Documentación de migración
+
+### 📋 Próximos Pasos
+- [ ] Configurar credenciales reales de Meta
+- [ ] Probar envío de mensajes con números reales
+- [ ] Configurar webhook en Meta for Developers
+- [ ] Eliminar dependencia de Twilio (opcional)
+- [ ] Optimizar rendimiento del servicio
+
+Para más detalles sobre la migración, consulta [MIGRATION_TWILIO_TO_META.md](MIGRATION_TWILIO_TO_META.md).
  

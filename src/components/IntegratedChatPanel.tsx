@@ -68,6 +68,14 @@ export default function IntegratedChatPanel({
   } = useChat();
 
   const [contacts, setContacts] = useState<Contact[]>([]);
+  
+  // Debug logs
+  console.log('🔍 IntegratedChatPanel - Estado actual:', {
+    selectedContact: selectedContact?.name || 'null',
+    messagesCount: messages?.length || 0,
+    contactsCount: contacts.length,
+    isOpen
+  });
   const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddContact, setShowAddContact] = useState(false);
@@ -128,6 +136,14 @@ export default function IntegratedChatPanel({
       setContacts(providerContacts);
     }
   }, [providers, unreadCounts]); // Mantener unreadCounts para actualizar contadores
+
+  // Seleccionar automáticamente el primer contacto cuando se abre el chat
+  useEffect(() => {
+    if (isOpen && contacts.length > 0 && !selectedContact) {
+      console.log('🔄 Auto-seleccionando primer contacto:', contacts[0]);
+      setSelectedContact(contacts[0]);
+    }
+  }, [isOpen, contacts, selectedContact, setSelectedContact]);
 
   // Scroll al final de los mensajes (optimizado)
   const scrollToBottom = useCallback(() => {
