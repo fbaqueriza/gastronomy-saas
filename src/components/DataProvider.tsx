@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Order, Provider, StockItem, WhatsAppMessage } from '../types';
 import supabase from '../lib/supabaseClient';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface DataContextType {
   orders: Order[];

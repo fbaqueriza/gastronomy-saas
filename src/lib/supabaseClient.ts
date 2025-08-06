@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Obtener las variables de entorno
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -9,7 +9,7 @@ console.log('DEBUG: supabaseUrl:', supabaseUrl);
 console.log('DEBUG: supabaseAnonKey:', supabaseAnonKey ? 'EXISTS' : 'MISSING');
 
 // Verificar que las variables estén disponibles
-let supabase;
+let supabase: SupabaseClient;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.log('WARNING: Las variables de entorno de Supabase no están configuradas - usando modo sin base de datos');
@@ -22,7 +22,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
         limit: () => ({ data: [], error: null })
       })
     })
-  };
+  } as any;
 } else {
   supabase = createClient(supabaseUrl, supabaseAnonKey);
 }

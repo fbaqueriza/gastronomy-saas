@@ -1,0 +1,67 @@
+COMANDOS PARA SUBIR A GITHUB
+================================
+
+1. ABRIR POWERSHELL COMO ADMINISTRADOR
+   - Presiona Windows + X
+   - Selecciona "Windows PowerShell (Administrador)"
+
+2. NAVEGAR AL DIRECTORIO
+   cd C:\Users\baquf\gastronomy-saas
+
+3. VERIFICAR GIT
+   git --version
+
+4. CONFIGURAR USUARIO (si no está configurado)
+   git config --global user.name "Francisco Baqueriza"
+   git config --global user.email "baquf@gmail.com"
+
+5. VERIFICAR ESTADO
+   git status
+
+6. AGREGAR ARCHIVOS
+   git add -A
+
+7. HACER COMMIT
+   git commit -m "Fix: Remove navigation banner from login page and improve real-time message sync"
+
+8. CONFIGURAR REMOTE
+   git remote add origin https://github.com/baquf/gastronomy-saas.git
+
+9. SUBIR A GITHUB
+   git push -u origin main
+
+ALTERNATIVA: EJECUTAR SCRIPT
+=============================
+
+Si los comandos manuales no funcionan, ejecuta:
+
+1. Doble clic en: temporario/subir-github.bat
+   O
+2. En PowerShell: .\temporario\subir-github-detallado.ps1
+
+PROBLEMAS COMUNES
+=================
+
+1. Si dice "fatal: not a git repository"
+   Ejecuta: git init
+
+2. Si dice "authentication failed"
+   - Ve a GitHub.com
+   - Settings > Developer settings > Personal access tokens
+   - Generate new token
+   - Usa el token como contraseña
+
+3. Si dice "port 3001 in use"
+   Ejecuta: taskkill /f /im node.exe
+
+4. Si hay conflictos
+   Ejecuta: git pull origin main --rebase
+
+ARCHIVOS MODIFICADOS
+====================
+- src/app/layout.tsx
+- src/components/ConditionalNavigation.tsx
+- src/contexts/ChatContext.tsx
+- src/lib/metaWhatsAppService.ts
+- src/app/auth/login/page.tsx
+- src/app/api/whatsapp/webhook/route.ts 

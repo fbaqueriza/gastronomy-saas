@@ -31,6 +31,7 @@ import es from '../../locales/es';
 import { Menu } from '@headlessui/react';
 import { useRouter } from 'next/navigation';
 import supabase from '../../lib/supabaseClient';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export default function DashboardPageWrapper() {
   const { user, loading: authLoading } = useSupabaseAuth();
