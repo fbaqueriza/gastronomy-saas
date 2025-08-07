@@ -9,19 +9,45 @@ import ConditionalNavigation from '../components/ConditionalNavigation';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Gastronomy Manager',
-  description: 'SaaS app for gastronomy commerce managers',
+  title: 'Gastrosaas - Plataforma SaaS para Restaurantes',
+  description: 'Gastrosaas es una plataforma SaaS que ayuda a restaurantes a digitalizar sus operaciones mediante herramientas como menú digital, gestión de pedidos, y comunicación automatizada con clientes por WhatsApp.',
+  keywords: 'restaurante, digitalización, menú digital, pedidos, WhatsApp Business, SaaS, gastronomía',
+  authors: [{ name: 'Gastrosaas Team' }],
+  creator: 'Gastrosaas',
+  publisher: 'Gastrosaas',
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  metadataBase: new URL('https://gastrosaas.com'),
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    title: 'Gastrosaas - Digitaliza tu Restaurante',
+    description: 'Plataforma SaaS completa para restaurantes con menú digital, gestión de pedidos y WhatsApp Business',
+    url: 'https://gastrosaas.com',
+    siteName: 'Gastrosaas',
+    locale: 'es_AR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Gastrosaas - Digitaliza tu Restaurante',
+    description: 'Plataforma SaaS completa para restaurantes con menú digital, gestión de pedidos y WhatsApp Business',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="es">
       <body className={inter.className}>
         <SupabaseAuthProvider>
           <ChatProvider>
             <WhatsAppSync />
             <ConditionalNavigation />
-            <main className="min-h-screen bg-gray-50">
+            <main className="min-h-screen">
               {children}
             </main>
           </ChatProvider>

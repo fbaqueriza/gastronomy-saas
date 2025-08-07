@@ -10,7 +10,10 @@ export default function ConditionalNavigation() {
   const authRoutes = ['/auth/login', '/auth/signup', '/auth/forgot-password'];
   const isAuthRoute = authRoutes.includes(pathname);
   
-  if (isAuthRoute) {
+  // No mostrar navegación en la página principal (landing page)
+  const isLandingPage = pathname === '/';
+  
+  if (isAuthRoute || isLandingPage) {
     return null;
   }
   
