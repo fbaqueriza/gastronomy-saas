@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, ShoppingCart, AlertTriangle, Clock, RefreshCw } from 'lucide-react';
-import { Provider, OrderItem, StockItem } from '../types';
+import { X, ShoppingCart, AlertTriangle, Clock, RefreshCw, Upload, FileText, Calendar, CreditCard } from 'lucide-react';
+import { Provider, OrderItem, StockItem, OrderFile } from '../types';
+import DateSelector from './DateSelector';
 
 interface CreateOrderModalProps {
   isOpen: boolean;
@@ -11,6 +12,9 @@ interface CreateOrderModalProps {
     providerId: string;
     items: OrderItem[];
     notes: string;
+    desiredDeliveryDate?: Date;
+    paymentMethod?: 'efectivo' | 'transferencia' | 'tarjeta' | 'cheque';
+    additionalFiles?: OrderFile[];
   }) => void;
   providers: Provider[];
   stockItems: StockItem[];
@@ -35,6 +39,10 @@ export default function CreateOrderModal({
   const [selectedProvider, setSelectedProvider] = useState<string>('');
   const [orderText, setOrderText] = useState('');
   const [notes, setNotes] = useState('');
+  const [desiredDeliveryDate, setDesiredDeliveryDate] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'transferencia' | 'tarjeta' | 'cheque'>('efectivo');
+  const [additionalFiles, setAdditionalFiles] = useState<OrderFile[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
 
   // Set selectedProvider from prop if provided
   useEffect(() => {
@@ -52,6 +60,49 @@ export default function CreateOrderModal({
       setOrderText(`${suggestedOrder.productName}: ${suggestedOrder.suggestedQuantity} ${suggestedOrder.unit}`);
     }
   }, [suggestedOrder]);
+
+  // Set default values when provider is selected
+  useEffect(() => {
+    if (selectedProvider) {
+      const provider = providers.find(p => p.id === selectedProvider);
+      if (provider) {
+        // Set default payment method
+        if (provider.defaultPaymentMethod) {
+          setPaymentMethod(provider.defaultPaymentMethod);
+        }
+        
+        // Set default delivery date based on provider's delivery days
+        if (provider.defaultDeliveryDays && provider.defaultDeliveryTime) {
+          const today = new Date();
+          const deliveryDays = provider.defaultDeliveryDays;
+          const deliveryTime = provider.defaultDeliveryTime;
+          
+          // Find next available delivery day
+          let nextDeliveryDate = new Date();
+          let daysToAdd = 0;
+          
+          while (daysToAdd < 14) { // Look up to 2 weeks ahead
+            const checkDate = new Date(today);
+            checkDate.setDate(today.getDate() + daysToAdd);
+            const dayName = checkDate.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
+            
+            if (deliveryDays.includes(dayName)) {
+              nextDeliveryDate = checkDate;
+              break;
+            }
+            daysToAdd++;
+          }
+          
+          // Set time - use first available time if it's an array
+          const timeToUse = Array.isArray(deliveryTime) ? deliveryTime[0] : deliveryTime;
+          const [hours, minutes] = timeToUse.split(':');
+          nextDeliveryDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+          
+          setDesiredDeliveryDate(nextDeliveryDate.toISOString().split('T')[0]);
+        }
+      }
+    }
+  }, [selectedProvider, providers]);
 
   // Generate suggested order text when provider is selected
   useEffect(() => {
@@ -97,10 +148,11 @@ export default function CreateOrderModal({
       setSelectedProvider('');
       setOrderText('');
       setNotes('');
+      setDesiredDeliveryDate('');
+      setPaymentMethod('efectivo');
+      setAdditionalFiles([]);
     }
   }, [isOpen]);
-
-  // Remove handleRefreshSuggestions and the Refresh Suggestions button from the UI
 
   const parseOrderText = (text: string): OrderItem[] => {
     const lines = text.split('\n').filter(line => line.trim());
@@ -124,14 +176,60 @@ export default function CreateOrderModal({
     return items;
   };
 
+  const handleFileUpload = async (files: FileList) => {
+    setUploadingFiles(true);
+    try {
+      const newFiles: OrderFile[] = [];
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileId = Date.now().toString() + i;
+        
+        // Simular subida de archivo (en producción esto iría a Supabase Storage)
+        const mockFileUrl = URL.createObjectURL(file);
+        
+        newFiles.push({
+          id: fileId,
+          fileName: file.name,
+          fileUrl: mockFileUrl,
+          fileSize: file.size,
+          uploadedAt: new Date(),
+          description: '',
+        });
+      }
+      
+      setAdditionalFiles(prev => [...prev, ...newFiles]);
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      alert('Error al subir archivos. Intenta nuevamente.');
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
+  const removeFile = (fileId: string) => {
+    setAdditionalFiles(prev => prev.filter(file => file.id !== fileId));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('DEBUG Modal: handleSubmit ejecutado', { selectedProvider, orderText, notes });
+    console.log('DEBUG Modal: handleSubmit ejecutado', { 
+      selectedProvider, 
+      orderText, 
+      notes, 
+      desiredDeliveryDate, 
+      paymentMethod, 
+      additionalFiles 
+    });
     if (!selectedProvider) return;
+    
     onCreateOrder({
       providerId: selectedProvider,
       items: parseOrderText(orderText),
       notes,
+      desiredDeliveryDate: desiredDeliveryDate ? new Date(desiredDeliveryDate) : undefined,
+      paymentMethod,
+      additionalFiles,
     });
   };
 
@@ -194,8 +292,64 @@ export default function CreateOrderModal({
                       <strong>Notas:</strong> {selectedProviderInfo.notes}
                     </div>
                   )}
+                  {selectedProviderInfo.defaultDeliveryDays && selectedProviderInfo.defaultDeliveryTime && (
+                    <div className="text-sm text-blue-700 mt-1">
+                      <strong>Entrega:</strong> {selectedProviderInfo.defaultDeliveryDays.join(', ')} a las {selectedProviderInfo.defaultDeliveryTime}
+                    </div>
+                  )}
+                  {selectedProviderInfo.defaultPaymentMethod && (
+                    <div className="text-sm text-blue-700 mt-1">
+                      <strong>Pago por defecto:</strong> {selectedProviderInfo.defaultPaymentMethod}
+                    </div>
+                  )}
                 </div>
               )}
+            </div>
+
+            {/* Delivery Date and Payment Method */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              {/* Delivery Date */}
+              <DateSelector
+                value={desiredDeliveryDate}
+                onChange={setDesiredDeliveryDate}
+                providerDeliveryDays={selectedProviderInfo?.defaultDeliveryDays}
+                providerDeliveryTime={selectedProviderInfo?.defaultDeliveryTime}
+              />
+
+              {/* Payment Method */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <CreditCard className="inline h-4 w-4 mr-1" />
+                  Método de pago
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: 'efectivo', label: 'Efectivo', icon: '💵' },
+                    { value: 'transferencia', label: 'Transferencia', icon: '🏦' },
+                    { value: 'tarjeta', label: 'Tarjeta', icon: '💳' },
+                    { value: 'cheque', label: 'Cheque', icon: '📄' },
+                  ].map((method) => (
+                    <button
+                      key={method.value}
+                      type="button"
+                      onClick={() => setPaymentMethod(method.value as any)}
+                      className={`p-3 border rounded-lg text-center transition-colors ${
+                        paymentMethod === method.value
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="text-2xl mb-1">{method.icon}</div>
+                      <div className="text-sm font-medium">{method.label}</div>
+                    </button>
+                  ))}
+                </div>
+                {selectedProviderInfo?.defaultPaymentMethod && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Método por defecto del proveedor: {selectedProviderInfo.defaultPaymentMethod}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Order Items Text */}
@@ -246,6 +400,61 @@ export default function CreateOrderModal({
                       </div>
                     </>
                   )}
+                </div>
+              )}
+            </div>
+
+            {/* Additional Files */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <FileText className="inline h-4 w-4 mr-1" />
+                Archivos adicionales
+              </label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
+                  className="hidden"
+                  id="file-upload"
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                />
+                <label
+                  htmlFor="file-upload"
+                  className="cursor-pointer inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {uploadingFiles ? 'Subiendo...' : 'Seleccionar archivos'}
+                </label>
+                <p className="mt-2 text-sm text-gray-500">
+                  PDF, imágenes, documentos (máx. 10MB por archivo)
+                </p>
+              </div>
+
+              {/* File List */}
+              {additionalFiles.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <h4 className="text-sm font-medium text-gray-900">Archivos adjuntos:</h4>
+                  {additionalFiles.map((file) => (
+                    <div key={file.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+                      <div className="flex items-center">
+                        <FileText className="h-4 w-4 text-gray-500 mr-2" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{file.fileName}</p>
+                          <p className="text-xs text-gray-500">
+                            {(file.fileSize / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(file.id)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

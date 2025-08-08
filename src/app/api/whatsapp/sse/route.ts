@@ -23,27 +23,11 @@ export async function GET(request: NextRequest) {
         new TextEncoder().encode(`data: ${JSON.stringify(testMessage)}\n\n`)
       );
 
-      // Mantener conexión viva
-      const keepAlive = setInterval(() => {
-        try {
-          const pingMessage = {
-            type: 'ping',
-            timestamp: new Date().toISOString()
-          };
-          controller.enqueue(
-            new TextEncoder().encode(`data: ${JSON.stringify(pingMessage)}\n\n`)
-          );
-        } catch (error) {
-          console.log('Cliente SSE desconectado');
-          clearInterval(keepAlive);
-          removeClient(controller);
-        }
-      }, 30000); // Ping cada 30 segundos
+      // No hay test periódico - la conexión se mantiene viva naturalmente
 
       // Limpiar cuando el cliente se desconecte
       request.signal.addEventListener('abort', () => {
         console.log('🔌 Cliente SSE desconectado');
-        clearInterval(keepAlive);
         removeClient(controller);
       });
     }

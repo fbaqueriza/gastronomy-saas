@@ -16,6 +16,10 @@ export interface Provider {
   alias?: string;
   cuitCuil?: string;
   razonSocial?: string;
+  // Nuevos campos para configuración de entrega y pago
+  defaultDeliveryDays?: string[]; // ['monday', 'wednesday', 'friday']
+  defaultDeliveryTime?: string[]; // '15:00'
+  defaultPaymentMethod?: 'efectivo' | 'transferencia' | 'tarjeta' | 'cheque';
   catalogs: Catalog[];
   createdAt: Date;
   updatedAt: Date;
@@ -62,6 +66,9 @@ export interface Order {
   currency: string;
   orderDate: Date;
   dueDate?: Date;
+  // Nuevos campos para fecha de entrega y forma de pago
+  desiredDeliveryDate?: Date;
+  paymentMethod?: 'efectivo' | 'transferencia' | 'tarjeta' | 'cheque';
   invoiceNumber?: string;
   bankInfo?: {
     iban?: string;
@@ -71,6 +78,8 @@ export interface Order {
   };
   receiptUrl?: string;
   notes?: string;
+  // Nuevo campo para archivos adicionales
+  additionalFiles?: OrderFile[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -81,6 +90,16 @@ export interface OrderItem {
   unit: string;
   price: number;
   total: number;
+}
+
+// Nuevo tipo para archivos adicionales de órdenes
+export interface OrderFile {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+  fileSize: number;
+  uploadedAt: Date;
+  description?: string;
 }
 
 // Payment types

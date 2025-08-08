@@ -37,6 +37,7 @@ export default function DataGrid({
   searchable = true,
   selectable = true,
   loading = false,
+  disabledRowIds = [],
 }: DataGridProps) {
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,6 +54,7 @@ export default function DataGrid({
         header: col.name,
         cell: ({ row, column }) => {
           const rowData = row.original;
+          const isRowDisabled = disabledRowIds.includes(rowData.id);
           const isEditing =
             editingCell?.rowId === row.id &&
             editingCell?.columnKey === column.id;
@@ -123,10 +125,16 @@ export default function DataGrid({
 
           return (
             <div
-              className={`px-2 py-1 ${colDef?.editable !== false ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+              className={`px-2 py-1 ${
+                colDef?.editable !== false && !isRowDisabled 
+                  ? 'cursor-pointer hover:bg-gray-100' 
+                  : isRowDisabled 
+                    ? 'cursor-not-allowed opacity-50' 
+                    : ''
+              }`}
               onClick={() => {
-                // Solo manejar click para columnas sin render personalizado
-                if (colDef?.editable !== false && !colDef?.render) {
+                // Solo manejar click para columnas sin render personalizado y si no está deshabilitado
+                if (colDef?.editable !== false && !colDef?.render && !isRowDisabled) {
                   setEditingCell({ rowId: row.id, columnKey: column.id });
                   setEditingValue(String(value || ''));
                 }

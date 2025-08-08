@@ -26,7 +26,6 @@ const headerMap: Record<string, string> = {
   'frecuencia': 'restockFrequency',
   'frecuenciaderepocicion': 'restockFrequency',
   'frecuenciareposicion': 'restockFrequency',
-  'frecuenciadereposicion': 'restockFrequency',
   'proveedoresasociados': 'associatedProviders',
   'associatedproviders': 'associatedProviders',
   'associated_providers': 'associatedProviders',

@@ -4,11 +4,12 @@ import { useState, useCallback, useEffect } from 'react';
 import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
 import SuggestedOrders from '../../components/SuggestedOrders';
 import CreateOrderModal from '../../components/CreateOrderModal';
+import EditOrderModal from '../../components/EditOrderModal';
 import ComprobanteButton from '../../components/ComprobanteButton';
 import ChatPreview from '../../components/ChatPreview';
 import IntegratedChatPanel from '../../components/IntegratedChatPanel';
 import { useChat } from '../../contexts/ChatContext';
-import { Order, OrderItem, Provider, StockItem } from '../../types';
+import { Order, OrderItem, Provider, StockItem, OrderFile } from '../../types';
 import {
   Plus,
   ShoppingCart,
@@ -24,6 +25,7 @@ import {
   Check,
   Download,
   ChevronDown,
+  Edit,
 } from 'lucide-react';
 import { DataProvider, useData } from '../../components/DataProvider';
 import es from '../../locales/es';
@@ -56,6 +58,8 @@ function OrdersPage({ user }: OrdersPageProps) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [suggestedOrder, setSuggestedOrder] = useState<any>(null);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   
   // Chat state
   const { openChat, isChatOpen, closeChat } = useChat();
@@ -74,6 +78,9 @@ function OrdersPage({ user }: OrdersPageProps) {
     providerId: string;
     items: OrderItem[];
     notes: string;
+    desiredDeliveryDate?: Date;
+    paymentMethod?: 'efectivo' | 'transferencia' | 'tarjeta' | 'cheque';
+    additionalFiles?: OrderFile[];
   }) => {
     if (!user) return;
     
@@ -86,6 +93,9 @@ function OrdersPage({ user }: OrdersPageProps) {
       currency: 'ARS',
       orderDate: new Date(),
       dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      desiredDeliveryDate: orderData.desiredDeliveryDate,
+      paymentMethod: orderData.paymentMethod,
+      additionalFiles: orderData.additionalFiles || [],
       invoiceNumber: '',
       bankInfo: {},
       receiptUrl: '',
@@ -344,6 +354,36 @@ function OrdersPage({ user }: OrdersPageProps) {
     }
   };
 
+  const handleEditOrder = (order: Order) => {
+    setEditingOrder(order);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveOrderEdit = async (orderId: string, updates: {
+    desiredDeliveryDate?: Date;
+    paymentMethod?: 'efectivo' | 'transferencia' | 'tarjeta' | 'cheque';
+    additionalFiles?: OrderFile[];
+    notes?: string;
+  }) => {
+    try {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+      
+      const updatedOrder = {
+        ...order,
+        ...updates,
+        updatedAt: new Date(),
+      };
+      
+      await updateOrder(updatedOrder);
+      console.log('✅ Pedido actualizado:', orderId);
+      setIsEditModalOpen(false);
+      setEditingOrder(null);
+    } catch (error) {
+      console.error('Error actualizando pedido:', error);
+    }
+  };
+
   // 1. Agregar estado para filtros
   const [filterProvider, setFilterProvider] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -525,6 +565,15 @@ function OrdersPage({ user }: OrdersPageProps) {
                       {/* Lado derecho: botones de acción */}
                       <div className="flex flex-col items-end gap-2 sm:w-5/12 min-w-[160px]">
                         
+                        {/* Editar pedido - disponible en cualquier estado */}
+                        <button
+                          onClick={() => handleEditOrder(order)}
+                          className="inline-flex items-center p-2 rounded-md text-xs font-medium border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
+                          title="Editar pedido"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+
                         {/* Enviar pedido - solo en estado pending */}
                         {order.status === 'pending' && (
                           <button
@@ -689,6 +738,12 @@ function OrdersPage({ user }: OrdersPageProps) {
                               <div><strong>Proveedor:</strong> {getProviderName(order.providerId)}</div>
                               <div><strong>Fecha del pedido:</strong> {formatDate(order.orderDate)}</div>
                               <div><strong>Fecha de vencimiento:</strong> {formatDate(order.dueDate)}</div>
+                              {order.desiredDeliveryDate && (
+                                <div><strong>Fecha de entrega deseada:</strong> {formatDate(order.desiredDeliveryDate)}</div>
+                              )}
+                              {order.paymentMethod && (
+                                <div><strong>Forma de pago:</strong> {order.paymentMethod}</div>
+                              )}
                               {order.notes && (
                                 <div><strong>Notas:</strong> {order.notes}</div>
                               )}
@@ -709,6 +764,38 @@ function OrdersPage({ user }: OrdersPageProps) {
                             </div>
                           </div>
                         </div>
+                        
+                        {/* Archivos adicionales */}
+                        {order.additionalFiles && order.additionalFiles.length > 0 && (
+                          <div className="mt-4">
+                            <h4 className="text-sm font-medium text-gray-900 mb-2">Archivos adicionales</h4>
+                            <div className="bg-gray-50 rounded-md p-3">
+                              <div className="space-y-2">
+                                {order.additionalFiles.map((file, index) => (
+                                  <div key={index} className="flex items-center justify-between text-xs">
+                                    <div className="flex items-center">
+                                      <FileText className="h-3 w-3 text-gray-500 mr-2" />
+                                      <span className="text-gray-700">{file.fileName}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <span className="text-gray-500">
+                                        {(file.fileSize / 1024 / 1024).toFixed(2)} MB
+                                      </span>
+                                      <a
+                                        href={file.fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800"
+                                      >
+                                        Ver
+                                      </a>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         
                         {/* Lista de ítems */}
                         <div className="mt-4">
@@ -845,6 +932,7 @@ function OrdersPage({ user }: OrdersPageProps) {
                                     <div className="mt-2 text-sm text-blue-700">
                       <ul className="list-disc list-inside space-y-1">
                         <li><strong>Crear pedido:</strong> Haz clic en "Crear nuevo pedido" para iniciar un pedido</li>
+                        <li><strong>Editar pedido:</strong> Haz clic en "Editar" para modificar fecha de entrega, método de pago o agregar archivos</li>
                         <li><strong>Enviar pedido:</strong> Una vez creado, haz clic en "Enviar pedido" para notificar al proveedor</li>
                         <li><strong>Descargar factura:</strong> Cuando recibas la factura, descárgala y revisa los detalles de pago</li>
                         <li><strong>Subir comprobante:</strong> Después de pagar, sube el comprobante de pago</li>
@@ -878,6 +966,18 @@ function OrdersPage({ user }: OrdersPageProps) {
         stockItems={stockItems}
         suggestedOrder={suggestedOrder}
         selectedProviderId={null}
+      />
+
+      {/* Edit Order Modal */}
+      <EditOrderModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingOrder(null);
+        }}
+        order={editingOrder}
+        providers={providers}
+        onSave={handleSaveOrderEdit}
       />
 
       {/* Integrated Chat Panel */}

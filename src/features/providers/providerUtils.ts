@@ -14,6 +14,9 @@ export const createNewProvider = (): Provider => ({
   alias: '',
   cuitCuil: '',
   razonSocial: '',
+  defaultDeliveryDays: [],
+  defaultDeliveryTime: [],
+  defaultPaymentMethod: 'efectivo',
   catalogs: [],
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -31,6 +34,12 @@ export const processProviderData = (data: any[], user_id: string): Provider[] =>
       typeof row.tags === 'string'
         ? row.tags.split(',').map((t: string) => t.trim())
         : row.tags || [],
+    defaultDeliveryDays:
+      typeof row.defaultDeliveryDays === 'string'
+        ? row.defaultDeliveryDays.split(',').map((d: string) => d.trim())
+        : row.defaultDeliveryDays || [],
+    defaultDeliveryTime: Array.isArray(row.defaultDeliveryTime) ? row.defaultDeliveryTime : (row.defaultDeliveryTime ? [row.defaultDeliveryTime] : []),
+    defaultPaymentMethod: row.defaultPaymentMethod || 'efectivo',
     updatedAt: new Date(),
   }));
 };
@@ -39,27 +48,34 @@ export const handleCatalogUpload = (
   providers: Provider[],
   providerId: string,
   file: File,
-): Provider[] => {
-  const url = URL.createObjectURL(file);
-  return providers.map((p) =>
-    p.id === providerId
-      ? {
-        ...p,
-        catalogs: [
-          ...p.catalogs,
-          {
-            id: Date.now().toString(),
-            providerId,
-            name: file.name,
-            fileUrl: url,
-            fileName: file.name,
-            fileSize: file.size,
-            uploadedAt: new Date(),
-          },
-        ],
-      }
-      : p,
-  );
+): Promise<Provider[]> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const updatedProviders = providers.map((p) =>
+        p.id === providerId
+          ? {
+            ...p,
+            catalogs: [
+              ...p.catalogs,
+              {
+                id: Date.now().toString(),
+                providerId,
+                name: file.name,
+                fileUrl: dataUrl,
+                fileName: file.name,
+                fileSize: file.size,
+                uploadedAt: new Date(),
+              },
+            ],
+          }
+          : p,
+      );
+      resolve(updatedProviders);
+    };
+    reader.readAsDataURL(file);
+  });
 };
 
 export const csvEscape = (value: string): string => {

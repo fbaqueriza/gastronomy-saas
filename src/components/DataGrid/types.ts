@@ -17,6 +17,7 @@ export interface DataGridProps {
   searchable?: boolean;
   selectable?: boolean;
   loading?: boolean;
+  disabledRowIds?: string[]; // IDs of rows that should be disabled for editing
 }
 
 export interface EditingCell {

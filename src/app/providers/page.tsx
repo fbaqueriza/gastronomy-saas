@@ -4,7 +4,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
 import SpreadsheetGrid from '../../components/DataGrid';
 import { Provider } from '../../types';
-import { Plus, Upload, Download, FileText, Eye } from 'lucide-react';
+import { Plus, Upload, Download, FileText, Eye, CreditCard, Edit } from 'lucide-react';
 import { useUndo } from '../../hooks/useUndo';
 import { useCSV } from '../../hooks/useCSV';
 import {
@@ -19,6 +19,8 @@ import { useChat } from '../../contexts/ChatContext';
 import { DataProvider, useData } from '../../components/DataProvider';
 import es from '../../locales/es';
 import { useRouter } from 'next/navigation';
+import ProviderConfigModal from '../../components/ProviderConfigModal';
+import { uploadCatalogFile } from '../../lib/supabase/storage';
 
 export default function ProvidersPageWrapper() {
   const { user, loading: authLoading } = useSupabaseAuth();
@@ -51,6 +53,10 @@ function ProvidersPage() {
   const [addingProvider, setAddingProvider] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentProvider, setCurrentProvider] = useState<Provider | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isEditingInTable, setIsEditingInTable] = useState<string | null>(null);
   
   // Chat state
   const { openChat, isChatOpen } = useChat();
@@ -65,30 +71,209 @@ function ProvidersPage() {
 
   // PDF upload handler
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const handleCatalogUploadLocal = (providerId: string, file: File) => {
-    // setProviders((prev) => handleCatalogUpload(prev, providerId, file)); // This line was removed
+  const handleCatalogUploadLocal = async (providerId: string, file: File): Promise<void> => {
+    console.log('DEBUG: handleCatalogUploadLocal called with:', providerId, file.name);
+    
+    if (!user?.id) {
+      console.error('DEBUG: No user ID available for upload');
+      alert('Error: Usuario no autenticado');
+      return;
+    }
+
+    try {
+      // Upload file to Supabase Storage
+      const uploadResult = await uploadCatalogFile(file, providerId, user.id);
+      
+      if (!uploadResult.success) {
+        console.error('DEBUG: Upload failed:', uploadResult.error);
+        alert(`Error al subir el archivo: ${uploadResult.error}`);
+        return;
+      }
+
+      console.log('DEBUG: File uploaded successfully:', uploadResult);
+
+      // Create catalog object with the Supabase URL
+      const catalog = {
+        id: `catalog-${Date.now()}`,
+        providerId: providerId,
+        name: file.name,
+        fileUrl: uploadResult.url!, // Use the Supabase URL
+        fileName: uploadResult.fileName || file.name,
+        fileSize: file.size,
+        uploadedAt: new Date(),
+      };
+      
+      console.log('DEBUG: Catalog object created:', catalog);
+      
+      // Update the provider with the catalog
+      const providerToUpdate = providers.find(p => p.id === providerId);
+      if (providerToUpdate) {
+        console.log('DEBUG: Found provider to update:', providerToUpdate.name);
+        
+        // Add the new catalog to the existing catalogs array
+        const existingCatalogs = providerToUpdate.catalogs || [];
+        const updatedCatalogs = [...existingCatalogs, catalog];
+        
+        const updatedProvider = {
+          ...providerToUpdate,
+          catalogs: updatedCatalogs
+        };
+        console.log('DEBUG: Updated provider with catalog:', updatedProvider);
+        
+        // Update in the database
+        await updateProvider(updatedProvider);
+        console.log('DEBUG: Provider updated successfully');
+      } else {
+        console.log('DEBUG: Provider not found for ID:', providerId);
+        alert('Error: Proveedor no encontrado');
+      }
+    } catch (error) {
+      console.error('DEBUG: Error in handleCatalogUploadLocal:', error);
+      alert('Error al procesar el archivo. Intenta nuevamente.');
+    }
   };
+
+  const handleOpenModal = (provider: Provider | null, editing: boolean = false) => {
+    console.log('DEBUG: handleOpenModal called with provider:', provider, 'editing:', editing);
+    console.log('DEBUG: Provider details:', {
+      id: provider?.id,
+      name: provider?.name,
+      email: provider?.email,
+      defaultDeliveryDays: provider?.defaultDeliveryDays,
+      defaultDeliveryTime: provider?.defaultDeliveryTime,
+      defaultPaymentMethod: provider?.defaultPaymentMethod
+    });
+    
+    setCurrentProvider(provider);
+    setIsEditing(editing);
+    setIsModalOpen(true);
+    
+    // If editing, set the provider ID as being edited in table
+    if (editing && provider) {
+      setIsEditingInTable(provider.id);
+    } else {
+      setIsEditingInTable(null);
+    }
+    
+    console.log('DEBUG: State updated - currentProvider:', provider, 'isModalOpen: true');
+  };
+
+  const handleSaveProviderConfig = async (updatedProvider: Provider) => {
+    try {
+      console.log('DEBUG: handleSaveProviderConfig called with:', updatedProvider);
+      await updateProvider(updatedProvider);
+      console.log('Proveedor actualizado:', updatedProvider.name);
+    } catch (error) {
+      console.error('Error actualizando proveedor:', error);
+    }
+  };
+
+  const handleAddProvider = async (providerData: Omit<Provider, 'id' | 'createdAt' | 'updatedAt' | 'user_id'>) => {
+    try {
+      console.log('DEBUG: handleAddProvider called with:', providerData);
+      setAddingProvider(true);
+      
+      const result = await addProvider(providerData, user?.id || '');
+      console.log('DEBUG: addProvider result:', result);
+      console.log('Proveedor agregado exitosamente');
+      
+      // Cerrar el modal y limpiar el estado
+      setIsModalOpen(false);
+      setCurrentProvider(null);
+      setIsEditing(false);
+      setIsEditingInTable(null);
+      
+      // Forzar una recarga de los datos
+      if (user?.id) {
+        await fetchAll();
+      }
+      
+      console.log('DEBUG: Provider added successfully, modal closed');
+    } catch (error) {
+      console.error('Error agregando proveedor:', error);
+    } finally {
+      setAddingProvider(false);
+    }
+  };
+
+  // Debug log for modal state
+  console.log('DEBUG: ProvidersPage render - modal state:', { isModalOpen, currentProvider: currentProvider?.name, isEditing });
+  console.log('DEBUG: ProvidersPage render - providers count:', providers.length);
+  console.log('DEBUG: ProvidersPage render - providers with catalogs:', providers.filter(p => p.catalogs && p.catalogs.length > 0).length);
 
   const columns = [
     {
       key: 'acciones',
       name: 'Acciones',
-      width: 80,
+      width: 120,
       editable: false,
-      render: (row: Provider) => (
-        <div className="flex gap-1 justify-center items-center" style={{ width: 80, minWidth: 80, maxWidth: 80 }}>
+      render: (value: any, row: Provider) => (
+        <div className="flex gap-1 justify-center items-center" style={{ width: 120, minWidth: 120, maxWidth: 120 }}>
           <button
-            className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            title="Ver catálogo del proveedor"
-            aria-label="Ver catálogo del proveedor"
+            className={`inline-flex items-center justify-center w-7 h-7 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+              row?.catalogs?.length 
+                ? 'hover:bg-blue-100 text-blue-600' 
+                : 'text-gray-400 hover:bg-gray-100 cursor-not-allowed'
+            }`}
+            title={row?.catalogs?.length ? "Ver catálogo del proveedor" : "Sin catálogo disponible"}
+            aria-label={row?.catalogs?.length ? "Ver catálogo del proveedor" : "Sin catálogo disponible"}
             onClick={() => {
+              console.log('DEBUG: Table catalog button clicked for row:', row);
+              console.log('DEBUG: row.catalogs:', row.catalogs);
+              
+              if (!row?.catalogs || row.catalogs.length === 0) {
+                console.log('DEBUG: No catalogs found in table');
+                alert('Este proveedor no tiene catálogos cargados.');
+                return;
+              }
+              
               const pdf = row.catalogs[0];
-              if (pdf?.fileUrl) {window.open(pdf.fileUrl, '_blank');}
+              if (!pdf?.fileUrl) {
+                console.log('DEBUG: Catalog found but no fileUrl in table');
+                alert('El catálogo existe pero la URL no está disponible.');
+                return;
+              }
+              
+              console.log('DEBUG: Opening catalog URL from table:', pdf.fileUrl);
+              try {
+                // Verificar si es una URL válida (incluye data URLs)
+                if (pdf.fileUrl.startsWith('blob:') || 
+                    pdf.fileUrl.startsWith('http') || 
+                    pdf.fileUrl.startsWith('data:')) {
+                  window.open(pdf.fileUrl, '_blank');
+                } else {
+                  console.log('DEBUG: Invalid URL format in table:', pdf.fileUrl);
+                  alert('El formato de la URL del catálogo no es válido.');
+                }
+              } catch (error) {
+                console.error('DEBUG: Error opening catalog from table:', error);
+                alert('Error al abrir el catálogo. Verifica que la URL sea válida.');
+              }
             }}
             disabled={!row?.catalogs?.length}
             tabIndex={0}
           >
-            <Eye className="h-4 w-4 text-blue-600" />
+            <Eye className={`h-4 w-4 ${row?.catalogs?.length ? 'text-blue-600' : 'text-gray-400'}`} />
+          </button>
+          <button
+            className="inline-flex items-center justify-center w-7 h-7 rounded hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            title="Editar proveedor"
+            aria-label="Editar proveedor"
+            onClick={() => {
+              console.log('DEBUG: Edit button clicked with row:', row);
+              console.log('DEBUG: Row type:', typeof row);
+              console.log('DEBUG: Row keys:', Object.keys(row || {}));
+              console.log('DEBUG: Row ID:', row?.id);
+              console.log('DEBUG: Row name:', row?.name);
+              console.log('DEBUG: Row email:', row?.email);
+              console.log('DEBUG: Row defaultDeliveryDays:', row?.defaultDeliveryDays);
+              console.log('DEBUG: Row defaultDeliveryTime:', row?.defaultDeliveryTime);
+              console.log('DEBUG: Row defaultPaymentMethod:', row?.defaultPaymentMethod);
+              handleOpenModal(row, true);
+            }}
+            tabIndex={0}
+          >
+            <Edit className="h-4 w-4 text-blue-600" />
           </button>
         </div>
       ),
@@ -114,6 +299,25 @@ function ProvidersPage() {
     { key: 'razonSocial', name: es.providers.razonSocial, width: 120, editable: true },
     { key: 'email', name: es.providers.email, width: 160, editable: true },
     { key: 'address', name: es.providers.address, width: 180, editable: true },
+    { 
+      key: 'defaultDeliveryDays', 
+      name: 'Días de entrega', 
+      width: 140, 
+      editable: true,
+      render: (value: string[]) => value ? value.join(', ') : '-'
+    },
+    { 
+      key: 'defaultDeliveryTime', 
+      name: 'Hora de entrega', 
+      width: 100, 
+      editable: true 
+    },
+    { 
+      key: 'defaultPaymentMethod', 
+      name: 'Pago por defecto', 
+      width: 120, 
+      editable: true 
+    },
   ];
 
   // Undo functionality
@@ -212,9 +416,13 @@ function ProvidersPage() {
       console.log('handleDataChange called with:', newData);
       
       // Solo actualizar si hay cambios reales
-      const changedProviders = newData.filter((provider, index) => {
-        const originalProvider = providers[index];
-        return originalProvider && (
+      const changedProviders = newData.filter((provider) => {
+        const originalProvider = providers.find(p => p.id === provider.id);
+        if (!originalProvider) {
+          // Es un nuevo proveedor, no necesitamos actualizarlo aquí
+          return false;
+        }
+        return (
           provider.name !== originalProvider.name ||
           provider.contactName !== originalProvider.contactName ||
           provider.phone !== originalProvider.phone ||
@@ -628,7 +836,8 @@ function ProvidersPage() {
             </div>
 
             <div className="flex items-center space-x-3">
-              {/* Botón de agregar movido a la tabla */}
+              {/* Botón de prueba temporal para agregar catálogo */}
+
             </div>
           </div>
         </div>
@@ -644,17 +853,18 @@ function ProvidersPage() {
             </p>
           </div>
           <SpreadsheetGrid
-              key={`providers-${providers.length}-${Date.now()}`} // Forzar re-render completo
+              key={`providers-${providers.length}`} // Solo usar providers.length, no Date.now()
               columns={columns}
               data={providers}
               onDataChange={handleDataChange}
-              onAddRow={addingProvider ? undefined : handleAddRow}
+              onAddRow={() => handleOpenModal(null, false)}
               onDeleteRows={handleDeleteRows}
               onExport={handleExport}
               onImport={handleImport}
               searchable={true}
               selectable={true}
               loading={loading || addingProvider}
+              disabledRowIds={providers.map(p => p.id)} // Bloquear todas las filas para edición directa
             />
         </div>
 
@@ -671,7 +881,7 @@ function ProvidersPage() {
                 </h3>
                 <div className="mt-2 text-sm text-blue-700">
                   <ul className="list-disc list-inside space-y-1">
-                    <li><strong>Agregar proveedor:</strong> Haz clic en "Agregar" para crear un nuevo proveedor</li>
+                    <li><strong>Agregar proveedor:</strong> Haz clic en el botón verde "Agregar" en la tabla para abrir el formulario</li>
                     <li><strong>Editar información:</strong> Haz doble clic en cualquier celda para editar los datos</li>
                     <li><strong>Copiar y pegar:</strong> Usa Ctrl+C y Ctrl+V para copiar datos entre celdas</li>
                     <li><strong>Categorías y etiquetas:</strong> Separa múltiples categorías o etiquetas con punto y coma (;)</li>
@@ -698,6 +908,23 @@ function ProvidersPage() {
           {importMessage}
         </div>
       )}
+
+      {/* Modal unificado de proveedores */}
+      <ProviderConfigModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          console.log('DEBUG: Closing modal - setting isModalOpen to false');
+          setIsModalOpen(false);
+          setCurrentProvider(null);
+          setIsEditing(false);
+          setIsEditingInTable(null); // Limpiar el estado de edición en tabla
+        }}
+        provider={currentProvider}
+        isEditing={isEditing}
+        onSave={handleSaveProviderConfig}
+        onAdd={handleAddProvider}
+        onCatalogUpload={handleCatalogUploadLocal}
+      />
     </div>
   );
 }
