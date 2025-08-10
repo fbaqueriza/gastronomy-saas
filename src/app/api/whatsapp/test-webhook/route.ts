@@ -1,45 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { metaWhatsAppService } from '../../../../lib/metaWhatsAppService';
+import { sendMessageToContact } from '../../../../lib/sseUtils';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🧪 TEST WEBHOOK - Simulando mensaje entrante de Twilio');
+    console.log('🧪 TEST-WEBHOOK - Simulando mensaje entrante...');
     
-    // Simular datos de un webhook de Twilio
-    const testData = {
-      MessageSid: 'TEST_' + Date.now(),
-      From: 'whatsapp:+5491135562673',
-      To: 'whatsapp:+14155238886',
-      Body: 'Mensaje de prueba desde webhook simulado',
-      MessageStatus: 'received'
+    const body = await request.json();
+    const { from, content, messageType = 'text' } = body;
+    
+    if (!from || !content) {
+      return NextResponse.json(
+        { error: 'Missing required fields: from and content' },
+        { status: 400 }
+      );
+    }
+    
+    // Simular mensaje entrante como si viniera de WhatsApp
+    const simulatedMessage = {
+      id: `test_webhook_${Date.now()}`,
+      from: from,
+      to: '5491141780300', // Tu número de WhatsApp Business
+      text: {
+        body: content
+      },
+      timestamp: new Date().toISOString(),
+      type: messageType
     };
     
-    console.log('🧪 Datos de prueba:', testData);
+    console.log('📥 TEST-WEBHOOK - Procesando mensaje simulado:', simulatedMessage);
     
-    // Hacer POST al webhook real
-    const webhookUrl = 'http://localhost:3001/api/whatsapp/twilio/webhook';
-    const formData = new FormData();
-    formData.append('MessageSid', testData.MessageSid);
-    formData.append('From', testData.From);
-    formData.append('To', testData.To);
-    formData.append('Body', testData.Body);
-    formData.append('MessageStatus', testData.MessageStatus);
+    // Procesar el mensaje como si fuera real
+    await metaWhatsAppService.processIncomingMessage(simulatedMessage);
     
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      body: formData
-    });
+    // Enviar por SSE para tiempo real
+    const sseMessage = {
+      type: 'whatsapp_message',
+      contactId: from,
+      id: simulatedMessage.id,
+      content: content,
+      timestamp: new Date().toISOString()
+    };
     
-    const result = await response.text();
-    console.log('🧪 Respuesta del webhook:', result);
+    console.log('📤 TEST-WEBHOOK - Enviando mensaje SSE:', sseMessage);
+    sendMessageToContact(from, sseMessage);
     
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Webhook simulado enviado',
-      webhookResponse: result
+    return NextResponse.json({
+      success: true,
+      message: 'Simulated incoming message processed successfully',
+      messageId: simulatedMessage.id,
+      timestamp: new Date().toISOString()
     });
     
   } catch (error) {
-    console.error('Error en test webhook:', error);
-    return NextResponse.json({ error: 'Error en test webhook' }, { status: 500 });
+    console.error('💥 TEST-WEBHOOK - Error:', error);
+    return NextResponse.json(
+      { error: 'Error processing simulated webhook' },
+      { status: 500 }
+    );
   }
 } 

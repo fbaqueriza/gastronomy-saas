@@ -36,7 +36,7 @@ export default function EnhancedChatPreview({
       setLastMessage(latestMessage);
       
       // Generar preview del mensaje
-      if (latestMessage.messageType === 'document') {
+      if (latestMessage.documentUrl) {
         setPreviewText(`📎 ${latestMessage.documentName || 'Documento'}`);
       } else {
         setPreviewText(latestMessage.content);
@@ -82,7 +82,7 @@ export default function EnhancedChatPreview({
     };
     
     // Abrir el chat global con este contacto
-    openChat(contact);
+    openChat(contact as any);
     
     // No llamar a onOpenChat para evitar crear chats separados
     // onOpenChat();

@@ -75,7 +75,7 @@ export default function WhatsAppIntegratedChat({
   // Función para cargar mensajes desde la base de datos
   const loadMessagesFromDB = async (contactPhone: string) => {
     try {
-      console.log('🔄 loadMessagesFromDB - Iniciando carga para:', contactPhone);
+  
       
       // Obtener todos los mensajes para poder filtrar tanto enviados como recibidos
       const response = await fetch('/api/whatsapp/messages');
@@ -100,19 +100,14 @@ export default function WhatsAppIntegratedChat({
         return false;
       });
       
-      console.log('🔍 loadMessagesFromDB - Mensajes relevantes:', relevantMessages.length);
+      
       
       // Convertir mensajes de la BD al formato del frontend
       const dbMessages: WhatsAppMessage[] = relevantMessages.map((dbMessage: any) => {
         // Determinar si el mensaje es enviado o recibido basado en el campo 'contact_id'
         const isFromBusiness = dbMessage.contact_id === '670680919470999'; // Tu número de WhatsApp Business
         
-        console.log('🔄 Conversión de mensaje:', {
-          messageId: dbMessage.message_sid || dbMessage.id,
-          contactId: dbMessage.contact_id,
-          isFromBusiness,
-          content: dbMessage.content?.substring(0, 30) + '...'
-        });
+
         
         return {
           id: dbMessage.message_sid || dbMessage.id,
@@ -123,12 +118,12 @@ export default function WhatsAppIntegratedChat({
         };
       });
       
-      console.log('🔄 loadMessagesFromDB - Mensajes convertidos:', dbMessages.length);
+
       
       // Ordenar mensajes por timestamp
       dbMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
       
-      console.log('📱 loadMessagesFromDB - Mensajes de BD cargados:', dbMessages.length);
+
       
       // Actualizar tanto el estado local como el persistente
       setMessages(dbMessages);
@@ -153,32 +148,24 @@ export default function WhatsAppIntegratedChat({
   // Función para conectar SSE
   const connectSSE = useCallback((contactPhone: string) => {
     if (sseConnection) {
-      console.log('🔌 Cerrando conexión SSE anterior');
       sseConnection.close();
     }
-
-    console.log(`🔌 Conectando SSE para contacto: ${contactPhone} (intento ${reconnectAttempts + 1})`);
     
     const eventSource = new EventSource(`/api/whatsapp/twilio/webhook?contactId=${contactPhone}`);
     
     eventSource.onopen = () => {
-      console.log('✅ Conexión SSE establecida para:', contactPhone);
       setSseConnected(true);
       setReconnectAttempts(0); // Resetear intentos en conexión exitosa
     };
     
     eventSource.onmessage = (event) => {
       try {
-        console.log('📨 Mensaje SSE recibido:', event.data);
         const data = JSON.parse(event.data);
         
         // Ignorar mensajes de prueba
         if (data.type === 'test') {
-          console.log('⏭️ Ignorando mensaje de prueba');
           return;
         }
-        
-        console.log('📱 Procesando mensaje SSE:', data);
         
         // Nuevo mensaje entrante
         const newMessage = {
@@ -189,17 +176,14 @@ export default function WhatsAppIntegratedChat({
           status: data.status as 'sent' | 'delivered' | 'read'
         };
         
-        console.log('💬 Nuevo mensaje procesado:', newMessage);
+
         
         setMessages(prev => {
           // Evitar duplicados
           const existingIds = new Set(prev.map(msg => msg.id));
           if (existingIds.has(newMessage.id)) {
-            console.log('⚠️ Mensaje duplicado, ignorando:', newMessage.id);
             return prev;
           }
-          
-          console.log('✅ Agregando nuevo mensaje a la interfaz');
           const updatedMessages = [...prev, newMessage];
           // Ordenar por timestamp
           updatedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
@@ -254,7 +238,7 @@ export default function WhatsAppIntegratedChat({
   // Cargar mensajes cuando se selecciona un contacto
   useEffect(() => {
     if (selectedContact) {
-      console.log('🔄 Cargando mensajes para contacto:', selectedContact.name, selectedContact.phone);
+  
       
       // Cargar mensajes del estado persistente
       const existingMessages = messagesByContact[selectedContact.phone] || [];
@@ -374,7 +358,7 @@ export default function WhatsAppIntegratedChat({
               userId: userId
             }),
           });
-          console.log('✅ Mensaje enviado guardado en BD');
+      
         } catch (error) {
           console.error('Error guardando mensaje enviado:', error);
         }

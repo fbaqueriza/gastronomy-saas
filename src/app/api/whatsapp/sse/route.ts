@@ -1,33 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addClient, removeClient } from '../../../../lib/sseUtils';
 
-// Forzar que este endpoint sea dinámico
-export const dynamic = 'force-dynamic';
-
 export async function GET(request: NextRequest) {
-  console.log('🔌 Cliente SSE intentando conectar...');
-
   const stream = new ReadableStream({
     start(controller) {
-      // Agregar cliente a la lista
+      // Agregar el cliente a la lista
       addClient(controller);
 
-      // Enviar mensaje de prueba inicial
-      const testMessage = {
-        type: 'test',
-        message: 'SSE conectado correctamente',
-        timestamp: new Date().toISOString()
-      };
-      
-      controller.enqueue(
-        new TextEncoder().encode(`data: ${JSON.stringify(testMessage)}\n\n`)
-      );
+      // Enviar un mensaje de prueba para confirmar la conexión
+      controller.enqueue(`data: ${JSON.stringify({ type: 'connection', message: 'SSE conectado' })}\n\n`);
 
-      // No hay test periódico - la conexión se mantiene viva naturalmente
+      // Mantener la conexión viva
+      const keepAlive = setInterval(() => {
+        try {
+          controller.enqueue(`data: ${JSON.stringify({ type: 'ping', timestamp: Date.now() })}\n\n`);
+        } catch (error) {
+          clearInterval(keepAlive);
+          removeClient(controller);
+        }
+      }, 30000); // Ping cada 30 segundos
 
-      // Limpiar cuando el cliente se desconecte
+      // Limpiar cuando se cierre la conexión
       request.signal.addEventListener('abort', () => {
-        console.log('🔌 Cliente SSE desconectado');
+        clearInterval(keepAlive);
         removeClient(controller);
       });
     }
@@ -42,4 +37,6 @@ export async function GET(request: NextRequest) {
       'Access-Control-Allow-Headers': 'Cache-Control'
     }
   });
-} 
+}
+
+ 

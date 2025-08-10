@@ -7,8 +7,12 @@ import CreateOrderModal from '../../components/CreateOrderModal';
 import EditOrderModal from '../../components/EditOrderModal';
 import ComprobanteButton from '../../components/ComprobanteButton';
 import ChatPreview from '../../components/ChatPreview';
-import IntegratedChatPanel from '../../components/IntegratedChatPanel';
 import { useChat } from '../../contexts/ChatContext';
+import { useGlobalChat } from '../../contexts/GlobalChatContext';
+import { ChatProvider } from '../../contexts/ChatContext';
+import { GlobalChatProvider } from '../../contexts/GlobalChatContext';
+import WhatsAppSync from '../../components/WhatsAppSync';
+import GlobalChatWrapper from '../../components/GlobalChatWrapper';
 import { Order, OrderItem, Provider, StockItem, OrderFile } from '../../types';
 import {
   Plus,
@@ -26,6 +30,7 @@ import {
   Download,
   ChevronDown,
   Edit,
+
 } from 'lucide-react';
 import { DataProvider, useData } from '../../components/DataProvider';
 import es from '../../locales/es';
@@ -33,6 +38,8 @@ import { Menu } from '@headlessui/react';
 import { useRouter } from 'next/navigation';
 import supabase from '../../lib/supabaseClient';
 import type { SupabaseClient } from '@supabase/supabase-js';
+
+
 
 export default function OrdersPageWrapper() {
   const { user, loading: authLoading } = useSupabaseAuth();
@@ -45,9 +52,15 @@ export default function OrdersPageWrapper() {
     return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div><p className="mt-4 text-gray-600">Cargando...</p></div></div>;
   }
   return (
-    <DataProvider userEmail={user?.email ?? undefined} userId={user?.id}>
-      {user && <OrdersPage user={user} />}
-    </DataProvider>
+    <ChatProvider>
+      <GlobalChatProvider>
+        <WhatsAppSync />
+        <DataProvider userEmail={user?.email ?? undefined} userId={user?.id}>
+          {user && <OrdersPage user={user} />}
+        </DataProvider>
+        <GlobalChatWrapper />
+      </GlobalChatProvider>
+    </ChatProvider>
   );
 }
 
@@ -60,17 +73,14 @@ function OrdersPage({ user }: OrdersPageProps) {
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+
+
   
-  // Chat state
-  const { openChat, isChatOpen, closeChat } = useChat();
-  const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
+  // Chat context
+  const { openChat } = useChat();
+  const { openGlobalChat } = useGlobalChat();
   
-  // Sincronizar el estado local con el contexto
-  useEffect(() => {
-    if (isChatOpen !== isChatPanelOpen) {
-      setIsChatPanelOpen(isChatOpen);
-    }
-  }, [isChatOpen, isChatPanelOpen, setIsChatPanelOpen]);
+
   
   // Remove all other local state for orders/providers/stockItems
   // All handlers now use Supabase CRUD only
@@ -104,7 +114,7 @@ function OrdersPage({ user }: OrdersPageProps) {
       updatedAt: new Date(),
     };
     
-    console.log('DEBUG Pedido:', JSON.stringify(newOrder, null, 2));
+
     const createdOrder = await addOrder(newOrder, user.id);
     setIsCreateModalOpen(false);
     setSuggestedOrder(null);
@@ -136,7 +146,7 @@ function OrdersPage({ user }: OrdersPageProps) {
         });
 
         if (response.ok) {
-          console.log('✅ Mensaje de pedido enviado al proveedor');
+    
         } else {
           console.error('❌ Error enviando mensaje de pedido');
         }
@@ -203,31 +213,26 @@ function OrdersPage({ user }: OrdersPageProps) {
   // Add getProviderName helper
   const getProviderName = (providerId: string) => {
     if (!providerId) return 'Proveedor desconocido';
-    console.log('DEBUG: getProviderName - providerId:', providerId);
-    console.log('DEBUG: getProviderName - providers:', providers);
-    console.log('DEBUG: getProviderName - providers length:', providers?.length);
     
-    // Si providers está vacío o no cargado, mostrar el ID temporalmente
     if (!providers || providers.length === 0) {
-      console.log('DEBUG: getProviderName - providers vacío, retornando ID');
       return `(ID: ${providerId})`;
     }
     
     const provider = providers.find((p: Provider) => p.id === providerId);
-    console.log('DEBUG: getProviderName - provider encontrado:', provider);
     
     if (provider && provider.name) {
-      console.log('DEBUG: getProviderName - retornando nombre:', provider.name);
       return provider.name;
     } else {
-      console.log('DEBUG: getProviderName - provider no encontrado o sin nombre, retornando ID');
       return `(ID: ${providerId})`;
     }
   };
   // Add state and handlers for WhatsApp chat
   const handleOrderClick = (order: Order) => {
+    
     // Encontrar el proveedor correspondiente
     const provider = providers.find(p => p.id === order.providerId);
+
+    
     if (provider) {
       // Normalizar el número de teléfono - remover espacios y guiones, agregar + si no tiene
       let normalizedPhone = provider.phone || '';
@@ -240,7 +245,7 @@ function OrdersPage({ user }: OrdersPageProps) {
         normalizedPhone = `+${normalizedPhone}`;
       }
       
-      console.log(`📞 Normalizando teléfono en orders: "${provider.phone}" -> "${normalizedPhone}"`);
+
       
       // Crear contacto para el chat
       const contact = {
@@ -253,13 +258,13 @@ function OrdersPage({ user }: OrdersPageProps) {
         unreadCount: 0
       };
       
-      // Abrir el chat usando el contexto
-      openChat(contact);
+      // Abrir el chat global
+      openGlobalChat(contact);
+    } else {
+      console.error('❌ handleOrderClick - No se encontró el proveedor para orderId:', order.id);
     }
   };
-  // Debug: mostrar datos de orders
-  console.log('DEBUG: orders data:', orders);
-  console.log('DEBUG: providers data:', providers);
+
   
   // Ordenar órdenes por fecha descendente (created_at) - los más recientes primero
   const sortedOrders = [...orders].sort((a, b) => {
@@ -287,12 +292,9 @@ function OrdersPage({ user }: OrdersPageProps) {
   const handleSendOrder = async (orderId: string) => {
     const order = orders.find(o => o.id === orderId);
     if (order) {
-      console.log('DEBUG: Enviando pedido', orderId, 'estado actual:', order.status);
       await updateOrder({ ...order, status: 'enviado' });
-      console.log('DEBUG: Pedido enviado, esperando factura...');
       
       setTimeout(async () => {
-        console.log('DEBUG: Simulando recepción de factura...');
         // Refetch orders para obtener el estado actualizado
         await fetchAll();
         
@@ -312,7 +314,7 @@ function OrdersPage({ user }: OrdersPageProps) {
           totalAmount: totalAmount,
         } as Order;
         
-        console.log('DEBUG: Actualizando pedido con factura y orden de pago:', orderWithInvoice);
+
         await updateOrder(orderWithInvoice);
         
         // Refetch para asegurar que se actualice la UI
@@ -331,14 +333,13 @@ function OrdersPage({ user }: OrdersPageProps) {
       reader.onload = async (e) => {
         const dataUrl = e.target?.result as string;
         
-        console.log('DEBUG: Simulando subida de comprobante:', fileName);
-        console.log('DEBUG: Data URL del comprobante creada');
+
         
         // Actualizar la orden con la data URL del comprobante
         const order = orders.find(o => o.id === orderId);
         if (order) {
           await updateOrder({ ...order, receiptUrl: dataUrl, status: 'pagado' });
-          console.log('DEBUG: Orden actualizada con comprobante');
+
         }
       };
       
@@ -376,7 +377,7 @@ function OrdersPage({ user }: OrdersPageProps) {
       };
       
       await updateOrder(updatedOrder);
-      console.log('✅ Pedido actualizado:', orderId);
+      
       setIsEditModalOpen(false);
       setEditingOrder(null);
     } catch (error) {
@@ -450,6 +451,10 @@ function OrdersPage({ user }: OrdersPageProps) {
       </div>
     );
   };
+
+  
+
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -539,6 +544,7 @@ function OrdersPage({ user }: OrdersPageProps) {
                             providerId={order.providerId}
                             orderId={order.id}
                             onOpenChat={() => handleOrderClick(order)}
+
                             hasUnreadMessages={false}
                             lastMessage={{
                               id: '1',
@@ -980,12 +986,9 @@ function OrdersPage({ user }: OrdersPageProps) {
         onSave={handleSaveOrderEdit}
       />
 
-      {/* Integrated Chat Panel */}
-      <IntegratedChatPanel
-        providers={providers}
-        isOpen={isChatPanelOpen}
-        onClose={() => setIsChatPanelOpen(false)}
-      />
+
+      
+
       
     </div>
   );

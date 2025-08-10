@@ -1,18 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuth } from '../hooks/useSupabaseAuth';
 import { Menu, X, User, LogOut, Settings, Bell, MessageSquare } from 'lucide-react';
-import { useChat } from '../contexts/ChatContext';
+import { ChatContext } from '../contexts/ChatContext';
+import { GlobalChatContext } from '../contexts/GlobalChatContext';
 import es from '../locales/es';
 
 export default function Navigation() {
   const { user, signOut } = useSupabaseAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const { openChat, unreadCounts } = useChat();
+  // Chat hooks - usando useContext directamente
+  const chatContext = useContext(ChatContext);
+  const globalChatContext = useContext(GlobalChatContext);
+  
+  const unreadCounts = chatContext?.unreadCounts || {};
+  const openGlobalChat = globalChatContext?.openGlobalChat || (() => {
+    // GlobalChatContext no disponible
+  });
   const router = useRouter();
   const pathname = usePathname();
 
@@ -36,6 +44,10 @@ export default function Navigation() {
   // Calcular total de mensajes no leídos
   const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
 
+  const handleChatClick = () => {
+    openGlobalChat();
+  };
+
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -57,7 +69,7 @@ export default function Navigation() {
                     href={item.href}
                     className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
                       isActive
-                        ? 'border-blue-500 text-gray-900'
+                        ? 'border-blue-500 text-blue-600'
                         : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                     }`}
                     title={item.name}
@@ -72,7 +84,7 @@ export default function Navigation() {
           <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-4">
             {/* Chat Button */}
             <button
-              onClick={() => openChat()}
+              onClick={handleChatClick}
               className="relative p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               title="Abrir chat"
             >
@@ -103,21 +115,23 @@ export default function Navigation() {
               </button>
 
               {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                  <Link
-                    href="/settings"
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <Settings className="h-4 w-4 mr-2" />
-                    {es.settings}
-                  </Link>
-                  <button
-                    onClick={handleSignOut}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    {es.signOut}
-                  </button>
+                <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                  <div className="py-1">
+                    <Link
+                      href="/settings"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      {es.settings}
+                    </Link>
+                    <button
+                      onClick={handleSignOut}
+                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      {es.signOut}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -175,32 +189,19 @@ export default function Navigation() {
                 </div>
               </div>
             </div>
-
             <div className="mt-3 space-y-1">
-              <button
-                onClick={() => openChat()}
-                className="flex items-center w-full px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
-              >
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Chat WhatsApp
-                {totalUnread > 0 && (
-                  <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1">
-                    {totalUnread}
-                  </span>
-                )}
-              </button>
               <Link
                 href="/settings"
-                className="flex items-center px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
               >
-                <Settings className="h-4 w-4 mr-2" />
+                <Settings className="h-4 w-4 mr-2 inline" />
                 {es.settings}
               </Link>
               <button
                 onClick={handleSignOut}
-                className="flex items-center w-full px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
               >
-                <LogOut className="h-4 w-4 mr-2" />
+                <LogOut className="h-4 w-4 mr-2 inline" />
                 {es.signOut}
               </button>
             </div>

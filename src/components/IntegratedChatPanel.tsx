@@ -1,10 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Paperclip, Phone, Video, MoreVertical, Plus, Search, MessageSquare, UserPlus, X, FileText, Download, Image, File } from 'lucide-react';
+import { Send, Paperclip, Phone, Video, MoreVertical, Plus, Search, MessageSquare, UserPlus, X, FileText, Download, Image, File, Smile, Mic } from 'lucide-react';
 import { useChat } from '../contexts/ChatContext';
+import { useGlobalChat } from '../contexts/GlobalChatContext';
 import { WhatsAppMessage, Contact } from '../types/whatsapp';
-import React from 'react'; // Added missing import for React
+import React from 'react';
+import WhatsAppStatusIndicator from './WhatsAppStatusIndicator';
+import { normalizePhoneNumber, phoneNumbersMatch } from '../lib/phoneUtils';
 
 interface IntegratedChatPanelProps {
   providers: any[];
@@ -49,6 +52,21 @@ const ContactItem = React.memo(({
 
 ContactItem.displayName = 'ContactItem';
 
+// Componente para mostrar estados de mensaje como WhatsApp
+const MessageStatus = ({ status }: { status: 'sent' | 'delivered' | 'read' | 'failed' }) => {
+  if (status === 'failed') {
+    return <span className="text-red-500">❌</span>;
+  }
+  
+  return (
+    <span className="text-gray-400">
+      {status === 'sent' && '✓'}
+      {status === 'delivered' && '✓✓'}
+      {status === 'read' && '✓✓'}
+    </span>
+  );
+};
+
 export default function IntegratedChatPanel({
   providers,
   isOpen,
@@ -57,6 +75,8 @@ export default function IntegratedChatPanel({
   const {
     selectedContact,
     messages,
+    setMessages,
+    messagesByContact,
     unreadCounts,
     setSelectedContact,
     addMessage,
@@ -67,83 +87,103 @@ export default function IntegratedChatPanel({
     connectionStatus
   } = useChat();
 
+
+
+  const { isGlobalChatOpen, closeGlobalChat, currentGlobalContact } = useGlobalChat();
+
   const [contacts, setContacts] = useState<Contact[]>([]);
-  
-  // Debug logs
-  console.log('🔍 IntegratedChatPanel - Estado actual:', {
-    selectedContact: selectedContact?.name || 'null',
-    messagesCount: messages?.length || 0,
-    contactsCount: contacts.length,
-    isOpen
-  });
   const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContact, setNewContact] = useState({ name: '', phone: '' });
   const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Función para cerrar el chat usando el contexto
+  // Usar el estado global del chat
+  const isPanelOpen = isGlobalChatOpen || isOpen;
+  const currentContact = currentGlobalContact || selectedContact;
+
+  // Función para cerrar el chat usando el contexto global
   const handleClose = () => {
+    closeGlobalChat();
     closeChat();
-    if (onClose) {
-      onClose();
-    }
+    if (onClose) onClose();
   };
 
   // Convertir proveedores a contactos (optimizado)
   useEffect(() => {
-    if (!providers || providers.length === 0) return;
-    
-    // Evitar re-renderizaciones innecesarias
-    const providerContacts: Contact[] = providers.map(provider => {
-      // Normalizar el número de teléfono - remover espacios y guiones, agregar + si no tiene
-      let normalizedPhone = provider.phone || '';
-      
-      // Remover espacios, guiones y paréntesis
-      normalizedPhone = normalizedPhone.replace(/[\s\-\(\)]/g, '');
-      
-      // Agregar + si no tiene
-      if (!normalizedPhone.startsWith('+')) {
-        normalizedPhone = `+${normalizedPhone}`;
-      }
-      
-      // Solo loggear si el número cambió
-      if (provider.phone !== normalizedPhone) {
-        console.log(`📞 Normalizando teléfono: "${provider.phone}" -> "${normalizedPhone}"`);
-      }
-      
-      return {
-        id: provider.id,
-        name: provider.name || 'Sin nombre',
-        phone: normalizedPhone,
-        lastMessage: '',
-        lastMessageTime: new Date(),
-        unreadCount: unreadCounts[normalizedPhone] || 0,
-        providerId: provider.id,
-        email: provider.email,
-        address: provider.address,
-        category: provider.category
-      };
+    console.log('🔄 IntegratedChatPanel: useEffect convertir proveedores:', { 
+      providersLength: providers?.length || 0,
+      providers: providers?.map(p => ({ id: p.id, name: p.name, phone: p.phone })) || [],
+      contactsLength: contacts.length
     });
     
-    // Solo actualizar si los contactos realmente cambiaron
-    const currentContactsString = JSON.stringify(contacts.map(c => ({ id: c.id, phone: c.phone })));
-    const newContactsString = JSON.stringify(providerContacts.map(c => ({ id: c.id, phone: c.phone })));
-    
-    if (currentContactsString !== newContactsString) {
-      setContacts(providerContacts);
+    if (providers && providers.length > 0) {
+      // Usar providers si están disponibles
+      const providerContacts: Contact[] = providers.map(provider => {
+        const normalizedPhone = normalizePhoneNumber(provider.phone);
+        
+        return {
+          id: provider.id,
+          name: provider.name || 'Sin nombre',
+          phone: normalizedPhone,
+          lastMessage: '',
+          lastMessageTime: new Date(),
+          unreadCount: unreadCounts[normalizedPhone] || 0,
+          providerId: provider.id,
+          email: provider.email,
+          address: provider.address,
+          category: provider.category
+        };
+      });
+      
+      
+      
+      // Solo actualizar si los contactos han cambiado
+      const hasChanged = contacts.length !== providerContacts.length || 
+        contacts.some((contact, index) => contact.id !== providerContacts[index]?.id);
+      
+      console.log('🔄 IntegratedChatPanel: ¿Han cambiado los contactos?', hasChanged);
+      
+      if (hasChanged) {
+        
+        setContacts(providerContacts);
+      }
+    } else {
+      
     }
-  }, [providers, unreadCounts]); // Mantener unreadCounts para actualizar contadores
+  }, [providers, unreadCounts]);
 
   // Seleccionar automáticamente el primer contacto cuando se abre el chat
   useEffect(() => {
-    if (isOpen && contacts.length > 0 && !selectedContact) {
-      console.log('🔄 Auto-seleccionando primer contacto:', contacts[0]);
-      setSelectedContact(contacts[0]);
+    if (isPanelOpen && contacts.length > 0 && !currentContact) {
+      
+      setSelectedContact(contacts[0] as any);
     }
-  }, [isOpen, contacts, selectedContact, setSelectedContact]);
+  }, [isPanelOpen, contacts.length, currentContact?.id]);
+
+  // Cargar mensajes del contacto seleccionado
+  // Sincronizar mensajes cuando cambia el contacto o los mensajes
+  useEffect(() => {
+    if (currentContact?.phone) {
+      // Obtener mensajes del contacto desde el contexto
+      const contactMessages = messagesByContact[currentContact.phone] || [];
+      
+      console.log(`📨 IntegratedChatPanel: Cargando ${contactMessages.length} mensajes para ${currentContact.name}`);
+      
+      // Actualizar los mensajes visibles
+      setMessages(contactMessages);
+      
+      // Marcar como leído
+      markAsRead(currentContact.phone);
+    } else {
+      setMessages([]);
+    }
+  }, [currentContact?.phone, messagesByContact]);
 
   // Scroll al final de los mensajes (optimizado)
   const scrollToBottom = useCallback(() => {
@@ -153,54 +193,46 @@ export default function IntegratedChatPanel({
   }, []);
 
   useEffect(() => {
-    // Hacer scroll al final cuando se selecciona un contacto o hay nuevos mensajes
-    if (selectedContact && messages && messages.length > 0) {
-      // Pequeño delay para asegurar que el DOM se actualice
+    if (currentContact && messages && messages.length > 0) {
       setTimeout(() => {
         scrollToBottom();
       }, 100);
     }
-  }, [selectedContact, messages, scrollToBottom]);
+  }, [currentContact, messages]);
+
+  // Auto-resize del textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
+    }
+  }, [newMessage]);
 
   const handleSendMessage = async () => {
-    console.log('🔍 DEBUG handleSendMessage - Iniciando:', { 
-      newMessage: newMessage, 
-      selectedContact: selectedContact,
-      hasMessage: !!newMessage.trim(),
-      hasContact: !!selectedContact
+    console.log('🚀 IntegratedChatPanel: handleSendMessage llamado:', { 
+      message: newMessage.trim(), 
+      contact: currentContact?.name || 'null' 
     });
     
-    if (!newMessage.trim() || !selectedContact) {
-      console.log('❌ handleSendMessage - No se puede enviar mensaje:', { 
-        hasMessage: !!newMessage.trim(), 
-        hasContact: !!selectedContact,
-        messageLength: newMessage.length,
-        contact: selectedContact 
-      });
+    if (!newMessage.trim() || !currentContact) {
+      console.log('❌ IntegratedChatPanel: No se puede enviar mensaje - mensaje vacío o sin contacto');
       return;
     }
 
     const messageToSend = newMessage.trim();
-    console.log('📤 handleSendMessage - Enviando mensaje desde panel integrado:', { 
-      message: messageToSend, 
-      to: selectedContact.phone,
-      contact: selectedContact 
-    });
     
     // Limpiar el input inmediatamente para mejor UX
     setNewMessage('');
-    console.log('🧹 handleSendMessage - Input limpiado inmediatamente');
     
     try {
-      console.log('📞 handleSendMessage - Llamando a sendMessage con:', {
-        contactId: selectedContact.phone,
-        content: messageToSend
+      console.log('📤 IntegratedChatPanel: Enviando mensaje:', { 
+        to: currentContact.phone, 
+        message: messageToSend 
       });
-      
-      await sendMessage(selectedContact.phone, messageToSend);
-      console.log('✅ handleSendMessage - Mensaje enviado exitosamente desde panel integrado');
+      await sendMessage(currentContact.phone, messageToSend);
+      console.log('✅ IntegratedChatPanel: Mensaje enviado exitosamente');
     } catch (error) {
-      console.error('💥 handleSendMessage - Error sending message from integrated panel:', error);
+      console.error('❌ IntegratedChatPanel: Error sending message:', error);
       // Restaurar el mensaje si falla
       setNewMessage(messageToSend);
       alert('Error al enviar mensaje. Inténtalo de nuevo.');
@@ -208,13 +240,13 @@ export default function IntegratedChatPanel({
   };
 
   const handleSendDocument = async (file: File) => {
-    if (!selectedContact) return;
+    if (!currentContact) return;
 
     setUploadingDocument(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('recipient', selectedContact.phone);
+      formData.append('recipient', currentContact.phone);
 
       const response = await fetch('/api/whatsapp/send-document', {
         method: 'POST',
@@ -238,7 +270,7 @@ export default function IntegratedChatPanel({
           documentType: file.type
         };
         
-        addMessage(selectedContact.phone, documentMessage);
+        addMessage(currentContact.phone, documentMessage);
       } else {
         throw new Error('Error al enviar documento');
       }
@@ -252,7 +284,7 @@ export default function IntegratedChatPanel({
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && selectedContact) {
+    if (file && currentContact) {
       handleSendDocument(file);
     }
     if (fileInputRef.current) {
@@ -263,8 +295,7 @@ export default function IntegratedChatPanel({
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      // Solo enviar si hay mensaje y contacto seleccionado
-      if (newMessage.trim() && selectedContact) {
+      if (newMessage.trim() && currentContact) {
         handleSendMessage();
       }
     }
@@ -291,7 +322,9 @@ export default function IntegratedChatPanel({
     contact.phone.includes(searchTerm)
   );
 
-  if (!isOpen) return null;
+  if (!isPanelOpen) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-y-0 right-0 w-[800px] bg-white shadow-xl flex flex-col z-50">
@@ -302,10 +335,7 @@ export default function IntegratedChatPanel({
             <MessageSquare className="h-6 w-6" />
             <div>
               <h2 className="text-lg font-semibold">WhatsApp Business</h2>
-              <p className="text-sm text-green-100">
-                {connectionStatus === 'connected' ? '🟢 Conectado' : 
-                 connectionStatus === 'connecting' ? '🟡 Conectando...' : '🔴 Desconectado'}
-              </p>
+              <WhatsAppStatusIndicator className="text-green-100" />
             </div>
           </div>
           <button
@@ -340,13 +370,12 @@ export default function IntegratedChatPanel({
               <ContactItem
                 key={contact.id}
                 contact={contact}
-                isSelected={selectedContact?.id === contact.id}
+                isSelected={currentContact?.id === contact.id}
                 onSelect={() => {
-                  // Solo loggear en desarrollo
                   if (process.env.NODE_ENV === 'development') {
                     console.log('👆 Seleccionando contacto:', contact.name, contact.phone);
                   }
-                  setSelectedContact(contact);
+                  setSelectedContact(contact as any);
                   markAsRead(contact.phone);
                 }}
               />
@@ -356,25 +385,39 @@ export default function IntegratedChatPanel({
 
         {/* Chat */}
         <div className="w-2/3 flex flex-col">
-          {selectedContact ? (
+          {currentContact ? (
             <>
               {/* Header del chat */}
               <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-gray-50">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
                     <span className="text-white font-medium">
-                      {selectedContact.name.charAt(0).toUpperCase()}
+                      {currentContact.name.charAt(0).toUpperCase()}
                     </span>
                   </div>
-                  <div>
-                    <h3 className="font-medium text-gray-900">{selectedContact.name}</h3>
-                    <p className="text-sm text-gray-500">{selectedContact.phone}</p>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-gray-900">{currentContact.name}</h3>
+                    <p className="text-sm text-gray-500">{currentContact.phone}</p>
+                    {isTyping && (
+                      <p className="text-xs text-green-600 mt-1">escribiendo...</p>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">
+                      <Phone className="h-4 w-4" />
+                    </button>
+                    <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">
+                      <Video className="h-4 w-4" />
+                    </button>
+                    <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
               </div>
 
               {/* Mensajes */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-100">
                 {messages.map((message) => (
                   <div
                     key={message.id}
@@ -384,7 +427,7 @@ export default function IntegratedChatPanel({
                       className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                         message.type === 'sent'
                           ? 'bg-green-500 text-white'
-                          : 'bg-gray-200 text-gray-900'
+                          : 'bg-white text-gray-900 shadow-sm'
                       }`}
                     >
                       {message.documentUrl ? (
@@ -401,24 +444,19 @@ export default function IntegratedChatPanel({
                           </a>
                         </div>
                       ) : (
-                        <p>{message.content}</p>
+                        <p className="whitespace-pre-wrap">{message.content}</p>
                       )}
                       <div className={`text-xs mt-1 flex items-center justify-between ${
                         message.type === 'sent' ? 'text-green-100' : 'text-gray-500'
                       }`}>
                         <span>
-                          {message.timestamp.toLocaleTimeString([], {
+                          {new Date(message.timestamp).toLocaleTimeString([], {
                             hour: '2-digit',
                             minute: '2-digit'
                           })}
                         </span>
                         {message.type === 'sent' && (
-                          <span className="ml-2">
-                            {message.status === 'sent' && '✓'}
-                            {message.status === 'delivered' && '✓✓'}
-                            {message.status === 'read' && '✓✓'}
-                            {message.status === 'failed' && '❌'}
-                          </span>
+                          <MessageStatus status={message.status || 'sent'} />
                         )}
                       </div>
                     </div>
@@ -428,8 +466,14 @@ export default function IntegratedChatPanel({
               </div>
 
               {/* Input */}
-              <div className="flex-shrink-0 p-4 border-t border-gray-200">
-                <div className="flex items-center space-x-2">
+              <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-white">
+                <div className="flex items-end space-x-2">
+                  <button
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    <Smile className="h-5 w-5" />
+                  </button>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
@@ -437,15 +481,9 @@ export default function IntegratedChatPanel({
                   >
                     <Paperclip className="h-5 w-5" />
                   </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
-                  />
                   <div className="flex-1 relative">
                     <textarea
+                      ref={textareaRef}
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                       onKeyPress={handleKeyPress}
@@ -455,14 +493,27 @@ export default function IntegratedChatPanel({
                       style={{ minHeight: '40px', maxHeight: '120px' }}
                     />
                   </div>
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={!newMessage.trim() || uploadingDocument}
-                    className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <Send className="h-5 w-5" />
-                  </button>
+                  {newMessage.trim() ? (
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={uploadingDocument}
+                      className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Send className="h-5 w-5" />
+                    </button>
+                  ) : (
+                    <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">
+                      <Mic className="h-5 w-5" />
+                    </button>
+                  )}
                 </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png"
+                />
               </div>
             </>
           ) : (

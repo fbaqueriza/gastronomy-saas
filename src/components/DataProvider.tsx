@@ -337,7 +337,7 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
 
   const updateProvider = useCallback(async (provider: Provider) => {
     try {
-      console.log('🔄 Actualizando proveedor:', provider);
+      
       
       // Manejar campos que pueden ser arrays o strings
       const categories = Array.isArray(provider.categories) ? provider.categories : 

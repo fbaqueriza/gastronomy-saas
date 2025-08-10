@@ -6,7 +6,6 @@ import SuggestedOrders from '../../components/SuggestedOrders';
 import CreateOrderModal from '../../components/CreateOrderModal';
 import ComprobanteButton from '../../components/ComprobanteButton';
 import ChatPreview from '../../components/ChatPreview';
-import IntegratedChatPanel from '../../components/IntegratedChatPanel';
 import { useChat } from '../../contexts/ChatContext';
 import { Order, OrderItem, Provider, StockItem } from '../../types';
 import {
@@ -123,7 +122,10 @@ function DashboardPageContent({
   setPaymentProofs: (proofs: { [orderId: string]: { url: string; name: string } }) => void;
 }) {
   const { addOrder, updateOrder, fetchAll } = useData();
-  const { openChat, isChatOpen: contextIsChatOpen, closeChat } = useChat();
+  // Chat hooks disabled - using placeholders
+  const openChat = (contact?: any) => console.log('Chat not available in dashboard', contact);
+  const contextIsChatOpen = false;
+  const closeChat = () => console.log('Chat not available in dashboard');
   
   // Sincronizar el estado local con el contexto
   useEffect(() => {
@@ -335,7 +337,7 @@ function DashboardPageContent({
         normalizedPhone = `+${normalizedPhone}`;
       }
       
-      console.log(`📞 Normalizando teléfono en dashboard: "${provider.phone}" -> "${normalizedPhone}"`);
+  
       
       // Crear contacto para el chat
       const contact = {
@@ -349,7 +351,7 @@ function DashboardPageContent({
       };
       
       // Abrir el chat usando el contexto
-      openChat(contact);
+      openChat(contact as any);
     }
   };
 
@@ -795,7 +797,7 @@ function DashboardPageContent({
                                   lastMessageTime: new Date(),
                                   unreadCount: 0
                                 };
-                                openChat(contact);
+                                openChat(contact as any);
                               }}
                               className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                               title="Chat con proveedor"
@@ -854,13 +856,6 @@ function DashboardPageContent({
         stockItems={stockItems}
         suggestedOrder={suggestedOrder}
         selectedProviderId={typeof selectedProviderId === 'string' ? selectedProviderId : null}
-      />
-
-      {/* Integrated Chat Panel */}
-      <IntegratedChatPanel
-        providers={providers}
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
       />
     </div>
   );

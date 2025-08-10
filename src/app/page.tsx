@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Phone, 
@@ -24,6 +24,8 @@ export default function LandingPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
+
+
 
   const handleWhatsAppClick = () => {
     window.open('https://wa.me/541135562673', '_blank');
@@ -83,6 +85,7 @@ export default function LandingPage() {
               <button
                 onClick={handleLoginClick}
                 className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                data-testid="login-button-desktop"
               >
                 Iniciar Sesión
               </button>
@@ -106,6 +109,7 @@ export default function LandingPage() {
                 <button
                   onClick={handleLoginClick}
                   className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors text-left"
+                  data-testid="login-button-mobile"
                 >
                   Iniciar Sesión
                 </button>

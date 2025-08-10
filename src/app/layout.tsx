@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { SupabaseAuthProvider } from '../hooks/useSupabaseAuth';
-import { ChatProvider } from '../contexts/ChatContext';
-import WhatsAppSync from '../components/WhatsAppSync';
 import ConditionalNavigation from '../components/ConditionalNavigation';
+import { ChatProvider } from '../contexts/ChatContext';
+import { GlobalChatProvider } from '../contexts/GlobalChatContext';
+import GlobalChatWrapper from '../components/GlobalChatWrapper';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -45,11 +46,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className}>
         <SupabaseAuthProvider>
           <ChatProvider>
-            <WhatsAppSync />
-            <ConditionalNavigation />
-            <main className="min-h-screen">
-              {children}
-            </main>
+            <GlobalChatProvider>
+              <ConditionalNavigation />
+              <main className="min-h-screen">
+                {children}
+              </main>
+              <GlobalChatWrapper />
+            </GlobalChatProvider>
           </ChatProvider>
         </SupabaseAuthProvider>
       </body>

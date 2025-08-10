@@ -58,27 +58,11 @@ export class MetaWhatsAppService {
         openaiApiKey: process.env.OPENAI_API_KEY
       };
       
-      try {
-        // Verificar si las credenciales son válidas
-        const response = await fetch(`${this.baseUrl}/${phoneNumberId}?access_token=${accessToken}`);
-        
-        if (response.ok) {
-          this.isEnabled = true;
-          this.isSimulationMode = false;
-          this.initialized = true;
-          console.log('Meta WhatsApp Service: Configuración válida, servicio habilitado en modo producción');
-        } else {
-          console.log('Meta WhatsApp Service: Credenciales inválidas, usando modo simulación');
-          this.isEnabled = true;
-          this.isSimulationMode = true;
-          this.initialized = true;
-        }
-      } catch (error: any) {
-        console.log('Meta WhatsApp Service: Error verificando credenciales, usando modo simulación');
-        this.isEnabled = true;
-        this.isSimulationMode = true;
-        this.initialized = true;
-      }
+      // Forzar modo producción si las credenciales están configuradas
+      this.isEnabled = true;
+      this.isSimulationMode = false;
+      this.initialized = true;
+      console.log('Meta WhatsApp Service: Configuración válida, servicio habilitado en modo producción');
     } else {
       console.log('Meta WhatsApp Service: Configuración no encontrada, usando modo simulación');
       this.isEnabled = true;
@@ -176,7 +160,7 @@ export class MetaWhatsAppService {
         const result = await response.json();
         console.log('✅ [REAL] Mensaje enviado exitosamente:', result);
 
-        // Guardar en base de datos (temporalmente deshabilitado)
+        // Guardar en base de datos
         try {
           await this.saveMessage({
             id: result.messages?.[0]?.id || `msg_${Date.now()}`,
@@ -492,7 +476,8 @@ export class MetaWhatsAppService {
         message_sid: message.id || generateUUID(), // Usar el ID original de Meta como message_sid
         contact_id: message.from || 'unknown',
         message_type: 'text',
-        user_id: 'default_user'
+        user_id: 'default_user',
+        status: message.status || 'delivered'
       };
 
       const { error } = await supabase

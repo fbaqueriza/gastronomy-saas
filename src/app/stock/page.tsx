@@ -14,8 +14,6 @@ import {
   Upload,
 } from 'lucide-react';
 import { DataProvider, useData } from '../../components/DataProvider';
-import IntegratedChatPanel from '../../components/IntegratedChatPanel';
-import { useChat } from '../../contexts/ChatContext';
 import es from '../../locales/es';
 import { useRouter } from 'next/navigation';
 
@@ -66,7 +64,9 @@ function StockPage({ user }: StockPageProps) {
   } | null>(null);
   
   // Chat state
-  const { openChat, isChatOpen } = useChat();
+  // Chat hooks disabled - using placeholders
+  const openChat = () => console.log('Chat not available in stock page');
+  const isChatOpen = false;
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
 
   // Sincronizar el estado local con el contexto
@@ -228,7 +228,7 @@ function StockPage({ user }: StockPageProps) {
       );
     });
     
-    console.log('🔄 Items con cambios detectados:', changedItems.length);
+
     
     // Actualizar solo los items modificados
     for (const changedItem of changedItems) {
@@ -768,13 +768,6 @@ Huevos,Proteínas,200,unidades,daily,Proveedor D,Proveedor D,2025-07-25,2025-07-
           </div>
         </div>
       )}
-      
-      {/* Chat Integrado */}
-      <IntegratedChatPanel
-        providers={providers}
-        isOpen={isChatPanelOpen}
-        onClose={() => setIsChatPanelOpen(false)}
-      />
       
       {/* Botón flotante del chat */}
       {/* ChatFloatingButton

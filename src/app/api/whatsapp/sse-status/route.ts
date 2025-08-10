@@ -1,35 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getClientCount } from '../../../../lib/sseUtils';
 
-// Forzar que este endpoint sea dinámico
-export const dynamic = 'force-dynamic';
+// Importar la función que necesitamos para verificar clientes conectados
+// Nota: Esto es una solución temporal para debugging
+let clientCount = 0;
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 Verificando estado SSE...');
-    
-    // Obtener el número real de clientes SSE conectados
-    const realClientCount = getClientCount();
-    
-    const status = {
-      timestamp: new Date().toISOString(),
-      totalActiveClients: realClientCount,
-      realClientCount: realClientCount,
-      message: 'SSE status endpoint funcionando'
-    };
-    
-    console.log('📊 Estado SSE:', status);
+    // En un entorno real, deberíamos acceder al Set de clientes desde el módulo SSE
+    // Por ahora, devolvemos información básica para debugging
     
     return NextResponse.json({
       success: true,
-      status
+      message: 'SSE Status endpoint',
+      timestamp: new Date().toISOString(),
+      note: 'Para ver el número real de clientes conectados, revisa los logs del servidor cuando se envía un mensaje SSE'
     });
-    
   } catch (error) {
-    console.error('Error verificando estado SSE:', error);
+    console.error('Error en SSE status:', error);
     return NextResponse.json({ 
-      error: 'Error verificando estado SSE',
-      details: error instanceof Error ? error.message : 'Error desconocido'
+      error: 'Internal Server Error' 
     }, { status: 500 });
   }
-} 
+}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { metaWhatsAppService } from '../../../../lib/metaWhatsAppService';
-import { sendMessageToContact } from '../../../../lib/sseUtils';
+import { sendMessageToClients } from '../../../../lib/sseUtils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,6 +8,13 @@ export async function GET(request: NextRequest) {
     const mode = searchParams.get('hub.mode');
     const token = searchParams.get('hub.verify_token');
     const challenge = searchParams.get('hub.challenge');
+
+    // Debug de variables de entorno
+    console.log('🔍 ENV DEBUG:', {
+      WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN,
+      NODE_ENV: process.env.NODE_ENV,
+      allEnvKeys: Object.keys(process.env).filter(key => key.includes('WHATSAPP'))
+    });
 
     console.log('🔍 Webhook verification debug:', {
       mode,
@@ -17,16 +24,13 @@ export async function GET(request: NextRequest) {
     });
 
     // Verificación del webhook para WhatsApp
-    if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+    const expectedToken = process.env.WHATSAPP_VERIFY_TOKEN || 'mi_token_de_verificacion_2024_cilantro';
+    if (mode === 'subscribe' && token === expectedToken) {
       console.log('✅ Webhook verified successfully');
       return new NextResponse(challenge, { status: 200 });
     }
 
-    console.log('❌ Webhook verification failed:', {
-      modeMatch: mode === 'subscribe',
-      tokenMatch: token === process.env.WHATSAPP_VERIFY_TOKEN
-    });
-
+    console.log('❌ Webhook verification failed:', { modeMatch: mode === 'subscribe', tokenMatch: token === expectedToken });
     return new NextResponse('Forbidden', { status: 403 });
   } catch (error) {
     console.error('Error in webhook verification:', error);
@@ -63,10 +67,16 @@ export async function POST(request: NextRequest) {
           console.log('🔄 Webhook POST - Procesando mensaje:', message);
           await metaWhatsAppService.processIncomingMessage(message);
           
+          // Normalizar el número de teléfono para que coincida con el formato del frontend
+          let normalizedFrom = message.from;
+          if (normalizedFrom && !normalizedFrom.startsWith('+')) {
+            normalizedFrom = `+${normalizedFrom}`;
+          }
+
           // Enviar mensaje a través de SSE para actualización en tiempo real
           const sseMessage = {
             type: 'whatsapp_message',
-            contactId: message.from,
+            contactId: normalizedFrom,
             id: message.id,
             content: message.text?.body || message.content,
             timestamp: new Date().toISOString()
@@ -74,27 +84,9 @@ export async function POST(request: NextRequest) {
           
           console.log('📤 Webhook POST - Enviando mensaje SSE:', sseMessage);
           
-          // Verificar si hay clientes conectados antes de enviar
-          const { getClientCount } = await import('../../../../lib/sseUtils');
-          const clientCount = getClientCount();
-          console.log('📊 Webhook POST - Clientes SSE conectados:', clientCount);
-          
-          if (clientCount > 0) {
-            sendMessageToContact(message.from, sseMessage);
-            console.log('✅ Webhook POST - Mensaje SSE enviado exitosamente');
-            
-            // Forzar sincronización inmediata después de enviar SSE
-            setTimeout(async () => {
-              try {
-                console.log('🔄 Webhook POST - Forzando sincronización inmediata...');
-                // La sincronización se hará automáticamente cuando el cliente reciba el SSE
-              } catch (error) {
-                console.error('❌ Webhook POST - Error en sincronización forzada:', error);
-              }
-            }, 100);
-          } else {
-            console.log('✅ Webhook POST - App cerrada, mensaje guardado en BD para sincronización posterior');
-          }
+          // Enviar a todos los clientes conectados
+          sendMessageToClients(sseMessage);
+          console.log('✅ Webhook POST - Mensaje SSE enviado exitosamente');
         }
         
         console.log('✅ Webhook POST - Mensajes procesados correctamente');

@@ -1,0 +1,8 @@
+﻿=== REPORTE DE DEBUG DEL CHAT ===
+Fecha: 08/10/2025 17:59:53
+Servidor: OK
+API /api/providers: 0 proveedores
+Data: {"success":true,"providers":[]}
+API /api/data/providers: 0 proveedores
+Data: {"success":true,"providers":[]}
+

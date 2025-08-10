@@ -14,7 +14,6 @@ import {
   csvEscape,
   parseCsvRow,
 } from '../../features/providers/providerUtils';
-import IntegratedChatPanel from '../../components/IntegratedChatPanel';
 import { useChat } from '../../contexts/ChatContext';
 import { DataProvider, useData } from '../../components/DataProvider';
 import es from '../../locales/es';
@@ -46,7 +45,7 @@ function ProvidersPage() {
 
   // Debug log for loading and user
   if (typeof window !== 'undefined') {
-    console.log('ProvidersPage: authLoading:', authLoading, 'user:', user);
+  
   }
 
   const [loading, setLoading] = useState(false);
@@ -58,7 +57,7 @@ function ProvidersPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingInTable, setIsEditingInTable] = useState<string | null>(null);
   
-  // Chat state
+  // Chat state - now enabled
   const { openChat, isChatOpen } = useChat();
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
 
@@ -72,7 +71,7 @@ function ProvidersPage() {
   // PDF upload handler
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const handleCatalogUploadLocal = async (providerId: string, file: File): Promise<void> => {
-    console.log('DEBUG: handleCatalogUploadLocal called with:', providerId, file.name);
+
     
     if (!user?.id) {
       console.error('DEBUG: No user ID available for upload');
@@ -90,7 +89,7 @@ function ProvidersPage() {
         return;
       }
 
-      console.log('DEBUG: File uploaded successfully:', uploadResult);
+
 
       // Create catalog object with the Supabase URL
       const catalog = {
@@ -103,12 +102,12 @@ function ProvidersPage() {
         uploadedAt: new Date(),
       };
       
-      console.log('DEBUG: Catalog object created:', catalog);
+
       
       // Update the provider with the catalog
       const providerToUpdate = providers.find(p => p.id === providerId);
       if (providerToUpdate) {
-        console.log('DEBUG: Found provider to update:', providerToUpdate.name);
+
         
         // Add the new catalog to the existing catalogs array
         const existingCatalogs = providerToUpdate.catalogs || [];
@@ -118,13 +117,13 @@ function ProvidersPage() {
           ...providerToUpdate,
           catalogs: updatedCatalogs
         };
-        console.log('DEBUG: Updated provider with catalog:', updatedProvider);
+
         
         // Update in the database
         await updateProvider(updatedProvider);
-        console.log('DEBUG: Provider updated successfully');
+
       } else {
-        console.log('DEBUG: Provider not found for ID:', providerId);
+
         alert('Error: Proveedor no encontrado');
       }
     } catch (error) {
@@ -134,8 +133,7 @@ function ProvidersPage() {
   };
 
   const handleOpenModal = (provider: Provider | null, editing: boolean = false) => {
-    console.log('DEBUG: handleOpenModal called with provider:', provider, 'editing:', editing);
-    console.log('DEBUG: Provider details:', {
+    console.log('DEBUG: handleOpenModal llamado con:', {
       id: provider?.id,
       name: provider?.name,
       email: provider?.email,
@@ -154,15 +152,11 @@ function ProvidersPage() {
     } else {
       setIsEditingInTable(null);
     }
-    
-    console.log('DEBUG: State updated - currentProvider:', provider, 'isModalOpen: true');
   };
 
   const handleSaveProviderConfig = async (updatedProvider: Provider) => {
     try {
-      console.log('DEBUG: handleSaveProviderConfig called with:', updatedProvider);
       await updateProvider(updatedProvider);
-      console.log('Proveedor actualizado:', updatedProvider.name);
     } catch (error) {
       console.error('Error actualizando proveedor:', error);
     }
@@ -170,12 +164,11 @@ function ProvidersPage() {
 
   const handleAddProvider = async (providerData: Omit<Provider, 'id' | 'createdAt' | 'updatedAt' | 'user_id'>) => {
     try {
-      console.log('DEBUG: handleAddProvider called with:', providerData);
+
       setAddingProvider(true);
       
       const result = await addProvider(providerData, user?.id || '');
-      console.log('DEBUG: addProvider result:', result);
-      console.log('Proveedor agregado exitosamente');
+
       
       // Cerrar el modal y limpiar el estado
       setIsModalOpen(false);
@@ -188,7 +181,7 @@ function ProvidersPage() {
         await fetchAll();
       }
       
-      console.log('DEBUG: Provider added successfully, modal closed');
+
     } catch (error) {
       console.error('Error agregando proveedor:', error);
     } finally {
@@ -197,9 +190,7 @@ function ProvidersPage() {
   };
 
   // Debug log for modal state
-  console.log('DEBUG: ProvidersPage render - modal state:', { isModalOpen, currentProvider: currentProvider?.name, isEditing });
-  console.log('DEBUG: ProvidersPage render - providers count:', providers.length);
-  console.log('DEBUG: ProvidersPage render - providers with catalogs:', providers.filter(p => p.catalogs && p.catalogs.length > 0).length);
+
 
   const columns = [
     {
@@ -218,23 +209,16 @@ function ProvidersPage() {
             title={row?.catalogs?.length ? "Ver catálogo del proveedor" : "Sin catálogo disponible"}
             aria-label={row?.catalogs?.length ? "Ver catálogo del proveedor" : "Sin catálogo disponible"}
             onClick={() => {
-              console.log('DEBUG: Table catalog button clicked for row:', row);
-              console.log('DEBUG: row.catalogs:', row.catalogs);
-              
               if (!row?.catalogs || row.catalogs.length === 0) {
-                console.log('DEBUG: No catalogs found in table');
                 alert('Este proveedor no tiene catálogos cargados.');
                 return;
               }
               
               const pdf = row.catalogs[0];
               if (!pdf?.fileUrl) {
-                console.log('DEBUG: Catalog found but no fileUrl in table');
                 alert('El catálogo existe pero la URL no está disponible.');
                 return;
               }
-              
-              console.log('DEBUG: Opening catalog URL from table:', pdf.fileUrl);
               try {
                 // Verificar si es una URL válida (incluye data URLs)
                 if (pdf.fileUrl.startsWith('blob:') || 
@@ -260,15 +244,6 @@ function ProvidersPage() {
             title="Editar proveedor"
             aria-label="Editar proveedor"
             onClick={() => {
-              console.log('DEBUG: Edit button clicked with row:', row);
-              console.log('DEBUG: Row type:', typeof row);
-              console.log('DEBUG: Row keys:', Object.keys(row || {}));
-              console.log('DEBUG: Row ID:', row?.id);
-              console.log('DEBUG: Row name:', row?.name);
-              console.log('DEBUG: Row email:', row?.email);
-              console.log('DEBUG: Row defaultDeliveryDays:', row?.defaultDeliveryDays);
-              console.log('DEBUG: Row defaultDeliveryTime:', row?.defaultDeliveryTime);
-              console.log('DEBUG: Row defaultPaymentMethod:', row?.defaultPaymentMethod);
               handleOpenModal(row, true);
             }}
             tabIndex={0}
@@ -437,24 +412,12 @@ function ProvidersPage() {
         );
       });
       
-      console.log('🔄 Proveedores con cambios detectados:', changedProviders.length);
-      if (changedProviders.length > 0) {
-        console.log('📝 Detalles de cambios:', changedProviders.map(p => ({
-          id: p.id,
-          name: p.name,
-          cbu: p.cbu,
-          alias: p.alias,
-          cuitCuil: p.cuitCuil,
-          razonSocial: p.razonSocial
-        })));
-      }
+
       
       // Actualizar solo los proveedores modificados
       for (const provider of changedProviders) {
         try {
-          console.log('🔄 Actualizando proveedor:', provider.id, provider.name);
           await updateProvider(provider);
-          console.log('✅ Proveedor actualizado exitosamente:', provider.id);
         } catch (error) {
           console.error('❌ Error updating provider:', provider.id, error);
         }
@@ -470,14 +433,12 @@ function ProvidersPage() {
     }
     
     setAddingProvider(true);
-    console.log('Adding new provider for user:', user.id);
     const newProvider = createNewProvider();
     newProvider.user_id = user.id;
-    console.log('New provider:', newProvider);
     
     // Forzar actualización inmediata del estado
     addProvider(newProvider, user.id).then(() => {
-      console.log('Provider added successfully');
+
       setAddingProvider(false);
       // Forzar re-render del DataGrid
       setTimeout(() => {
@@ -512,7 +473,7 @@ function ProvidersPage() {
         forceDelete = confirm(confirmMessage);
         
         if (!forceDelete) {
-          console.log('Borrado cancelado por el usuario');
+  
           return;
         }
       }
@@ -520,9 +481,7 @@ function ProvidersPage() {
       setLoading(true);
       try {
         const ids = rowsToDelete.map(row => row.id);
-        console.log('Intentando borrar proveedores:', ids, forceDelete ? '(con pedidos)' : '(sin pedidos)');
         await deleteProvider(ids, user.id, true, forceDelete); // batch delete
-        console.log('Proveedores eliminados exitosamente:', ids);
       } catch (err) {
         console.error('Error deleting providers:', rowsToDelete, err);
         // Mostrar mensaje de error al usuario
@@ -648,16 +607,11 @@ function ProvidersPage() {
       const headers = rawHeaders.map(h => headerMap[h] || h);
       
       // Debug: mostrar headers procesados
-      console.log('Headers originales:', parseCsvRow(lines[0]));
-      console.log('Headers normalizados:', rawHeaders);
-      console.log('Headers mapeados:', headers);
-      console.log('HeaderMap keys disponibles:', Object.keys(headerMap));
+      
       
       // Verificar si contactName está en los headers
       const hasContactName = headers.includes('contactName');
-      console.log('¿Incluye contactName?', hasContactName);
       if (!hasContactName) {
-        console.log('Headers que podrían ser contactName:', rawHeaders.filter(h => h.includes('contact') || h.includes('persona') || h.includes('nombre')));
       }
       
       const required = ['name', 'categories'];
@@ -673,11 +627,7 @@ function ProvidersPage() {
         
         // Debug para la primera fila
         if (index === 0) {
-          console.log('Primera fila de datos:');
-          console.log('Headers:', headers);
-          console.log('Values:', values);
-          console.log('Row procesado:', row);
-          console.log('contactName value:', row.contactName);
+          
         }
         
         const categories = row.categories ? String(row.categories).split(';').map((c: string) => c.trim()).filter(Boolean) : [];
@@ -783,7 +733,7 @@ function ProvidersPage() {
         delete safeProviderSnake.cuitCuil;
         delete safeProviderSnake.createdAt;
         delete safeProviderSnake.updatedAt;
-        console.log('Insertando provider en Supabase:', JSON.stringify(safeProviderSnake, null, 2));
+
         const result = await addProvider(safeProviderSnake, user.id);
         if (result && result.error) {
           errorCount++;
@@ -896,13 +846,6 @@ function ProvidersPage() {
         </div>
       </main>
 
-      {/* Chat Integrado */}
-      <IntegratedChatPanel
-        providers={providers}
-        isOpen={isChatPanelOpen}
-        onClose={() => setIsChatPanelOpen(false)}
-      />
-      
       {importMessage && (
         <div className="fixed top-4 right-4 z-50 bg-blue-100 border border-blue-400 text-blue-800 px-4 py-2 rounded shadow">
           {importMessage}
@@ -913,7 +856,7 @@ function ProvidersPage() {
       <ProviderConfigModal
         isOpen={isModalOpen}
         onClose={() => {
-          console.log('DEBUG: Closing modal - setting isModalOpen to false');
+    
           setIsModalOpen(false);
           setCurrentProvider(null);
           setIsEditing(false);

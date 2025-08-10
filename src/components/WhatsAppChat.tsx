@@ -130,7 +130,7 @@ export default function WhatsAppChat({
         
         // Mostrar notificación si está en modo simulación
         if (result.simulated) {
-          console.log('📱 Mensaje enviado en modo simulación');
+    
         }
       } else {
         console.error('Error sending message:', result.error);

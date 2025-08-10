@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { MessageSquare, Bell } from 'lucide-react';
-import { useChat } from '../contexts/ChatContext';
+// import { useChat } from '../contexts/ChatContext';
 import { Contact } from '../types/whatsapp';
 
 interface ChatMessage {
@@ -32,9 +32,13 @@ export default function ChatPreview({
   hasUnreadMessages = false,
   lastMessage,
 }: ChatPreviewProps) {
-  const { openChat, unreadCounts } = useChat();
+  // Chat hooks disabled - using placeholders
+  const openChat = () => console.log('Chat not available in this context');
+  const unreadCounts = {}; // Placeholder when chat is not available
   const [previewText, setPreviewText] = useState('');
   const [timeAgo, setTimeAgo] = useState('');
+
+
 
   useEffect(() => {
     if (lastMessage) {
@@ -67,25 +71,6 @@ export default function ChatPreview({
   }, [lastMessage]);
 
   const handleOpenChat = () => {
-    if (providerPhone && providerId) {
-      // Normalizar el número de teléfono para que coincida con el webhook
-      const normalizedPhone = providerPhone.startsWith('+') ? providerPhone : `+${providerPhone}`;
-      
-      // Crear contacto para el contexto global
-      const contact: Contact = {
-        id: providerId,
-        name: providerName,
-        phone: normalizedPhone,
-        providerId: providerId,
-        lastMessage: previewText,
-        lastMessageTime: lastMessage?.timestamp,
-        unreadCount: unreadCounts[normalizedPhone] || 0
-      };
-      
-      // Abrir el chat global
-      openChat(contact);
-    }
-    
     // Llamar al callback original si existe
     if (onOpenChat) {
       onOpenChat();
@@ -99,36 +84,39 @@ export default function ChatPreview({
           ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' 
           : 'bg-white border-gray-200 hover:bg-gray-50'
       }`}
-      onClick={handleOpenChat}
+      onClick={() => {
+        handleOpenChat();
+      }}
     >
-      {/* Indicador de mensajes no leídos */}
-      {hasUnreadMessages && (
-        <div className="absolute -top-0.5 -right-0.5">
-          <div className="bg-red-500 text-white text-xs rounded-full w-3 h-3 flex items-center justify-center">
-            <Bell className="w-1.5 h-1.5" />
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center space-x-2">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                {providerName.charAt(0).toUpperCase()}
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium text-gray-900 truncate">
+                  {providerName}
+                </h4>
+                <span className="text-xs text-gray-500">
+                  {timeAgo}
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 truncate">
+                {previewText || 'Sin mensajes recientes'}
+              </p>
+            </div>
           </div>
         </div>
-      )}
-
-      <div className="flex items-center space-x-1">
-        {/* Contenido del preview */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between">
-            {timeAgo && (
-              <span className="text-xs text-gray-500 flex-shrink-0">
-                {timeAgo}
-              </span>
-            )}
-          </div>
-          
-          <div className="flex items-center">
-            <MessageSquare className="w-2.5 h-2.5 text-gray-400 mr-1 flex-shrink-0" />
-            <p className={`text-xs truncate ${
-              hasUnreadMessages ? 'text-blue-700 font-medium' : 'text-gray-600'
-            }`}>
-              {previewText}
-            </p>
-          </div>
+        
+        <div className="flex items-center space-x-1">
+          {hasUnreadMessages && (
+            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+          )}
+          <MessageSquare className="h-4 w-4 text-gray-400" />
         </div>
       </div>
     </div>
