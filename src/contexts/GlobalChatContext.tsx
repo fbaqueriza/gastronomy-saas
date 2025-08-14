@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { Contact } from '../types/whatsapp';
 
 interface GlobalChatContextType {
@@ -16,18 +16,17 @@ export function GlobalChatProvider({ children }: { children: ReactNode }) {
   const [isGlobalChatOpen, setIsGlobalChatOpen] = useState(false);
   const [currentGlobalContact, setCurrentGlobalContact] = useState<Contact | null>(null);
 
-  const openGlobalChat = (contact?: Contact) => {
+  const openGlobalChat = useCallback((contact?: Contact) => {
     if (contact) {
       setCurrentGlobalContact(contact);
     }
-    
     setIsGlobalChatOpen(true);
-  };
+  }, []);
 
-  const closeGlobalChat = () => {
+  const closeGlobalChat = useCallback(() => {
     setIsGlobalChatOpen(false);
     setCurrentGlobalContact(null);
-  };
+  }, []);
 
   return (
     <GlobalChatContext.Provider
@@ -45,6 +44,7 @@ export function GlobalChatProvider({ children }: { children: ReactNode }) {
 
 export function useGlobalChat() {
   const context = useContext(GlobalChatContext);
+  
   if (context === undefined) {
     throw new Error('useGlobalChat must be used within a GlobalChatProvider');
   }

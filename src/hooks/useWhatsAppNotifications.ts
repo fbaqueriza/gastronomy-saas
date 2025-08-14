@@ -1,63 +1,97 @@
-import { useEffect, useCallback } from 'react';
-import { useChat } from '../contexts/ChatContext';
+import { useEffect, useState, useCallback } from 'react';
 
 export function useWhatsAppNotifications() {
-  const { messagesByContact, isChatOpen } = useChat();
+  const [permission, setPermission] = useState<NotificationPermission>('default');
+  const [isSupported, setIsSupported] = useState(false);
 
-  // Solicitar permisos de notificación
-  const requestNotificationPermission = useCallback(async () => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      const permission = await Notification.requestPermission();
-      return permission === 'granted';
+  useEffect(() => {
+    // Verificar si las notificaciones están soportadas
+    if ('Notification' in window) {
+      setIsSupported(true);
+      setPermission(Notification.permission);
     }
-    return Notification.permission === 'granted';
   }, []);
 
-  // Mostrar notificación de nuevo mensaje
-  const showNotification = useCallback((title: string, body: string, icon?: string) => {
-    if ('Notification' in window && Notification.permission === 'granted' && !isChatOpen) {
-      new Notification(title, {
-        body,
-        icon: icon || '/favicon.ico',
+  const requestPermission = useCallback(async (): Promise<boolean> => {
+    if (!isSupported) {
+      console.log('❌ Notificaciones no soportadas en este navegador');
+      return false;
+    }
+
+    try {
+      const result = await Notification.requestPermission();
+      setPermission(result);
+      console.log(`✅ Permiso de notificaciones: ${result}`);
+      return result === 'granted';
+    } catch (error) {
+      console.error('❌ Error solicitando permiso de notificaciones:', error);
+      return false;
+    }
+  }, [isSupported]);
+
+  const showNotification = useCallback((title: string, options?: NotificationOptions) => {
+    if (!isSupported) {
+      console.log('❌ Notificaciones no soportadas');
+      return;
+    }
+
+    if (permission !== 'granted') {
+      console.log('❌ Permiso de notificaciones no concedido');
+      return;
+    }
+
+    try {
+      const notification = new Notification(title, {
+        icon: '/favicon.ico',
         badge: '/favicon.ico',
         tag: 'whatsapp-message',
         requireInteraction: false,
-        silent: false
+        silent: false,
+        ...options
       });
+
+      // Auto-cerrar después de 5 segundos
+      setTimeout(() => {
+        notification.close();
+      }, 5000);
+
+      // Manejar clic en la notificación
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+
+      console.log('🔔 Notificación mostrada:', title);
+      return notification;
+    } catch (error) {
+      console.error('❌ Error mostrando notificación:', error);
     }
-  }, [isChatOpen]);
+  }, [isSupported, permission]);
 
-  // Detectar nuevos mensajes y mostrar notificaciones
-  useEffect(() => {
-    const totalMessages = Object.values(messagesByContact).reduce(
-      (total, messages) => total + messages.length, 
-      0
-    );
-
-    // Solo mostrar notificación si hay mensajes y el chat no está abierto
-    if (totalMessages > 0 && !isChatOpen) {
-      const unreadMessages = Object.values(messagesByContact).reduce(
-        (total, messages) => total + messages.filter(m => m.type === 'received').length,
-        0
-      );
-
-      if (unreadMessages > 0) {
-        showNotification(
-          'Nuevo mensaje de WhatsApp',
-          `${unreadMessages} mensaje${unreadMessages > 1 ? 's' : ''} nuevo${unreadMessages > 1 ? 's' : ''}`,
-          '/favicon.ico'
-        );
+  const showMessageNotification = useCallback((contactName: string, message: string) => {
+    const title = `Nuevo mensaje de ${contactName}`;
+    const options: NotificationOptions = {
+      body: message.length > 100 ? message.substring(0, 100) + '...' : message,
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      tag: 'whatsapp-message',
+      requireInteraction: false,
+      silent: false,
+      data: {
+        type: 'whatsapp-message',
+        contactName,
+        message
       }
-    }
-  }, [messagesByContact, isChatOpen, showNotification]);
+    };
 
-  // Solicitar permisos al cargar
-  useEffect(() => {
-    requestNotificationPermission();
-  }, [requestNotificationPermission]);
+    return showNotification(title, options);
+  }, [showNotification]);
 
   return {
-    requestNotificationPermission,
-    showNotification
+    isSupported,
+    permission,
+    requestPermission,
+    showNotification,
+    showMessageNotification
   };
 }

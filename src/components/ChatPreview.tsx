@@ -1,26 +1,22 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { MessageSquare, Bell } from 'lucide-react';
-// import { useChat } from '../contexts/ChatContext';
-import { Contact } from '../types/whatsapp';
-
-interface ChatMessage {
-  id: string;
-  type: 'sent' | 'received';
-  content: string;
-  timestamp: Date;
-  status?: 'sent' | 'delivered' | 'read';
-}
+import React from 'react';
+import { MessageSquare, Clock } from 'lucide-react';
 
 interface ChatPreviewProps {
   providerName: string;
-  providerPhone?: string;
-  providerId?: string;
-  orderId?: string;
-  onOpenChat?: () => void;
-  hasUnreadMessages?: boolean;
-  lastMessage?: ChatMessage;
+  providerPhone: string;
+  providerId: string;
+  orderId: string;
+  onOpenChat: () => void;
+  hasUnreadMessages: boolean;
+  lastMessage: {
+    id: string;
+    type: 'sent' | 'received';
+    content: string;
+    timestamp: Date;
+    status: 'sent' | 'delivered' | 'read';
+  };
 }
 
 export default function ChatPreview({
@@ -29,96 +25,68 @@ export default function ChatPreview({
   providerId,
   orderId,
   onOpenChat,
-  hasUnreadMessages = false,
-  lastMessage,
+  hasUnreadMessages,
+  lastMessage
 }: ChatPreviewProps) {
-  // Chat hooks disabled - using placeholders
-  const openChat = () => console.log('Chat not available in this context');
-  const unreadCounts = {}; // Placeholder when chat is not available
-  const [previewText, setPreviewText] = useState('');
-  const [timeAgo, setTimeAgo] = useState('');
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('es-AR', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
 
-
-
-  useEffect(() => {
-    if (lastMessage) {
-      // Limitar el preview a 50 caracteres
-      const text = lastMessage.content.length > 50 
-        ? lastMessage.content.substring(0, 50) + '...' 
-        : lastMessage.content;
-      setPreviewText(text);
-
-      // Calcular tiempo transcurrido
-      const now = new Date();
-      const messageTime = new Date(lastMessage.timestamp);
-      const diffInMinutes = Math.floor((now.getTime() - messageTime.getTime()) / (1000 * 60));
-      
-      if (diffInMinutes < 1) {
-        setTimeAgo('Ahora');
-      } else if (diffInMinutes < 60) {
-        setTimeAgo(`Hace ${diffInMinutes} min`);
-      } else if (diffInMinutes < 1440) {
-        const hours = Math.floor(diffInMinutes / 60);
-        setTimeAgo(`Hace ${hours}h`);
-      } else {
-        const days = Math.floor(diffInMinutes / 1440);
-        setTimeAgo(`Hace ${days}d`);
-      }
-    } else {
-      setPreviewText('Iniciar conversación...');
-      setTimeAgo('');
-    }
-  }, [lastMessage]);
-
-  const handleOpenChat = () => {
-    // Llamar al callback original si existe
-    if (onOpenChat) {
-      onOpenChat();
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'sent':
+        return <div className="w-2 h-2 bg-gray-400 rounded-full" />;
+      case 'delivered':
+        return <div className="w-2 h-2 bg-blue-400 rounded-full" />;
+      case 'read':
+        return <div className="w-2 h-2 bg-green-400 rounded-full" />;
+      default:
+        return <div className="w-2 h-2 bg-gray-400 rounded-full" />;
     }
   };
 
   return (
     <div 
-      className={`relative p-1 rounded border cursor-pointer transition-all duration-200 hover:shadow-sm ${
-        hasUnreadMessages 
-          ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' 
-          : 'bg-white border-gray-200 hover:bg-gray-50'
-      }`}
-      onClick={() => {
-        handleOpenChat();
-      }}
+      className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+      onClick={onOpenChat}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                {providerName.charAt(0).toUpperCase()}
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium text-gray-900 truncate">
-                  {providerName}
-                </h4>
-                <span className="text-xs text-gray-500">
-                  {timeAgo}
-                </span>
-              </div>
-              <p className="text-xs text-gray-600 truncate">
-                {previewText || 'Sin mensajes recientes'}
-              </p>
-            </div>
+      <div className="flex-shrink-0">
+        <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
+          <MessageSquare className="w-5 h-5 text-white" />
+        </div>
+      </div>
+      
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-medium text-gray-900 truncate">
+            {providerName}
+          </h4>
+          <div className="flex items-center space-x-1">
+            <span className="text-xs text-gray-500">
+              {formatTime(lastMessage.timestamp)}
+            </span>
+            {getStatusIcon(lastMessage.status)}
           </div>
         </div>
         
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-xs text-gray-600 truncate">
+            {lastMessage.content}
+          </p>
           {hasUnreadMessages && (
-            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+            <div className="flex-shrink-0">
+              <div className="w-2 h-2 bg-red-500 rounded-full" />
+            </div>
           )}
-          <MessageSquare className="h-4 w-4 text-gray-400" />
         </div>
+        
+        <p className="text-xs text-gray-500 mt-1">
+          {providerPhone}
+        </p>
       </div>
     </div>
   );
-} 
+}

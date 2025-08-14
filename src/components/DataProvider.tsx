@@ -139,9 +139,37 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
   // Error state for user fetch/creation
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Fetch providers
+  const fetchProviders = useCallback(async () => {
+    if (!currentUserId) {
+      return;
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('providers')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error cargando proveedores:', error);
+        setProviders([]);
+        return;
+      }
+
+      setProviders(data?.map(mapProviderFromDb) || []);
+    } catch (error) {
+      console.error('Error cargando proveedores:', error);
+      setProviders([]);
+    }
+  }, [currentUserId]);
+
   // Fetch all data for the user
   const fetchAll = useCallback(async () => {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+      return;
+    }
     setLoading(true);
     setErrorMsg(null);
     try {
@@ -155,7 +183,9 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
       if (ordError) console.error('Error fetching orders:', ordError);
       if (stockError) console.error('Error fetching stock:', stockError);
       
-      setProviders((provs || []).map(mapProviderFromDb));
+      const mappedProviders = (provs || []).map(mapProviderFromDb);
+      
+      setProviders(mappedProviders);
       setOrders((ords || []).map(mapOrderFromDb));
       setStockItems((stocks || []).map(mapStockItemFromDb));
     } catch (error) {
@@ -167,8 +197,10 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
   }, [currentUserId]);
 
   useEffect(() => {
-    if (currentUserId) fetchAll();
-  }, [currentUserId, fetchAll]);
+    if (currentUserId) {
+      fetchAll();
+    }
+  }, [currentUserId]); // Solo depende de currentUserId, no de fetchAll
 
   // CRUD: Orders
   const addOrder = useCallback(async (order: Partial<Order>, user_id: string) => {

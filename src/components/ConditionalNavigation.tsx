@@ -13,7 +13,12 @@ export default function ConditionalNavigation() {
   // No mostrar navegación en la página principal (landing page)
   const isLandingPage = pathname === '/';
   
-  if (isAuthRoute || isLandingPage) {
+  // Filtrar rutas de Next.js internas
+  const isNextInternalRoute = pathname.includes('_next') || 
+                             pathname.includes('.well-known') || 
+                             pathname.includes('static');
+  
+  if (isAuthRoute || isLandingPage || isNextInternalRoute) {
     return null;
   }
   

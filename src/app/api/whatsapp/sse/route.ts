@@ -1,29 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { addClient, removeClient } from '../../../../lib/sseUtils';
+import { addClient, removeClient, cleanupInactiveClients } from '../../../../lib/sseUtils';
 
 export async function GET(request: NextRequest) {
   const stream = new ReadableStream({
     start(controller) {
-      // Agregar el cliente a la lista
-      addClient(controller);
+      // Agregar el cliente a la lista y obtener su ID
+      const clientId = addClient(controller);
+
+      console.log(`🔗 SSE - Cliente ${clientId} conectado`);
 
       // Enviar un mensaje de prueba para confirmar la conexión
-      controller.enqueue(`data: ${JSON.stringify({ type: 'connection', message: 'SSE conectado' })}\n\n`);
+      controller.enqueue(`data: ${JSON.stringify({ 
+        type: 'connection', 
+        message: 'SSE conectado',
+        clientId,
+        timestamp: new Date().toISOString()
+      })}\n\n`);
 
-      // Mantener la conexión viva
-      const keepAlive = setInterval(() => {
-        try {
-          controller.enqueue(`data: ${JSON.stringify({ type: 'ping', timestamp: Date.now() })}\n\n`);
-        } catch (error) {
-          clearInterval(keepAlive);
-          removeClient(controller);
-        }
-      }, 30000); // Ping cada 30 segundos
+      // Limpiar clientes inactivos cada 5 minutos (sin pings)
+      const cleanupInterval = setInterval(() => {
+        cleanupInactiveClients();
+      }, 300000); // 5 minutos
 
       // Limpiar cuando se cierre la conexión
       request.signal.addEventListener('abort', () => {
-        clearInterval(keepAlive);
-        removeClient(controller);
+        console.log(`🔌 Cliente ${clientId} desconectado por abort`);
+        clearInterval(cleanupInterval);
+        removeClient(clientId);
       });
     }
   });

@@ -6,6 +6,7 @@ import ConditionalNavigation from '../components/ConditionalNavigation';
 import { ChatProvider } from '../contexts/ChatContext';
 import { GlobalChatProvider } from '../contexts/GlobalChatContext';
 import GlobalChatWrapper from '../components/GlobalChatWrapper';
+import ChatInitializer from '../components/ChatInitializer';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SupabaseAuthProvider>
           <ChatProvider>
             <GlobalChatProvider>
+              <ChatInitializer />
               <ConditionalNavigation />
               <main className="min-h-screen">
                 {children}

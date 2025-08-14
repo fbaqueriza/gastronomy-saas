@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Paperclip, Phone, Video, MoreVertical, Plus, Search, MessageSquare, UserPlus, X, FileText, Download, Image, File, Smile, Mic } from 'lucide-react';
+import { Send, Paperclip, Phone, Video, MoreVertical, Plus, Search, MessageSquare, UserPlus, X, FileText, Download, Image, File, Smile, Mic, RefreshCw } from 'lucide-react';
 import { useChat } from '../contexts/ChatContext';
 import { useGlobalChat } from '../contexts/GlobalChatContext';
 import { WhatsAppMessage, Contact } from '../types/whatsapp';
 import React from 'react';
 import WhatsAppStatusIndicator from './WhatsAppStatusIndicator';
 import { normalizePhoneNumber, phoneNumbersMatch } from '../lib/phoneUtils';
+import NotificationPermission from './NotificationPermission';
 
 interface IntegratedChatPanelProps {
   providers: any[];
@@ -19,11 +20,13 @@ interface IntegratedChatPanelProps {
 const ContactItem = React.memo(({ 
   contact, 
   isSelected, 
-  onSelect 
+  onSelect,
+  unreadCount
 }: { 
   contact: Contact; 
   isSelected: boolean; 
-  onSelect: (contact: Contact) => void; 
+  onSelect: (contact: Contact) => void;
+  unreadCount: number;
 }) => (
   <div
     onClick={() => onSelect(contact)}
@@ -41,9 +44,9 @@ const ContactItem = React.memo(({
           </p>
         )}
       </div>
-      {contact.unreadCount && contact.unreadCount > 0 && (
+      {unreadCount > 0 && (
         <span className="ml-2 bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-          {contact.unreadCount}
+          {unreadCount}
         </span>
       )}
     </div>
@@ -72,6 +75,7 @@ export default function IntegratedChatPanel({
   isOpen,
   onClose
 }: IntegratedChatPanelProps) {
+  
   const {
     selectedContact,
     messages,
@@ -84,10 +88,9 @@ export default function IntegratedChatPanel({
     sendMessage,
     closeChat,
     isConnected,
-    connectionStatus
+    connectionStatus,
+    setMessagesByContact
   } = useChat();
-
-
 
   const { isGlobalChatOpen, closeGlobalChat, currentGlobalContact } = useGlobalChat();
 
@@ -107,6 +110,8 @@ export default function IntegratedChatPanel({
   const isPanelOpen = isGlobalChatOpen || isOpen;
   const currentContact = currentGlobalContact || selectedContact;
 
+
+
   // Función para cerrar el chat usando el contexto global
   const handleClose = () => {
     closeGlobalChat();
@@ -116,14 +121,7 @@ export default function IntegratedChatPanel({
 
   // Convertir proveedores a contactos (optimizado)
   useEffect(() => {
-    console.log('🔄 IntegratedChatPanel: useEffect convertir proveedores:', { 
-      providersLength: providers?.length || 0,
-      providers: providers?.map(p => ({ id: p.id, name: p.name, phone: p.phone })) || [],
-      contactsLength: contacts.length
-    });
-    
     if (providers && providers.length > 0) {
-      // Usar providers si están disponibles
       const providerContacts: Contact[] = providers.map(provider => {
         const normalizedPhone = normalizePhoneNumber(provider.phone);
         
@@ -131,9 +129,9 @@ export default function IntegratedChatPanel({
           id: provider.id,
           name: provider.name || 'Sin nombre',
           phone: normalizedPhone,
-          lastMessage: '',
-          lastMessageTime: new Date(),
-          unreadCount: unreadCounts[normalizedPhone] || 0,
+          lastMessage: provider.lastMessage || '',
+          lastMessageTime: provider.lastMessageTime ? new Date(provider.lastMessageTime) : new Date(),
+          unreadCount: provider.unreadCount || 0,
           providerId: provider.id,
           email: provider.email,
           address: provider.address,
@@ -141,64 +139,55 @@ export default function IntegratedChatPanel({
         };
       });
       
-      
-      
-      // Solo actualizar si los contactos han cambiado
-      const hasChanged = contacts.length !== providerContacts.length || 
-        contacts.some((contact, index) => contact.id !== providerContacts[index]?.id);
-      
-      console.log('🔄 IntegratedChatPanel: ¿Han cambiado los contactos?', hasChanged);
-      
-      if (hasChanged) {
-        
-        setContacts(providerContacts);
-      }
-    } else {
-      
+      setContacts(providerContacts);
     }
-  }, [providers, unreadCounts]);
+  }, [providers]); // Solo depende de providers
 
   // Seleccionar automáticamente el primer contacto cuando se abre el chat
   useEffect(() => {
     if (isPanelOpen && contacts.length > 0 && !currentContact) {
-      
       setSelectedContact(contacts[0] as any);
     }
-  }, [isPanelOpen, contacts.length, currentContact?.id]);
+  }, [isPanelOpen, contacts, currentContact?.id, setSelectedContact]);
 
-  // Cargar mensajes del contacto seleccionado
-  // Sincronizar mensajes cuando cambia el contacto o los mensajes
+  // Sincronizar mensajes cuando cambia el contacto
   useEffect(() => {
     if (currentContact?.phone) {
-      // Obtener mensajes del contacto desde el contexto
-      const contactMessages = messagesByContact[currentContact.phone] || [];
+      const normalizedPhone = normalizePhoneNumber(currentContact.phone);
+      const contactMessages = messagesByContact[normalizedPhone] || [];
       
-      console.log(`📨 IntegratedChatPanel: Cargando ${contactMessages.length} mensajes para ${currentContact.name}`);
-      
-      // Actualizar los mensajes visibles
       setMessages(contactMessages);
-      
-      // Marcar como leído
-      markAsRead(currentContact.phone);
+      markAsRead(normalizedPhone);
     } else {
       setMessages([]);
     }
-  }, [currentContact?.phone, messagesByContact]);
+  }, [currentContact?.phone, messagesByContact, setMessages, markAsRead]);
 
   // Scroll al final de los mensajes (optimizado)
   const scrollToBottom = useCallback(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'end',
+        inline: 'nearest'
+      });
     }
   }, []);
 
+  // Scroll automático cuando cambian los mensajes o se abre el chat
   useEffect(() => {
     if (currentContact && messages && messages.length > 0) {
-      setTimeout(() => {
+      // Scroll inmediatamente sin delay
+      scrollToBottom();
+      
+      // Scroll adicional después de un breve delay para asegurar que se renderice
+      const timer = setTimeout(() => {
         scrollToBottom();
-      }, 100);
+      }, 50);
+      
+      return () => clearTimeout(timer);
     }
-  }, [currentContact, messages]);
+  }, [currentContact, messages.length, isPanelOpen, scrollToBottom]);
 
   // Auto-resize del textarea
   useEffect(() => {
@@ -209,13 +198,7 @@ export default function IntegratedChatPanel({
   }, [newMessage]);
 
   const handleSendMessage = async () => {
-    console.log('🚀 IntegratedChatPanel: handleSendMessage llamado:', { 
-      message: newMessage.trim(), 
-      contact: currentContact?.name || 'null' 
-    });
-    
     if (!newMessage.trim() || !currentContact) {
-      console.log('❌ IntegratedChatPanel: No se puede enviar mensaje - mensaje vacío o sin contacto');
       return;
     }
 
@@ -225,14 +208,8 @@ export default function IntegratedChatPanel({
     setNewMessage('');
     
     try {
-      console.log('📤 IntegratedChatPanel: Enviando mensaje:', { 
-        to: currentContact.phone, 
-        message: messageToSend 
-      });
       await sendMessage(currentContact.phone, messageToSend);
-      console.log('✅ IntegratedChatPanel: Mensaje enviado exitosamente');
     } catch (error) {
-      console.error('❌ IntegratedChatPanel: Error sending message:', error);
       // Restaurar el mensaje si falla
       setNewMessage(messageToSend);
       alert('Error al enviar mensaje. Inténtalo de nuevo.');
@@ -255,7 +232,6 @@ export default function IntegratedChatPanel({
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Documento enviado:', result);
         
         // Agregar mensaje de documento al chat
         const documentMessage: WhatsAppMessage = {
@@ -372,12 +348,11 @@ export default function IntegratedChatPanel({
                 contact={contact}
                 isSelected={currentContact?.id === contact.id}
                 onSelect={() => {
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log('👆 Seleccionando contacto:', contact.name, contact.phone);
-                  }
                   setSelectedContact(contact as any);
-                  markAsRead(contact.phone);
+                  // Marcar como leído solo cuando se selecciona el contacto
+                  markAsRead(normalizePhoneNumber(contact.phone));
                 }}
+                unreadCount={unreadCounts[normalizePhoneNumber(contact.phone)] || 0}
               />
             ))}
           </div>
@@ -402,17 +377,34 @@ export default function IntegratedChatPanel({
                       <p className="text-xs text-green-600 mt-1">escribiendo...</p>
                     )}
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">
-                      <Phone className="h-4 w-4" />
-                    </button>
-                    <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">
-                      <Video className="h-4 w-4" />
-                    </button>
-                    <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
-                  </div>
+                                     <div className="flex items-center space-x-2">
+                     <NotificationPermission />
+                     <button 
+                       onClick={async () => {
+                         try {
+                           const response = await fetch('/api/whatsapp/sse-status');
+                           const data = await response.json();
+                           console.log('📊 Estado SSE:', data);
+                           alert(`Clientes SSE conectados: ${data.clientCount}`);
+                         } catch (error) {
+                           console.error('❌ Error verificando SSE:', error);
+                         }
+                       }}
+                       className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
+                       title="Verificar estado SSE"
+                     >
+                       <MessageSquare className="h-4 w-4" />
+                     </button>
+                     <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">
+                       <Phone className="h-4 w-4" />
+                     </button>
+                     <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">
+                       <Video className="h-4 w-4" />
+                     </button>
+                     <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">
+                       <MoreVertical className="h-4 w-4" />
+                     </button>
+                   </div>
                 </div>
               </div>
 

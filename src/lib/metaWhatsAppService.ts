@@ -307,17 +307,52 @@ export class MetaWhatsAppService {
     try {
       console.log('💾 processIncomingMessage - Guardando mensaje...');
       
+      // Extraer contenido del mensaje
+      let messageContent = '';
+      if (messageData.text && messageData.text.body) {
+        messageContent = messageData.text.body;
+      } else if (messageData.content) {
+        messageContent = messageData.content;
+      } else if (messageData.type === 'image' && messageData.image) {
+        messageContent = '[Imagen]';
+      } else if (messageData.type === 'document' && messageData.document) {
+        messageContent = `[Documento: ${messageData.document.filename}]`;
+      } else {
+        messageContent = '[Mensaje no soportado]';
+      }
+
+      // Normalizar número de teléfono
+      let normalizedFrom = messageData.from;
+      if (normalizedFrom && !normalizedFrom.startsWith('+')) {
+        normalizedFrom = `+${normalizedFrom}`;
+      }
+
       // Guardar mensaje
       await this.saveMessage({
         id: messageData.id || `sim_${Date.now()}`,
         from: messageData.from,
         to: messageData.to,
-        content: messageData.text?.body || messageData.message,
+        content: messageContent,
         timestamp: new Date(messageData.timestamp || Date.now()),
         status: 'delivered',
         isAutomated: false,
         isSimulated: this.isSimulationMode
       });
+
+      // ENVIAR POR SSE PARA TIEMPO REAL
+      const { sendMessageToClients } = await import('./sseUtils');
+      const sseMessage = {
+        type: 'whatsapp_message',
+        contactId: normalizedFrom,
+        id: messageData.id || `sim_${Date.now()}`,
+        content: messageContent,
+        timestamp: new Date().toISOString(),
+        status: 'delivered'
+      };
+      
+      console.log('📤 processIncomingMessage - Enviando mensaje SSE:', sseMessage);
+      sendMessageToClients(sseMessage);
+      console.log('✅ processIncomingMessage - Mensaje SSE enviado');
 
       console.log('🤖 processIncomingMessage - Análisis de IA desactivado');
       

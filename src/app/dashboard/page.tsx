@@ -31,7 +31,6 @@ import { Menu } from '@headlessui/react';
 import { useRouter } from 'next/navigation';
 import supabase from '../../lib/supabaseClient';
 import type { SupabaseClient } from '@supabase/supabase-js';
-
 export default function DashboardPageWrapper() {
   const { user, loading: authLoading } = useSupabaseAuth();
   const router = useRouter();
@@ -122,10 +121,8 @@ function DashboardPageContent({
   setPaymentProofs: (proofs: { [orderId: string]: { url: string; name: string } }) => void;
 }) {
   const { addOrder, updateOrder, fetchAll } = useData();
-  // Chat hooks disabled - using placeholders
-  const openChat = (contact?: any) => console.log('Chat not available in dashboard', contact);
-  const contextIsChatOpen = false;
-  const closeChat = () => console.log('Chat not available in dashboard');
+  // Chat hooks
+  const { openChat, isChatOpen: contextIsChatOpen, closeChat } = useChat();
   
   // Sincronizar el estado local con el contexto
   useEffect(() => {
@@ -351,7 +348,7 @@ function DashboardPageContent({
       };
       
       // Abrir el chat usando el contexto
-      openChat(contact as any);
+      openChat(contact);
     }
   };
 
@@ -797,7 +794,7 @@ function DashboardPageContent({
                                   lastMessageTime: new Date(),
                                   unreadCount: 0
                                 };
-                                openChat(contact as any);
+                                openChat(contact);
                               }}
                               className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                               title="Chat con proveedor"
@@ -860,4 +857,7 @@ function DashboardPageContent({
     </div>
   );
 }
+
+
+
 
