@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useContext, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuth } from '../hooks/useSupabaseAuth';
 import { Menu, X, User, LogOut, Settings, Bell, MessageSquare } from 'lucide-react';
-import { ChatContext } from '../contexts/ChatContext';
-import { GlobalChatContext } from '../contexts/GlobalChatContext';
+import { useChat } from '../contexts/ChatContext';
+import { useGlobalChat } from '../contexts/GlobalChatContext';
 import es from '../locales/es';
 
 export default function Navigation() {
@@ -15,9 +15,10 @@ export default function Navigation() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const hasRendered = useRef(false);
-  // Chat hooks - usando useContext directamente
-  const chatContext = useContext(ChatContext);
-  const globalChatContext = useContext(GlobalChatContext);
+  
+  // Chat hooks - usando hooks personalizados
+  const { unreadCounts, forceReconnectSSE } = useChat();
+  const { openGlobalChat } = useGlobalChat();
 
   useEffect(() => {
     if (!hasRendered.current) {
@@ -25,9 +26,6 @@ export default function Navigation() {
       hasRendered.current = true;
     }
   }, []);
-  
-  const unreadCounts = chatContext?.unreadCounts || {};
-  const openGlobalChat = globalChatContext?.openGlobalChat;
   const router = useRouter();
   const pathname = usePathname();
 
@@ -37,7 +35,7 @@ export default function Navigation() {
       setIsUserMenuOpen(false);
       router.push('/auth/login');
     } catch (error) {
-      console.error('Error al cerrar sesión:', error);
+      // Error al cerrar sesión
     }
   };
 
@@ -50,6 +48,12 @@ export default function Navigation() {
 
   // Calcular total de mensajes no leídos
   const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+  
+  // Debug: Log del contador de navegación (solo en desarrollo)
+  // if (process.env.NODE_ENV === 'development') {
+  //   console.log('🧭 NAVEGACIÓN - totalUnread:', totalUnread);
+  //   console.log('🧭 NAVEGACIÓN - unreadCounts:', unreadCounts);
+  // }
 
   // Cambiar título de la página cuando hay mensajes no leídos
   useEffect(() => {
@@ -64,7 +68,7 @@ export default function Navigation() {
     if (openGlobalChat) {
       openGlobalChat();
     } else {
-      console.error('❌ openGlobalChat no disponible');
+      // openGlobalChat no disponible
     }
   };
 
@@ -114,6 +118,15 @@ export default function Navigation() {
                   {totalUnread > 99 ? '99+' : totalUnread}
                 </span>
               )}
+            </button>
+
+            {/* Botón temporal para forzar reconexión SSE */}
+            <button
+              onClick={forceReconnectSSE}
+              className="ml-2 p-2 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-md"
+              title="Reconectar SSE"
+            >
+              🔄
             </button>
 
             {/* Notifications */}

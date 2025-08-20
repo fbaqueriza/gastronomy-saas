@@ -1,0 +1,18 @@
+[core]
+    pager = 
+    autocrlf = true
+    safecrlf = warn
+    fileMode = false
+
+[color]
+    ui = false
+
+[pager]
+    branch = false
+    log = false
+    show = false
+    status = false
+    diff = false
+
+[init]
+    defaultBranch = master

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test SSE Debug</title>
+</head>
+<body>
+    <h1>Test SSE Debug</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+    <button onclick="testConnection()">Test Connection</button>
+    <button onclick="sendTestMessage()">Send Test Message</button>
+    
+    <script>
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+        let eventSource = null;
+        
+        function testConnection() {
+            console.log('🧪 Iniciando test SSE debug...');
+            
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            eventSource = new EventSource('/api/whatsapp/sse');
+            
+            eventSource.onopen = function(event) {
+                console.log('🔔 SSE conectado');
+                statusDiv.textContent = 'Connected';
+                statusDiv.style.color = 'green';
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.textContent = 'SSE Connected';
+                messageDiv.style.color = 'green';
+                messagesDiv.appendChild(messageDiv);
+            };
+            
+            eventSource.onmessage = function(event) {
+                console.log('📨 Mensaje recibido:', event.data);
+                const data = JSON.parse(event.data);
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.textContent = `${data.type}: ${JSON.stringify(data)}`;
+                messagesDiv.appendChild(messageDiv);
+            };
+            
+            eventSource.onerror = function(event) {
+                console.error('❌ Error SSE:', event);
+                statusDiv.textContent = 'Error';
+                statusDiv.style.color = 'red';
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.textContent = 'SSE Error';
+                messageDiv.style.color = 'red';
+                messagesDiv.appendChild(messageDiv);
+            };
+        }
+        
+        function sendTestMessage() {
+            console.log('📨 Enviando mensaje de prueba...');
+            fetch('/api/whatsapp/simulate-incoming', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    from: '5491135562673',
+                    content: 'Test message from debug',
+                    messageType: 'text'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Mensaje enviado:', data);
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.textContent = `Message sent: ${data.messageId}`;
+                messageDiv.style.color = 'blue';
+                messagesDiv.appendChild(messageDiv);
+            })
+            .catch(error => {
+                console.error('❌ Error enviando mensaje:', error);
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.textContent = `Error: ${error.message}`;
+                messageDiv.style.color = 'red';
+                messagesDiv.appendChild(messageDiv);
+            });
+        }
+        
+        // Auto-connect on load
+        testConnection();
+    </script>
+</body>
+</html>

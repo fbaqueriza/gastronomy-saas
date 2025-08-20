@@ -7,7 +7,30 @@ import { useGlobalChat } from '../contexts/GlobalChatContext';
 import { WhatsAppMessage, Contact } from '../types/whatsapp';
 import React from 'react';
 import WhatsAppStatusIndicator from './WhatsAppStatusIndicator';
-import { normalizePhoneNumber, phoneNumbersMatch } from '../lib/phoneUtils';
+// Función simplificada para normalizar números de teléfono
+const normalizeContactIdentifier = (identifier: string): string => {
+  if (!identifier) return '';
+  
+  // Remover todos los caracteres no numéricos excepto el +
+  let normalized = identifier.replace(/[^\d+]/g, '');
+  
+  // Si no empieza con +, agregarlo
+  if (!normalized.startsWith('+')) {
+    normalized = '+' + normalized;
+  }
+  
+  // Para números que ya tienen el formato correcto, devolverlos tal como están
+  if (normalized.startsWith('+54') || normalized.startsWith('+67')) {
+    return normalized;
+  }
+  
+  // Si es un número local sin código de país, asumir Argentina
+  if (normalized.startsWith('+') && normalized.length === 11) {
+    return '+54' + normalized.substring(1);
+  }
+  
+  return normalized;
+};
 import NotificationPermission from './NotificationPermission';
 
 interface IntegratedChatPanelProps {
@@ -79,18 +102,44 @@ export default function IntegratedChatPanel({
   const {
     selectedContact,
     messages,
-    setMessages,
     messagesByContact,
     unreadCounts,
-    setSelectedContact,
-    addMessage,
     markAsRead,
     sendMessage,
     closeChat,
     isConnected,
     connectionStatus,
-    setMessagesByContact
+    selectContact
   } = useChat();
+
+  // Función para cargar mensajes manualmente
+  const cargarMensajesManual = async () => {
+    try {
+      const response = await fetch('/api/whatsapp/messages');
+      const data = await response.json();
+      
+      if (data.messages && Array.isArray(data.messages)) {
+        // Transformar y cargar mensajes directamente
+        const transformedMessages = data.messages.map((msg: any) => ({
+          id: msg.id,
+          content: msg.content,
+          timestamp: msg.timestamp || msg.created_at,
+          type: msg.message_type === 'text' ? 'received' : 'sent',
+          contact_id: msg.contact_id || msg.from,
+          status: msg.status || 'delivered'
+        }));
+        
+        alert(`✅ ${transformedMessages.length} mensajes procesados manualmente`);
+        
+        // Recargar la página para forzar la actualización
+        window.location.reload();
+      } else {
+        alert(`❌ Error: ${data.messages?.length || 0} mensajes encontrados`);
+      }
+    } catch (error) {
+      alert('❌ Error cargando mensajes');
+    }
+  };
 
   const { isGlobalChatOpen, closeGlobalChat, currentGlobalContact } = useGlobalChat();
 
@@ -108,7 +157,7 @@ export default function IntegratedChatPanel({
 
   // Usar el estado global del chat
   const isPanelOpen = isGlobalChatOpen || isOpen;
-  const currentContact = currentGlobalContact || selectedContact;
+  const currentContact = selectedContact; // Usar solo selectedContact del contexto de chat
 
 
 
@@ -119,19 +168,29 @@ export default function IntegratedChatPanel({
     if (onClose) onClose();
   };
 
-  // Convertir proveedores a contactos (optimizado)
+  // Convertir proveedores a contactos con mensajes actualizados
   useEffect(() => {
     if (providers && providers.length > 0) {
       const providerContacts: Contact[] = providers.map(provider => {
-        const normalizedPhone = normalizePhoneNumber(provider.phone);
+        const normalizedPhone = normalizeContactIdentifier(provider.phone);
+        
+        // Obtener el último mensaje de este contacto usando la normalización
+        const contactMessages = messagesByContact[normalizedPhone] || [];
+        const lastMessage = contactMessages.length > 0 
+          ? contactMessages[contactMessages.length - 1].content 
+          : provider.lastMessage || '';
+        
+        const lastMessageTime = contactMessages.length > 0 
+          ? new Date(contactMessages[contactMessages.length - 1].timestamp)
+          : (provider.lastMessageTime ? new Date(provider.lastMessageTime) : new Date());
         
         return {
           id: provider.id,
           name: provider.name || 'Sin nombre',
           phone: normalizedPhone,
-          lastMessage: provider.lastMessage || '',
-          lastMessageTime: provider.lastMessageTime ? new Date(provider.lastMessageTime) : new Date(),
-          unreadCount: provider.unreadCount || 0,
+          lastMessage: lastMessage,
+          lastMessageTime: lastMessageTime,
+          unreadCount: unreadCounts[normalizedPhone] || 0,
           providerId: provider.id,
           email: provider.email,
           address: provider.address,
@@ -141,27 +200,22 @@ export default function IntegratedChatPanel({
       
       setContacts(providerContacts);
     }
-  }, [providers]); // Solo depende de providers
+  }, [providers, messagesByContact, unreadCounts]); // Dependencias actualizadas
 
   // Seleccionar automáticamente el primer contacto cuando se abre el chat
   useEffect(() => {
     if (isPanelOpen && contacts.length > 0 && !currentContact) {
-      setSelectedContact(contacts[0] as any);
+      selectContact(contacts[0]);
     }
-  }, [isPanelOpen, contacts, currentContact?.id, setSelectedContact]);
+  }, [isPanelOpen, contacts, currentContact?.phone, selectContact]);
 
-  // Sincronizar mensajes cuando cambia el contacto
+  // Marcar como leído cuando cambia el contacto
   useEffect(() => {
     if (currentContact?.phone) {
-      const normalizedPhone = normalizePhoneNumber(currentContact.phone);
-      const contactMessages = messagesByContact[normalizedPhone] || [];
-      
-      setMessages(contactMessages);
+      const normalizedPhone = normalizeContactIdentifier(currentContact.phone);
       markAsRead(normalizedPhone);
-    } else {
-      setMessages([]);
     }
-  }, [currentContact?.phone, messagesByContact, setMessages, markAsRead]);
+  }, [currentContact?.phone, markAsRead]);
 
   // Scroll al final de los mensajes (optimizado)
   const scrollToBottom = useCallback(() => {
@@ -176,18 +230,34 @@ export default function IntegratedChatPanel({
 
   // Scroll automático cuando cambian los mensajes o se abre el chat
   useEffect(() => {
-    if (currentContact && messages && messages.length > 0) {
-      // Scroll inmediatamente sin delay
-      scrollToBottom();
-      
-      // Scroll adicional después de un breve delay para asegurar que se renderice
-      const timer = setTimeout(() => {
-        scrollToBottom();
-      }, 50);
-      
-      return () => clearTimeout(timer);
+    if (currentContact && messagesEndRef.current) {
+      // Scroll inmediatamente al final sin animación
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ 
+            behavior: 'instant',
+            block: 'end',
+            inline: 'nearest'
+          });
+        }
+      }, 200); // Aumentar delay para asegurar que el DOM esté listo
     }
-  }, [currentContact, messages.length, isPanelOpen, scrollToBottom]);
+  }, [currentContact, messagesByContact]);
+
+  // Scroll adicional cuando se abre el chat
+  useEffect(() => {
+    if (isPanelOpen && currentContact && messagesEndRef.current) {
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ 
+            behavior: 'instant',
+            block: 'end',
+            inline: 'nearest'
+          });
+        }
+      }, 300);
+    }
+  }, [isPanelOpen, currentContact]);
 
   // Auto-resize del textarea
   useEffect(() => {
@@ -233,25 +303,11 @@ export default function IntegratedChatPanel({
       if (response.ok) {
         const result = await response.json();
         
-        // Agregar mensaje de documento al chat
-        const documentMessage: WhatsAppMessage = {
-          id: `doc-${Date.now()}`,
-          type: 'sent',
-          content: `Documento enviado: ${file.name}`,
-          timestamp: new Date(),
-          status: 'sent',
-          documentUrl: result.documentUrl,
-          documentName: file.name,
-          documentSize: file.size,
-          documentType: file.type
-        };
-        
-        addMessage(currentContact.phone, documentMessage);
+        // Documento enviado exitosamente
       } else {
         throw new Error('Error al enviar documento');
       }
     } catch (error) {
-      console.error('Error sending document:', error);
       alert('Error al enviar documento. Inténtalo de nuevo.');
     } finally {
       setUploadingDocument(false);
@@ -312,6 +368,7 @@ export default function IntegratedChatPanel({
             <div>
               <h2 className="text-lg font-semibold">WhatsApp Business</h2>
               <WhatsAppStatusIndicator className="text-green-100" />
+              <NotificationPermission />
             </div>
           </div>
           <button
@@ -344,15 +401,15 @@ export default function IntegratedChatPanel({
           <div className="flex-1 overflow-y-auto">
             {filteredContacts.map((contact) => (
               <ContactItem
-                key={contact.id}
+                key={contact.phone}
                 contact={contact}
-                isSelected={currentContact?.id === contact.id}
+                isSelected={currentContact?.phone === contact.phone}
                 onSelect={() => {
-                  setSelectedContact(contact as any);
+                  selectContact(contact);
                   // Marcar como leído solo cuando se selecciona el contacto
-                  markAsRead(normalizePhoneNumber(contact.phone));
+                  markAsRead(contact.phone);
                 }}
-                unreadCount={unreadCounts[normalizePhoneNumber(contact.phone)] || 0}
+                unreadCount={unreadCounts[contact.phone] || 0}
               />
             ))}
           </div>
@@ -377,24 +434,14 @@ export default function IntegratedChatPanel({
                       <p className="text-xs text-green-600 mt-1">escribiendo...</p>
                     )}
                   </div>
-                                     <div className="flex items-center space-x-2">
-                     <NotificationPermission />
-                     <button 
-                       onClick={async () => {
-                         try {
-                           const response = await fetch('/api/whatsapp/sse-status');
-                           const data = await response.json();
-                           console.log('📊 Estado SSE:', data);
-                           alert(`Clientes SSE conectados: ${data.clientCount}`);
-                         } catch (error) {
-                           console.error('❌ Error verificando SSE:', error);
-                         }
-                       }}
-                       className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                       title="Verificar estado SSE"
-                     >
-                       <MessageSquare className="h-4 w-4" />
-                     </button>
+                  <div className="flex items-center space-x-2">
+                    <button 
+                      onClick={cargarMensajesManual}
+                      className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
+                      title="Forzar recarga de mensajes"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </button>
                      <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">
                        <Phone className="h-4 w-4" />
                      </button>
@@ -408,54 +455,42 @@ export default function IntegratedChatPanel({
                 </div>
               </div>
 
-              {/* Mensajes */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-100">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.type === 'sent' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                        message.type === 'sent'
-                          ? 'bg-green-500 text-white'
-                          : 'bg-white text-gray-900 shadow-sm'
-                      }`}
-                    >
-                      {message.documentUrl ? (
-                        <div className="flex items-center space-x-2">
-                          <File className="h-4 w-4" />
-                          <span>{message.documentName}</span>
-                          <a
-                            href={message.documentUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-500 hover:underline"
-                          >
-                            Ver
-                          </a>
-                        </div>
-                      ) : (
-                        <p className="whitespace-pre-wrap">{message.content}</p>
-                      )}
-                      <div className={`text-xs mt-1 flex items-center justify-between ${
-                        message.type === 'sent' ? 'text-green-100' : 'text-gray-500'
-                      }`}>
-                        <span>
-                          {new Date(message.timestamp).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                        {message.type === 'sent' && (
-                          <MessageStatus status={message.status || 'sent'} />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
+                               {/* Mensajes */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-100">
+                  {(() => {
+                    const contactMessages = currentContact && messagesByContact[normalizeContactIdentifier(currentContact.phone)];
+                    return contactMessages?.map((message) => (
+                     <div
+                       key={message.id}
+                       className={`flex ${message.type === 'sent' ? 'justify-end' : 'justify-start'}`}
+                     >
+                       <div
+                         className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                           message.type === 'sent'
+                             ? 'bg-green-500 text-white'
+                             : 'bg-white text-gray-900 shadow-sm'
+                         }`}
+                       >
+                         <p className="whitespace-pre-wrap">{message.content}</p>
+                         <div className={`text-xs mt-1 flex items-center justify-between ${
+                           message.type === 'sent' ? 'text-green-100' : 'text-gray-500'
+                         }`}>
+                           <span>
+                             {new Date(message.timestamp).toLocaleTimeString([], {
+                               hour: '2-digit',
+                               minute: '2-digit'
+                             })}
+                           </span>
+                           {message.type === 'sent' && (
+                             <MessageStatus status={message.status || 'sent'} />
+                           )}
+                         </div>
+                       </div>
+                     </div>
+                   ));
+                 })()}
+                 <div ref={messagesEndRef} />
+               </div>
 
               {/* Input */}
               <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-white">

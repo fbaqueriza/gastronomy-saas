@@ -295,17 +295,13 @@ export class MetaWhatsAppService {
 
   // Procesar mensaje entrante con IA automática
   async processIncomingMessage(messageData: any): Promise<void> {
-    console.log('📥 processIncomingMessage - Iniciando procesamiento:', messageData);
-    
     await this.initializeIfConfigured();
 
     if (!this.isServiceEnabled()) {
-      console.log('❌ processIncomingMessage - Servicio deshabilitado');
       return;
     }
 
     try {
-      console.log('💾 processIncomingMessage - Guardando mensaje...');
       
       // Extraer contenido del mensaje
       let messageContent = '';
@@ -321,10 +317,10 @@ export class MetaWhatsAppService {
         messageContent = '[Mensaje no soportado]';
       }
 
-      // Normalizar número de teléfono
+      // Normalizar número de teléfono - SIN el + para consistencia con el frontend
       let normalizedFrom = messageData.from;
-      if (normalizedFrom && !normalizedFrom.startsWith('+')) {
-        normalizedFrom = `+${normalizedFrom}`;
+      if (normalizedFrom && normalizedFrom.startsWith('+')) {
+        normalizedFrom = normalizedFrom.substring(1);
       }
 
       // Guardar mensaje
@@ -350,24 +346,18 @@ export class MetaWhatsAppService {
         status: 'delivered'
       };
       
-      console.log('📤 processIncomingMessage - Enviando mensaje SSE:', sseMessage);
+      console.log('📤 Meta Service - Enviando mensaje SSE:', sseMessage);
       sendMessageToClients(sseMessage);
-      console.log('✅ processIncomingMessage - Mensaje SSE enviado');
-
-      console.log('🤖 processIncomingMessage - Análisis de IA desactivado');
       
       // Comentado: Respuesta automática desactivada
       // const analysis = await this.analyzeWithAI(messageData.text?.body || messageData.message);
       // const autoResponse = await this.generateAutoResponse(analysis, messageData.text?.body || messageData.message);
       // if (autoResponse) {
-      //   console.log('📤 processIncomingMessage - Enviando respuesta automática:', autoResponse);
       //   await this.sendMessage(messageData.from, autoResponse);
       // }
 
-      console.log('✅ processIncomingMessage - Mensaje procesado correctamente');
-
     } catch (error) {
-      console.error('💥 Error processing incoming message:', error);
+      // Error processing incoming message
     }
   }
 
@@ -484,16 +474,8 @@ export class MetaWhatsAppService {
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       
       if (!supabaseUrl || !supabaseAnonKey) {
-        console.log('Supabase no configurado, saltando guardado de mensaje');
         return;
       }
-
-      console.log('💾 saveMessage - Guardando mensaje:', {
-        id: message.id,
-        from: message.from,
-        to: message.to,
-        content: message.content || message.text?.body
-      });
 
       // Usar solo las columnas más básicas y generar UUID válido
       const generateUUID = () => {
@@ -504,12 +486,23 @@ export class MetaWhatsAppService {
         });
       };
       
+      // DETECTAR SI EL FROM ES UN ID DE WHATSAPP BUSINESS
+      let contactId = message.from || 'unknown';
+      
+      // Si el from es el ID del número de WhatsApp Business, usar un identificador especial
+      if (contactId === process.env.WHATSAPP_PHONE_NUMBER_ID || 
+          contactId === `+${process.env.WHATSAPP_PHONE_NUMBER_ID}` ||
+          contactId.includes('670680919470999')) {
+        // Para mensajes simulados o del sistema, usar un identificador especial
+        contactId = '+5491112345678'; // Número de prueba para mensajes del sistema
+      }
+      
       const messageData = {
         id: generateUUID(), // Siempre generar UUID para el id
         content: message.content || message.text?.body || '',
         timestamp: message.timestamp || new Date().toISOString(),
         message_sid: message.id || generateUUID(), // Usar el ID original de Meta como message_sid
-        contact_id: message.from || 'unknown',
+        contact_id: contactId,
         message_type: 'text',
         user_id: 'default_user',
         status: message.status || 'delivered'
@@ -520,12 +513,10 @@ export class MetaWhatsAppService {
         .insert(messageData);
       
       if (error) {
-        console.log('❌ Error saving WhatsApp message (no crítico):', error);
-      } else {
-        console.log('✅ saveMessage - Mensaje guardado correctamente');
+        // Error no crítico, continuar
       }
     } catch (error) {
-      console.log('💥 Error saving WhatsApp message (no crítico):', error);
+      // Error no crítico, continuar
     }
   }
 

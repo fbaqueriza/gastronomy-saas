@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
       // Agregar el cliente a la lista y obtener su ID
       const clientId = addClient(controller);
 
-      console.log(`🔗 SSE - Cliente ${clientId} conectado`);
+      // Cliente conectado
 
       // Enviar un mensaje de prueba para confirmar la conexión
       controller.enqueue(`data: ${JSON.stringify({ 
@@ -24,7 +24,12 @@ export async function GET(request: NextRequest) {
 
       // Limpiar cuando se cierre la conexión
       request.signal.addEventListener('abort', () => {
-        console.log(`🔌 Cliente ${clientId} desconectado por abort`);
+        clearInterval(cleanupInterval);
+        removeClient(clientId);
+      });
+
+      // También manejar el cierre del stream
+      controller.signal?.addEventListener('abort', () => {
         clearInterval(cleanupInterval);
         removeClient(clientId);
       });
