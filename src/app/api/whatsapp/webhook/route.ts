@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     console.log('📥 Webhook POST - Recibiendo mensaje entrante...');
+    console.log('📥 Webhook POST - Timestamp:', new Date().toISOString());
     
     // Verificar si el servicio de WhatsApp está habilitado
     if (!metaWhatsAppService.isServiceEnabled()) {
@@ -62,40 +63,45 @@ export async function POST(request: NextRequest) {
         const messages = entry.changes[0].value.messages;
         console.log('📨 Webhook POST - Mensajes encontrados:', messages.length);
         
-        // Procesar cada mensaje
-        for (const message of messages) {
-          console.log('🔄 Webhook POST - Procesando mensaje:', message);
-          await metaWhatsAppService.processIncomingMessage(message);
-          
-          // Normalizar el número de teléfono para que coincida con el formato del frontend
-          let normalizedFrom = message.from;
-          if (normalizedFrom && !normalizedFrom.startsWith('+')) {
-            normalizedFrom = `+${normalizedFrom}`;
-          }
+                          // Procesar cada mensaje - TIEMPO REAL
+         for (const message of messages) {
+           console.log('🔄 Webhook POST - Procesando mensaje en tiempo real:', message);
+           
+           // Normalizar el número de teléfono para que coincida con el formato del frontend
+           let normalizedFrom = message.from;
+           if (normalizedFrom && !normalizedFrom.startsWith('+')) {
+             normalizedFrom = `+${normalizedFrom}`;
+           }
 
-          // Enviar mensaje a través de SSE para actualización en tiempo real
-          const sseMessage = {
-            type: 'whatsapp_message',
-            contactId: normalizedFrom,
-            id: message.id,
-            content: message.text?.body || message.content,
-            timestamp: new Date().toISOString()
-          };
-          
-          console.log('📤 Webhook POST - Enviando mensaje SSE:', sseMessage);
-          
-          // Enviar a todos los clientes conectados
-          sendMessageToClients(sseMessage);
-          console.log('✅ Webhook POST - Mensaje SSE enviado exitosamente');
-        }
+           // Extraer el contenido del mensaje
+           let messageContent = '';
+           if (message.text && message.text.body) {
+             messageContent = message.text.body;
+           } else if (message.content) {
+             messageContent = message.content;
+           } else if (message.type === 'image' && message.image) {
+             messageContent = '[Imagen]';
+           } else if (message.type === 'document' && message.document) {
+             messageContent = `[Documento: ${message.document.filename}]`;
+           } else {
+             messageContent = '[Mensaje no soportado]';
+           }
+
+           // Procesar mensaje en base de datos (incluye SSE)
+           console.log('📤 Webhook POST - Procesando mensaje con SSE...');
+           await metaWhatsAppService.processIncomingMessage(message);
+           console.log('✅ Webhook POST - Mensaje procesado correctamente');
+         }
         
         console.log('✅ Webhook POST - Mensajes procesados correctamente');
         return new NextResponse('OK', { status: 200 });
       } else {
         console.log('⚠️ Webhook POST - No se encontraron mensajes en el webhook');
+        console.log('📋 Webhook POST - Estructura del entry:', JSON.stringify(entry, null, 2));
       }
     } else {
       console.log('❌ Webhook POST - No es un webhook de WhatsApp Business API');
+      console.log('📋 Webhook POST - Object recibido:', body.object);
     }
 
     return new NextResponse('OK', { status: 200 });

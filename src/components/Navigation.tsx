@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSupabaseAuth } from '../hooks/useSupabaseAuth';
@@ -13,14 +13,21 @@ export default function Navigation() {
   const { user, signOut } = useSupabaseAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const hasRendered = useRef(false);
   // Chat hooks - usando useContext directamente
   const chatContext = useContext(ChatContext);
   const globalChatContext = useContext(GlobalChatContext);
+
+  useEffect(() => {
+    if (!hasRendered.current) {
+      setIsMounted(true);
+      hasRendered.current = true;
+    }
+  }, []);
   
   const unreadCounts = chatContext?.unreadCounts || {};
-  const openGlobalChat = globalChatContext?.openGlobalChat || (() => {
-    // GlobalChatContext no disponible
-  });
+  const openGlobalChat = globalChatContext?.openGlobalChat;
   const router = useRouter();
   const pathname = usePathname();
 
@@ -44,8 +51,21 @@ export default function Navigation() {
   // Calcular total de mensajes no leídos
   const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
 
+  // Cambiar título de la página cuando hay mensajes no leídos
+  useEffect(() => {
+    if (totalUnread > 0) {
+      document.title = `(${totalUnread}) ${es.appName}`;
+    } else {
+      document.title = es.appName;
+    }
+  }, [totalUnread]);
+
   const handleChatClick = () => {
-    openGlobalChat();
+    if (openGlobalChat) {
+      openGlobalChat();
+    } else {
+      console.error('❌ openGlobalChat no disponible');
+    }
   };
 
   return (
@@ -86,11 +106,11 @@ export default function Navigation() {
             <button
               onClick={handleChatClick}
               className="relative p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              title="Abrir chat"
+              title={`Abrir chat${totalUnread > 0 ? ` (${totalUnread} mensajes no leídos)` : ''}`}
             >
               <MessageSquare className="h-6 w-6" />
               {totalUnread > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
                   {totalUnread > 99 ? '99+' : totalUnread}
                 </span>
               )}
@@ -143,7 +163,7 @@ export default function Navigation() {
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
             >
-              {isMenuOpen ? (
+              {isMounted && isMenuOpen ? (
                 <X className="h-6 w-6" />
               ) : (
                 <Menu className="h-6 w-6" />
@@ -154,7 +174,7 @@ export default function Navigation() {
       </div>
 
       {/* Mobile Navigation */}
-      {isMenuOpen && (
+      {isMounted && isMenuOpen && (
         <div className="sm:hidden">
           <div className="pt-2 pb-3 space-y-1">
             {navigation.map((item) => {
@@ -190,6 +210,19 @@ export default function Navigation() {
               </div>
             </div>
             <div className="mt-3 space-y-1">
+              {/* Chat Button Mobile */}
+              <button
+                onClick={handleChatClick}
+                className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+              >
+                <MessageSquare className="h-4 w-4 mr-2 inline" />
+                Chat
+                {totalUnread > 0 && (
+                  <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-2 py-1">
+                    {totalUnread > 99 ? '99+' : totalUnread}
+                  </span>
+                )}
+              </button>
               <Link
                 href="/settings"
                 className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"

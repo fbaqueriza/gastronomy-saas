@@ -1,50 +1,39 @@
-# Working Solution - Script que funciona definitivamente
+# Script para ejecutar comandos de forma segura sin trabarse
 param(
+    [Parameter(Mandatory=$true)]
     [string]$Command,
+    
     [int]$TimeoutSeconds = 30
 )
 
-Write-Host "🔄 Ejecutando comando..." -ForegroundColor Yellow
+Write-Host "Ejecutando comando: $Command" -ForegroundColor Green
+Write-Host "Timeout: $TimeoutSeconds segundos" -ForegroundColor Yellow
 
 try {
-    # Crear archivo temporal con el comando
-    $tempFile = [System.IO.Path]::GetTempFileName()
-    $Command | Out-File -FilePath $tempFile -Encoding UTF8
-    
-    # Ejecutar desde archivo temporal
-    $job = Start-Job -ScriptBlock {
-        param($file)
-        $cmd = Get-Content -Path $file -Raw
+    # Ejecutar comando con timeout
+    $job = Start-Job -ScriptBlock { 
+        param($cmd)
         Invoke-Expression $cmd
-    } -ArgumentList $tempFile
+    } -ArgumentList $Command
     
     # Esperar con timeout
-    $completed = Wait-Job -Job $job -Timeout $TimeoutSeconds
+    $result = Wait-Job -Job $job -Timeout $TimeoutSeconds
     
-    if ($completed) {
+    if ($result) {
+        # Comando completado
         $output = Receive-Job -Job $job
-        Remove-Job -Job $job -Force
-        
-        Write-Host "✅ Comando completado" -ForegroundColor Green
-        
-        # Imprimir resultado
-        if ($output) {
-            Write-Output $output
-        }
-        
+        Write-Host "Comando completado exitosamente" -ForegroundColor Green
+        Write-Host "Salida: $output" -ForegroundColor Cyan
+        Remove-Job -Job $job
+        exit 0
     } else {
-        Write-Host "⏰ Timeout" -ForegroundColor Red
-        Stop-Job -Job $job -Force
-        Remove-Job -Job $job -Force
+        # Timeout alcanzado
+        Write-Host "Timeout alcanzado. Deteniendo proceso..." -ForegroundColor Red
+        Stop-Job -Job $job
+        Remove-Job -Job $job
+        exit 1
     }
 } catch {
-    Write-Host "❌ Error: $($_.Exception.Message)" -ForegroundColor Red
-} finally {
-    # Limpiar archivo temporal
-    if (Test-Path $tempFile) {
-        Remove-Item $tempFile -Force
-    }
-    
-    # Forzar salto de línea final
-    Write-Host ""
+    Write-Host "Error ejecutando comando: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
 }

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test SSE</title>
+</head>
+<body>
+    <h1>Test SSE Connection</h1>
+    <div id="status">Conectando...</div>
+    <div id="messages"></div>
+
+    <script>
+        console.log('🚀 Iniciando test SSE...');
+        
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+        
+        try {
+            console.log('🔄 Creando EventSource...');
+            const eventSource = new EventSource('/api/whatsapp/sse');
+            
+            eventSource.onopen = function(event) {
+                console.log('✅ SSE conectado:', event);
+                statusDiv.textContent = 'Conectado al SSE';
+                statusDiv.style.color = 'green';
+            };
+            
+            eventSource.onmessage = function(event) {
+                console.log('📨 Mensaje SSE recibido:', event.data);
+                const data = JSON.parse(event.data);
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.textContent = `Mensaje: ${JSON.stringify(data)}`;
+                messagesDiv.appendChild(messageDiv);
+            };
+            
+            eventSource.onerror = function(event) {
+                console.error('❌ Error SSE:', event);
+                statusDiv.textContent = 'Error en SSE';
+                statusDiv.style.color = 'red';
+            };
+            
+        } catch (error) {
+            console.error('❌ Error creando EventSource:', error);
+            statusDiv.textContent = 'Error: ' + error.message;
+            statusDiv.style.color = 'red';
+        }
+    </script>
+</body>
+</html>
