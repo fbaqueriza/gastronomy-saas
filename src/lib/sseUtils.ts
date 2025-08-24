@@ -24,12 +24,10 @@ let clientCounter = 0;
 
 // Función para enviar mensaje a todos los clientes conectados - TIEMPO REAL
 export function sendMessageToClients(message: any) {
-  console.log('📤 SSE Utils - Recibiendo mensaje para enviar:', message);
-  
   // SIEMPRE guardar mensaje en buffer si es un mensaje de WhatsApp
   if (message.type === 'whatsapp_message') {
     messageBuffer.push(message);
-    // Mantener solo los Ãºltimos 20 mensajes (mÃ¡s buffer para WhatsApp real)
+    // Mantener solo los últimos 20 mensajes
     if (messageBuffer.length > 20) {
       messageBuffer.shift();
     }
@@ -39,17 +37,12 @@ export function sendMessageToClients(message: any) {
   const encoder = new TextEncoder();
   const data = encoder.encode(messageData);
 
-
-
   const disconnectedClients: string[] = [];
-  let sentToClients = 0;
 
   // Enviar mensaje a TODOS los clientes conectados INMEDIATAMENTE
   clients.forEach((client, clientId) => {
     try {
       client.controller.enqueue(data);
-      sentToClients++;
-      console.log(`📤 SSE - Mensaje enviado a cliente ${clientId}`);
     } catch (error) {
       disconnectedClients.push(clientId);
     }
@@ -59,8 +52,6 @@ export function sendMessageToClients(message: any) {
   disconnectedClients.forEach(clientId => {
     clients.delete(clientId);
   });
-
-
 }
 
 // Función para enviar mensaje a un contacto específico

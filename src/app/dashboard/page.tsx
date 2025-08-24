@@ -5,8 +5,9 @@ import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
 import SuggestedOrders from '../../components/SuggestedOrders';
 import CreateOrderModal from '../../components/CreateOrderModal';
 import ComprobanteButton from '../../components/ComprobanteButton';
-import ChatPreview from '../../components/ChatPreview';
+
 import { useChat } from '../../contexts/ChatContext';
+import { useGlobalChat } from '../../contexts/GlobalChatContext';
 import { Order, OrderItem, Provider, StockItem } from '../../types';
 import {
   Plus,
@@ -31,6 +32,7 @@ import { Menu } from '@headlessui/react';
 import { useRouter } from 'next/navigation';
 import supabase from '../../lib/supabaseClient';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { OrderNotificationService } from '../../lib/orderNotificationService';
 export default function DashboardPageWrapper() {
   const { user, loading: authLoading } = useSupabaseAuth();
   const router = useRouter();
@@ -123,6 +125,7 @@ function DashboardPageContent({
   const { addOrder, updateOrder, fetchAll } = useData();
   // Chat hooks
   const { openChat, isChatOpen: contextIsChatOpen, closeChat } = useChat();
+  const { openGlobalChat } = useGlobalChat();
   
   // Sincronizar el estado local con el contexto
   useEffect(() => {
@@ -219,9 +222,38 @@ function DashboardPageContent({
       updatedAt: new Date(),
       user_id: user.id,
     };
-    await addOrder(newOrder, user.id);
+    
+    // Cerrar modal inmediatamente para mejor UX
     setIsCreateModalOpen(false);
     setSuggestedOrder(null);
+    
+    // Crear la orden en segundo plano
+    const createdOrder = await addOrder(newOrder, user.id);
+    
+    // Enviar notificación al proveedor en segundo plano
+    if (createdOrder) {
+      const provider = providers.find(p => p.id === orderData.providerId);
+      
+      if (provider) {
+        // Ejecutar en segundo plano sin bloquear la UI
+        OrderNotificationService.sendOrderNotification({
+          order: createdOrder as Order,
+          provider: provider,
+          items: orderData.items
+        }).catch(error => {
+          console.error('❌ Error enviando notificación de pedido:', error);
+        });
+      } else {
+        console.error('❌ Proveedor no encontrado para ID:', orderData.providerId);
+      }
+    } else {
+      console.error('❌ No se pudo crear la orden');
+    }
+    
+    // Actualizar la lista de órdenes en segundo plano
+    fetchAll().catch(error => {
+      console.error('❌ Error actualizando lista de órdenes:', error);
+    });
   };
   const handleSuggestedOrderCreate = (suggestedOrder: any) => {
     setSuggestedOrder(suggestedOrder);
@@ -319,11 +351,12 @@ function DashboardPageContent({
     });
   };
 
-  const handleOrderClick = (order: Order) => {
+    const handleOrderClick = (order: Order) => {
     // Encontrar el proveedor correspondiente
     const provider = providers.find(p => p.id === order.providerId);
+    
     if (provider) {
-      // Normalizar el número de teléfono - remover espacios y guiones, agregar + si no tiene
+      // Normalizar el número de teléfono usando la función del contexto
       let normalizedPhone = provider.phone || '';
       
       // Remover espacios, guiones y paréntesis
@@ -334,12 +367,17 @@ function DashboardPageContent({
         normalizedPhone = `+${normalizedPhone}`;
       }
       
-  
+      // Asegurar que sea un número argentino válido
+      if (!normalizedPhone.includes('+549')) {
+        normalizedPhone = `+549${normalizedPhone.replace('+', '')}`;
+      }
       
-      // Crear contacto para el chat
+      // Crear contacto para el chat con el formato correcto
       const contact = {
         id: provider.id,
-        name: provider.name,
+        name: provider.contact_name 
+          ? `${provider.name} - ${provider.contact_name}`
+          : provider.name,
         phone: normalizedPhone,
         providerId: provider.id,
         lastMessage: '',
@@ -347,8 +385,19 @@ function DashboardPageContent({
         unreadCount: 0
       };
       
-      // Abrir el chat usando el contexto
-      openChat(contact);
+      // Abrir el chat usando el contexto global
+      openGlobalChat(contact);
+      
+      // También seleccionar el contacto en el chat local
+      if (typeof window !== 'undefined') {
+        // Usar un timeout para asegurar que el chat esté abierto
+        setTimeout(() => {
+          const event = new CustomEvent('selectContact', { 
+            detail: { contact } 
+          });
+          window.dispatchEvent(event);
+        }, 100);
+      }
     }
   };
 
@@ -488,27 +537,19 @@ function DashboardPageContent({
                               </div>
                             </div>
                             
-                            {/* Chat Preview - sin tiempo duplicado */}
-                            <div className="mt-1">
-                              <ChatPreview
-                                providerName={getProviderName(order.providerId)}
-                                providerPhone={providers.find(p => p.id === order.providerId)?.phone || ''}
-                                providerId={order.providerId}
-                                orderId={order.id}
-                                onOpenChat={() => handleOrderClick(order)}
-                                hasUnreadMessages={false}
-                                lastMessage={{
-                                  id: '1',
-                                  type: 'received',
-                                  content: '¡Hola! Tu pedido está siendo procesado. ¿Necesitas algo más?',
-                                  timestamp: new Date(Date.now() - 3600000),
-                                  status: 'read'
-                                }}
-                              />
-                            </div>
+
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
+                          
+                          {/* Botón de chat */}
+                          <button
+                            onClick={() => handleOrderClick(order)}
+                            className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
+                            title="Abrir chat con proveedor"
+                          >
+                            <MessageSquare className="h-3 w-3" />
+                          </button>
                           
                           {/* Enviar pedido - solo en estado pending */}
                           {order.status === 'pending' && (
@@ -794,7 +835,7 @@ function DashboardPageContent({
                                   lastMessageTime: new Date(),
                                   unreadCount: 0
                                 };
-                                openChat(contact);
+                                openGlobalChat(contact);
                               }}
                               className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                               title="Chat con proveedor"

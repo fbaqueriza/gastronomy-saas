@@ -6,7 +6,7 @@ import SuggestedOrders from '../../components/SuggestedOrders';
 import CreateOrderModal from '../../components/CreateOrderModal';
 import EditOrderModal from '../../components/EditOrderModal';
 import ComprobanteButton from '../../components/ComprobanteButton';
-import ChatPreview from '../../components/ChatPreview';
+
 import { useChat } from '../../contexts/ChatContext';
 import { useGlobalChat } from '../../contexts/GlobalChatContext';
 import { ChatProvider } from '../../contexts/ChatContext';
@@ -38,6 +38,7 @@ import { Menu } from '@headlessui/react';
 import { useRouter } from 'next/navigation';
 import supabase from '../../lib/supabaseClient';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { OrderNotificationService } from '../../lib/orderNotificationService';
 
 
 
@@ -56,8 +57,8 @@ export default function OrdersPageWrapper() {
       <GlobalChatProvider>
         <WhatsAppSync />
         <DataProvider userEmail={user?.email ?? undefined} userId={user?.id}>
-          {user && <OrdersPage user={user} />}
-        </DataProvider>
+            {user && <OrdersPage user={user} />}
+          </DataProvider>
         <GlobalChatWrapper />
       </GlobalChatProvider>
     </ChatProvider>
@@ -84,75 +85,39 @@ function OrdersPage({ user }: OrdersPageProps) {
   
   // Remove all other local state for orders/providers/stockItems
   // All handlers now use Supabase CRUD only
-  const handleCreateOrder = async (orderData: {
-    providerId: string;
-    items: OrderItem[];
-    notes: string;
-    desiredDeliveryDate?: Date;
-    paymentMethod?: 'efectivo' | 'transferencia' | 'tarjeta' | 'cheque';
-    additionalFiles?: OrderFile[];
-  }) => {
-    if (!user) return;
-    
-    const newOrder: Partial<Order> = {
-      providerId: orderData.providerId,
-      user_id: user.id,
-      items: orderData.items,
-      status: 'pending',
-      totalAmount: orderData.items.reduce((sum, item) => sum + item.total, 0),
-      currency: 'ARS',
-      orderDate: new Date(),
-      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-      desiredDeliveryDate: orderData.desiredDeliveryDate,
-      paymentMethod: orderData.paymentMethod,
-      additionalFiles: orderData.additionalFiles || [],
-      invoiceNumber: '',
-      bankInfo: {},
-      receiptUrl: '',
-      notes: orderData.notes,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    
-
-    const createdOrder = await addOrder(newOrder, user.id);
+  const handleCreateOrder = async (orderData: any) => {
+    const newOrder = await addOrder(orderData, user.id);
     setIsCreateModalOpen(false);
     setSuggestedOrder(null);
 
-    // Enviar mensaje automático al proveedor
+    // Enviar notificación automática al proveedor
     try {
       const provider = providers.find(p => p.id === orderData.providerId);
-      if (provider && provider.phone) {
-        const orderMessage = `🛒 *Nuevo Pedido*\n\n` +
-          `*Proveedor:* ${provider.name}\n` +
-          `*Fecha:* ${new Date().toLocaleDateString('es-AR')}\n` +
-          `*Total:* $${orderData.items.reduce((sum, item) => sum + item.total, 0).toLocaleString()}\n\n` +
-          `*Productos:*\n` +
-          orderData.items.map(item => 
-            `• ${item.productName}: ${item.quantity} ${item.unit} - $${item.total}`
-          ).join('\n') +
-          (orderData.notes ? `\n\n*Notas:* ${orderData.notes}` : '');
+      if (provider) {
+        const notificationData = {
+          order: newOrder as Order,
+          provider: provider,
+          items: orderData.items
+        };
 
-        // Enviar mensaje a través de la API
-        const response = await fetch('/api/whatsapp/test-send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: provider.phone,
-            message: orderMessage
-          }),
-        });
-
-        if (response.ok) {
-    
+        const notificationSent = await OrderNotificationService.sendOrderNotification(notificationData);
+        
+        if (notificationSent) {
+          console.log('✅ Notificación de pedido enviada exitosamente');
+          
+          // Forzar recarga de mensajes después de enviar la orden
+          setTimeout(() => {
+            // Disparar un evento personalizado para actualizar el chat
+            window.dispatchEvent(new CustomEvent('orderSent', {
+              detail: { orderId: newOrder.id, providerId: orderData.providerId }
+            }));
+          }, 2000); // Esperar 2 segundos para que se procese el mensaje
         } else {
-          console.error('❌ Error enviando mensaje de pedido');
+          console.error('❌ Error enviando notificación de pedido');
         }
       }
     } catch (error) {
-      console.error('Error enviando mensaje de pedido:', error);
+      console.error('Error enviando notificación de pedido:', error);
     }
   };
 
@@ -294,6 +259,16 @@ function OrdersPage({ user }: OrdersPageProps) {
     if (order) {
       await updateOrder({ ...order, status: 'enviado' });
       
+      // Enviar notificación de estado actualizado
+      try {
+        const provider = providers.find(p => p.id === order.providerId);
+        if (provider) {
+          await OrderNotificationService.sendOrderStatusUpdate(order, provider, 'enviado');
+        }
+      } catch (error) {
+        console.error('Error enviando notificación de estado:', error);
+      }
+      
       setTimeout(async () => {
         // Refetch orders para obtener el estado actualizado
         await fetchAll();
@@ -316,6 +291,15 @@ function OrdersPage({ user }: OrdersPageProps) {
         
 
         await updateOrder(orderWithInvoice);
+        
+        // Enviar notificación de factura recibida
+        try {
+          if (provider) {
+            await OrderNotificationService.sendOrderStatusUpdate(orderWithInvoice, provider, 'factura_recibida');
+          }
+        } catch (error) {
+          console.error('Error enviando notificación de factura:', error);
+        }
         
         // Refetch para asegurar que se actualice la UI
         await fetchAll();
@@ -382,6 +366,19 @@ function OrdersPage({ user }: OrdersPageProps) {
       setEditingOrder(null);
     } catch (error) {
       console.error('Error actualizando pedido:', error);
+    }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    try {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        await updateOrder({ ...order, status: 'cancelled' });
+      }
+      setIsEditModalOpen(false);
+      setEditingOrder(null);
+    } catch (error) {
+      console.error('Error cancelando pedido:', error);
     }
   };
 
@@ -536,25 +533,7 @@ function OrdersPage({ user }: OrdersPageProps) {
                           <span>{formatDate(order.createdAt || order.orderDate)}</span>
                         </div>
                         
-                        {/* Chat Preview - debajo de la fecha */}
-                        <div className="mb-1">
-                          <ChatPreview
-                            providerName={getProviderName(order.providerId)}
-                            providerPhone={providers.find(p => p.id === order.providerId)?.phone || ''}
-                            providerId={order.providerId}
-                            orderId={order.id}
-                            onOpenChat={() => handleOrderClick(order)}
 
-                            hasUnreadMessages={false}
-                            lastMessage={{
-                              id: '1',
-                              type: 'received',
-                              content: '¡Hola! Tu pedido está siendo procesado. ¿Necesitas algo más?',
-                              timestamp: new Date(Date.now() - 3600000),
-                              status: 'read'
-                            }}
-                          />
-                        </div>
                         
                         <div className="flex flex-col gap-1 mt-1 text-xs text-gray-600">
                           {order.items.slice(0, 2).map((item, index) => (
@@ -568,17 +547,26 @@ function OrdersPage({ user }: OrdersPageProps) {
                         {/* Orden de pago - solo en estado factura_recibida */}
                         {showPaymentOrder(order)}
                       </div>
-                      {/* Lado derecho: botones de acción */}
-                      <div className="flex flex-col items-end gap-2 sm:w-5/12 min-w-[160px]">
-                        
-                        {/* Editar pedido - disponible en cualquier estado */}
-                        <button
-                          onClick={() => handleEditOrder(order)}
-                          className="inline-flex items-center p-2 rounded-md text-xs font-medium border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
-                          title="Editar pedido"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
+                                             {/* Lado derecho: botones de acción */}
+                       <div className="flex flex-col items-end gap-2 sm:w-5/12 min-w-[160px]">
+                         
+                         {/* Botón de chat */}
+                         <button
+                           onClick={() => handleOrderClick(order)}
+                           className="inline-flex items-center p-2 rounded-md text-xs font-medium border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
+                           title="Abrir chat con proveedor"
+                         >
+                           <MessageSquare className="h-4 w-4" />
+                         </button>
+                         
+                         {/* Editar pedido - disponible en cualquier estado */}
+                         <button
+                           onClick={() => handleEditOrder(order)}
+                           className="inline-flex items-center p-2 rounded-md text-xs font-medium border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-gray-400"
+                           title="Editar pedido"
+                         >
+                           <Edit className="h-4 w-4" />
+                         </button>
 
                         {/* Enviar pedido - solo en estado pending */}
                         {order.status === 'pending' && (
@@ -974,17 +962,18 @@ function OrdersPage({ user }: OrdersPageProps) {
         selectedProviderId={null}
       />
 
-      {/* Edit Order Modal */}
-      <EditOrderModal
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setEditingOrder(null);
-        }}
-        order={editingOrder}
-        providers={providers}
-        onSave={handleSaveOrderEdit}
-      />
+             {/* Edit Order Modal */}
+       <EditOrderModal
+         isOpen={isEditModalOpen}
+         onClose={() => {
+           setIsEditModalOpen(false);
+           setEditingOrder(null);
+         }}
+         order={editingOrder}
+         providers={providers}
+         onSave={handleSaveOrderEdit}
+         onCancel={handleCancelOrder}
+       />
 
 
       

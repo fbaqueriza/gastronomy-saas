@@ -209,8 +209,8 @@ async function addIncomingMessage(phoneNumber: string, content: string, messageS
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🚨 WEBHOOK POST RECIBIDO - URL:', request.url);
-    console.log('🚨 WEBHOOK POST RECIBIDO - Headers:', Object.fromEntries(request.headers.entries()));
+    // console.log('🚨 WEBHOOK POST RECIBIDO - URL:', request.url);
+    // console.log('🚨 WEBHOOK POST RECIBIDO - Headers:', Object.fromEntries(request.headers.entries()));
     
     const formData = await request.formData();
     

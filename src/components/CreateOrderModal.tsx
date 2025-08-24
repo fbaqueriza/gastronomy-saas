@@ -95,8 +95,10 @@ export default function CreateOrderModal({
           
           // Set time - use first available time if it's an array
           const timeToUse = Array.isArray(deliveryTime) ? deliveryTime[0] : deliveryTime;
-          const [hours, minutes] = timeToUse.split(':');
-          nextDeliveryDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+          if (timeToUse && typeof timeToUse === 'string') {
+            const [hours, minutes] = timeToUse.split(':');
+            nextDeliveryDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+          }
           
           setDesiredDeliveryDate(nextDeliveryDate.toISOString().split('T')[0]);
         }
@@ -268,11 +270,11 @@ export default function CreateOrderModal({
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Elige un proveedor...</option>
-                {providers.map((provider) => (
-                  <option key={provider.id} value={provider.id}>
-                    {provider.name} - {provider.email}
-                  </option>
-                ))}
+                                 {providers.map((provider) => (
+                   <option key={provider.id} value={provider.id}>
+                     {provider.name} - {provider.contact_name}
+                   </option>
+                 ))}
               </select>
               
               {selectedProviderInfo && (

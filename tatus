@@ -1,5 +1,0 @@
-[33m97005b6[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m feat: Chat de WhatsApp completamente funcional - Mensajes entrantes y salientes funcionando - SSE con reconexión automática - Sincronización de mensajes corregida - Loop infinito eliminado - Webhook de WhatsApp Business integrado
-[33m4750daa[m feat: bloqueo de edición directa en tabla de proveedores y eliminación de botón de prueba
-[33m796b03d[m feat: Landing page profesional para Gastrosaas - Cambio de nombre de Gastroapp a Gastrosaas - Landing page completa con servicios de facturación y finanzas - Página de login mejorada sin cajitas de servicios - Corrección del número de WhatsApp (+54 11 3556-2673) - Eliminación de sección de testimonios - Archivos SEO agregados (robots.txt, sitemap.xml) - Limpieza de archivos temporarios
-[33m631d5ab[m Fix: Add explicit TypeScript types for forEach parameters in ChatContext
-[33m221e93a[m Fix: Add proper TypeScript types for Supabase client to resolve build errors

@@ -13,7 +13,7 @@ export function useWhatsAppSync() {
     addMessage(contactId, message);
   }, [addMessage]);
 
-  // Función para simular un mensaje entrante (útil para testing)
+  // Función para simular un mensaje entrante
   const simulateIncomingMessage = useCallback((contactId: string, content: string) => {
     const message: WhatsAppMessage = {
       id: `sim_${Date.now()}`,

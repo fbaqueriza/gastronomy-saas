@@ -18,6 +18,7 @@ interface EditOrderModalProps {
     additionalFiles?: OrderFile[];
     notes?: string;
   }) => void;
+  onCancel?: (orderId: string) => void;
 }
 
 export default function EditOrderModal({
@@ -26,6 +27,7 @@ export default function EditOrderModal({
   order,
   providers,
   onSave,
+  onCancel,
 }: EditOrderModalProps) {
   const [desiredDeliveryDate, setDesiredDeliveryDate] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'transferencia' | 'tarjeta' | 'cheque'>('efectivo');
@@ -90,6 +92,15 @@ export default function EditOrderModal({
     });
     
     onClose();
+  };
+
+  const handleCancel = () => {
+    if (!order || !onCancel) return;
+    
+    if (confirm('¿Estás seguro de que quieres cancelar este pedido? Esta acción cambiará el estado a "cancelado".')) {
+      onCancel(order.id);
+      onClose();
+    }
   };
 
   const getProvider = () => {
@@ -299,20 +310,33 @@ export default function EditOrderModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <ShoppingCart className="h-4 w-4 mr-1" />
-            Guardar cambios
-          </button>
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
+                     <div>
+             {onCancel && (
+               <button
+                 onClick={handleCancel}
+                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+               >
+                 <X className="h-4 w-4 mr-1" />
+                 Cancelar pedido
+               </button>
+             )}
+           </div>
+          <div className="flex space-x-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <ShoppingCart className="h-4 w-4 mr-1" />
+              Guardar cambios
+            </button>
+          </div>
         </div>
       </div>
     </div>

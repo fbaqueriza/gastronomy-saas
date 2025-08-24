@@ -20,8 +20,8 @@ export default function GlobalChatWrapper() {
       setLoading(true);
       setError(null);
       
-      // Si hay usuario autenticado, usar autenticación
-      if (user) {
+        // Si hay usuario autenticado, usar autenticación
+        if (user) {
         supabase.auth.getSession().then(({ data: { session } }) => {
           if (!session?.access_token) {
             setError('No hay sesión activa');
@@ -90,10 +90,10 @@ export default function GlobalChatWrapper() {
   }, [isGlobalChatOpen]);
 
   return (
-    <IntegratedChatPanel 
+      <IntegratedChatPanel 
       providers={providers || []}
-      isOpen={isGlobalChatOpen}
-      onClose={closeGlobalChat}
-    />
+        isOpen={isGlobalChatOpen} 
+        onClose={closeGlobalChat} 
+      />
   );
 }

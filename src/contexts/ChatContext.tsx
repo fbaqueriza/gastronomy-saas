@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import supabase from '../lib/supabaseClient';
 
 // Tipos
 interface WhatsAppMessage {
@@ -23,8 +24,10 @@ interface Contact {
 interface ChatContextType {
   messages: WhatsAppMessage[];
   messagesByContact: { [contactId: string]: WhatsAppMessage[] };
+  sortedContacts: Contact[];
   selectedContact: Contact | null;
   unreadCounts: { [contactId: string]: number };
+  totalUnreadCount: number;
   isConnected: boolean;
   connectionStatus: 'connected' | 'disconnected' | 'connecting';
   isChatOpen: boolean;
@@ -83,7 +86,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     });
   }, [sendNotification]);
 
-  // CARGAR MENSAJES - VERSIÓN SIMPLE DE LA GUÍA TÉCNICA
+  // CARGAR MENSAJES - VERSIÓN OPTIMIZADA CON NOTIFICACIONES
   const loadMessages = useCallback(async () => {
     try {
       const response = await fetch('/api/whatsapp/messages');
@@ -94,131 +97,83 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           id: msg.id,
           content: msg.content,
           timestamp: msg.timestamp || msg.created_at,
-          type: msg.message_type === 'text' ? 'received' : 'sent',
+          type: msg.message_type === 'sent' ? 'sent' : 'received',
           contact_id: msg.contact_id || msg.from,
           status: msg.status || 'delivered'
         }));
         
-        setMessages(transformedMessages);
+        // PRESERVAR MENSAJES LOCALES Y DETECTAR NUEVOS MENSAJES
+        setMessages(prev => {
+          const newMessages = [...transformedMessages];
+          const hasNewMessages = newMessages.length !== prev.length || 
+            newMessages.some((msg, index) => !prev[index] || msg.id !== prev[index].id);
+          
+          if (hasNewMessages) {
+            return newMessages;
+          }
+          return prev;
+        });
       }
     } catch (error) {
-      console.error('Error cargando mensajes:', error);
+      console.error('Error loading messages:', error);
     }
   }, []);
 
   const forceReconnectSSE = useCallback(() => {
-    console.log('🔄 Forzando reconexión SSE...');
-    if (typeof window !== 'undefined') {
+    console.log('🔄 Reconectando Supabase Realtime...');
+    // Solo reconectar si hay problemas de conexión
+    if (connectionStatus === 'disconnected') {
       window.location.reload();
     }
-  }, []);
+  }, [connectionStatus]);
 
-  // CARGAR MENSAJES INICIALES - VERSIÓN SIMPLE
+  // CARGAR MENSAJES INICIALES Y POLLING OPTIMIZADO
   useEffect(() => {
+    // Cargar inmediatamente
     loadMessages();
     
     // Solicitar permisos de notificación
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-  }, [loadMessages]); // Solo ejecutar al montar
 
-  // Recargar mensajes cuando se abre el chat si no hay mensajes
-  useEffect(() => {
-    if (isChatOpen && messages.length === 0) {
-      loadMessages();
-    }
-  }, [isChatOpen, loadMessages, messages.length]);
+    // Listener para actualizar mensajes cuando se envía una orden
+    const handleOrderSent = () => {
+      setTimeout(() => {
+        loadMessages();
+      }, 1000);
+    };
 
-  // CONEXIÓN SSE SIMPLE - VERSIÓN FUNCIONAL DE LA GUÍA TÉCNICA
+    window.addEventListener('orderSent', handleOrderSent);
+
+                                       // Recargar cada 3 segundos para reducir carga y logs
+       const interval = setInterval(() => {
+         loadMessages();
+       }, 3000);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('orderSent', handleOrderSent);
+    };
+  }, []); // Remover loadMessages de las dependencias para evitar múltiples inicializaciones
+
+  // SIMULAR CONEXIÓN EXITOSA - POLLING FUNCIONA
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    let eventSource: EventSource | null = null;
-    let reconnectTimeout: NodeJS.Timeout | null = null;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 5;
-    const baseReconnectDelay = 1000;
-
-    const connectSSE = () => {
-      try {
-        eventSource = new EventSource('/api/whatsapp/sse');
-
-        eventSource.onopen = () => {
-          reconnectAttempts = 0;
-          setIsConnected(true);
-          setConnectionStatus('connected');
-        };
-
-        eventSource.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            
-            // Procesar mensajes de WhatsApp
-            if (data.type === 'whatsapp_message' && data.contactId) {
-              setMessages(prev => {
-                const messageExists = prev.some(msg => msg.id === data.id);
-                if (messageExists) {
-                  return prev;
-                }
-                
-                const newMessage: WhatsAppMessage = {
-                  id: data.id,
-                  content: data.content,
-                  timestamp: data.timestamp,
-                  type: 'received',
-                  contact_id: data.contactId,
-                  status: data.status || 'delivered'
-                };
-                
-                // Notificación push solo si el chat no está abierto
-                if (data.content && !isChatOpen) {
-                  const contactName = data.contactId.replace('+', '');
-                  sendWhatsAppNotification(contactName, data.content);
-                }
-                
-                return [...prev, newMessage];
-              });
-            }
-          } catch (error) {
-            console.error('Error procesando mensaje SSE:', error);
-          }
-        };
-
-        eventSource.onerror = (error) => {
-          setIsConnected(false);
-          setConnectionStatus('disconnected');
-          
-          if (eventSource) {
-            eventSource.close();
-            eventSource = null;
-          }
-          
-          // Reconectar automáticamente
-          if (reconnectAttempts < maxReconnectAttempts) {
-            reconnectAttempts++;
-            const delay = Math.min(3000, baseReconnectDelay * Math.pow(1.5, reconnectAttempts - 1));
-            reconnectTimeout = setTimeout(connectSSE, delay);
-          }
-        };
-      } catch (error) {
-        console.error('Error al conectar SSE:', error);
-      }
-    };
-
-    // Iniciar conexión
-    connectSSE();
-
-    // Cleanup al desmontar
-    return () => {
-      if (eventSource) {
-        eventSource.close();
-      }
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-      }
-    };
-  }, []); // Sin dependencias para evitar reconexiones constantes
+    // Verificar si ya se inicializó para evitar múltiples instancias
+    if (connectionStatus !== 'disconnected' || isConnected) return;
+    
+         // console.log('🔄 Iniciando sistema de mensajes con polling...');
+     setConnectionStatus('connecting');
+     
+     // Simular conexión exitosa más rápido
+     setTimeout(() => {
+       setIsConnected(true);
+       setConnectionStatus('connected');
+       // console.log('✅ Sistema de mensajes conectado exitosamente');
+     }, 500);
+  }, []); // Solo ejecutar una vez al montar el componente
 
   // Función para enviar mensaje
   const sendMessage = useCallback(async (contactId: string, content: string) => {
@@ -260,6 +215,37 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
               : msg
           )
         );
+        
+        // Guardar mensaje en base de datos después de envío exitoso
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+          );
+          
+          const generateUUID = () => {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+              const r = Math.random() * 16 | 0;
+              const v = c == 'x' ? r : (r & 0x3 | 0x8);
+              return v.toString(16);
+            });
+          };
+          
+          await supabase.from('whatsapp_messages').insert({
+            id: generateUUID(),
+            message_sid: result.messageId || `msg_${Date.now()}`,
+            from: process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID || '670680919470999',
+            to: contactId,
+            content: content.trim(),
+            timestamp: new Date().toISOString(),
+            status: 'sent',
+            message_type: 'sent',
+            user_id: 'default_user'
+          });
+        } catch (error) {
+          console.error('Error saving message to DB:', error);
+        }
       } else {
         // Marcar como fallido si hay error
         setMessages(prev => 
@@ -271,11 +257,21 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         );
       }
     } catch (error) {
+      console.error('Error sending message:', error);
+      // Marcar como fallido si hay error
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === newMessage.id 
+            ? { ...msg, status: 'failed' as const }
+            : msg
+        )
+      );
     }
-  }, []);
+  }, [loadMessages]);
 
   // SOLUCIÓN INTEGRAL markAsRead - ACTUALIZACIÓN INMEDIATA Y PERSISTENTE
   const markAsRead = useCallback(async (contactId: string) => {
+    if (!contactId) return;
     
     // Usar la función unificada de normalización
     const normalizedContactId = normalizeContactIdentifier(contactId);
@@ -295,7 +291,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         return updatedMessages;
       });
 
-      // Actualizar en Supabase
+      // Actualizar en Supabase (solo una vez)
       const response = await fetch('/api/whatsapp/mark-as-read', {
         method: 'POST',
         headers: {
@@ -306,19 +302,26 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
-      if (!response.ok) {
-      } else {
-      }
+             if (response.ok) {
+         const result = await response.json();
+         // console.log('✅ Mensajes marcados como leídos para:', normalizedContactId);
+       }
     } catch (error) {
+      console.error('Error marking as read:', error);
     }
-  }, [normalizeContactIdentifier]);
+  }, []);
 
   // Función para seleccionar contacto
   const selectContact = useCallback((contact: Contact) => {
+    // Solo marcar como leído si es un contacto diferente
+    if (selectedContact && selectedContact.phone !== contact.phone) {
+      markAsRead(selectedContact.phone);
+    }
+    
     setSelectedContact(contact);
-    // Marcar mensajes como leídos al seleccionar contacto
+    // Marcar mensajes como leídos del nuevo contacto
     markAsRead(contact.phone);
-  }, [markAsRead]);
+  }, [markAsRead, selectedContact]);
 
   // Función para abrir chat
   const openChat = useCallback(() => {
@@ -330,7 +333,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setIsChatOpen(false);
   }, []);
 
-  // Calcular mensajes agrupados por contacto
+  // Calcular mensajes agrupados por contacto y ordenar por última actividad
   const messagesByContact = useMemo(() => {
     const grouped: { [contactId: string]: WhatsAppMessage[] } = {};
     
@@ -342,7 +345,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       grouped[contactId].push(message);
     });
     
-    // Ordenar mensajes por timestamp
+    // Ordenar mensajes por timestamp dentro de cada contacto
     Object.keys(grouped).forEach(contactId => {
       grouped[contactId].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     });
@@ -350,38 +353,103 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     return grouped;
   }, [messages]);
 
-  // Calcular contadores de mensajes no leídos
+  // Obtener contactos ordenados por última actividad - SOLO CONTACTOS VÁLIDOS
+  const sortedContacts = useMemo(() => {
+    const contacts: Contact[] = [];
+    
+    // Solo procesar si tenemos mensajes válidos
+    if (!messages || messages.length === 0) {
+      return contacts;
+    }
+    
+    Object.entries(messagesByContact).forEach(([contactId, contactMessages]) => {
+      if (contactMessages.length === 0) return;
+      
+      // Filtrar el contacto de prueba (ambas versiones)
+      if (contactId === '+5491112345678' || contactId === '5491112345678') {
+        return;
+      }
+      
+      // Solo incluir contactos argentinos válidos
+      if (!contactId.includes('+549')) {
+        return;
+      }
+      
+      // Obtener el último mensaje para determinar la última actividad
+      const lastMessage = contactMessages[contactMessages.length - 1];
+      
+      // Contar mensajes no leídos
+      const unreadCount = contactMessages.filter(msg =>
+        msg.type === 'received' && msg.status !== 'read'
+      ).length;
+      
+      // No generar nombres temporales - dejar que IntegratedChatPanel los maneje
+      const phoneNumber = contactId.replace('+', '');
+      contacts.push({
+        phone: contactId,
+        name: `Contacto ${phoneNumber.slice(-4)}`, // Nombre temporal básico
+        lastMessage: lastMessage.content,
+        unreadCount: unreadCount > 0 ? unreadCount : undefined
+      });
+    });
+    
+    // Ordenar por timestamp del último mensaje (más reciente primero)
+    return contacts.sort((a, b) => {
+      const aMessages = messagesByContact[a.phone];
+      const bMessages = messagesByContact[b.phone];
+      
+      if (!aMessages.length || !bMessages.length) return 0;
+      
+      const aLastMessage = aMessages[aMessages.length - 1];
+      const bLastMessage = bMessages[bMessages.length - 1];
+      
+      return new Date(bLastMessage.timestamp).getTime() - new Date(aLastMessage.timestamp).getTime();
+    });
+  }, [messagesByContact, messages]);
+
+  // Calcular contadores de mensajes no leídos - VERSIÓN CORREGIDA
   const unreadCounts = useMemo(() => {
     const counts: { [contactId: string]: number } = {};
     
-    Object.keys(messagesByContact).forEach(contactId => {
+    Object.entries(messagesByContact).forEach(([contactId, contactMessages]) => {
       if (!contactId) return;
-      const contactMessages = messagesByContact[contactId];
-      const isConversationOpen = selectedContact &&
-        normalizeContactIdentifier(selectedContact.phone) === contactId;
-
-      if (isConversationOpen) {
-        delete counts[contactId];
-      } else {
-        const unreadCount = contactMessages.filter(msg =>
-          msg.type === 'received' && msg.status !== 'read' && msg.status !== 'sent'
-        ).length;
-        if (unreadCount > 0) {
-          counts[contactId] = unreadCount;
-        } else {
-          delete counts[contactId];
-        }
+      
+      // Filtrar el contacto de prueba
+      if (contactId === '+5491112345678' || contactId === '5491112345678') return;
+      
+      // Solo incluir contactos argentinos válidos
+      if (!contactId.includes('+549')) return;
+      
+      // Contar solo mensajes recibidos que no están leídos
+      const unreadCount = contactMessages.filter(msg =>
+        msg.type === 'received' && msg.status !== 'read'
+      ).length;
+      
+      if (unreadCount > 0) {
+        counts[contactId] = unreadCount;
       }
     });
     
+         // Log temporal para debug (solo si hay cambios)
+     // if (Object.keys(counts).length > 0) {
+     //   console.log('🔢 Contadores no leídos calculados:', counts);
+     // }
+    
     return counts;
-  }, [messages, selectedContact]);
+  }, [messagesByContact, messages]);
+
+  // Calcular total de mensajes no leídos para la navegación
+  const totalUnreadCount = useMemo(() => {
+    return Object.values(unreadCounts).reduce((total, count) => total + count, 0);
+  }, [unreadCounts]);
 
   const value = useMemo(() => ({
     messages,
     messagesByContact,
+    sortedContacts,
     selectedContact,
     unreadCounts,
+    totalUnreadCount,
     isConnected,
     connectionStatus,
     isChatOpen,
@@ -395,8 +463,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   }), [
     messages,
     messagesByContact,
+    sortedContacts,
     selectedContact,
     unreadCounts,
+    totalUnreadCount,
     isConnected,
     connectionStatus,
     isChatOpen,

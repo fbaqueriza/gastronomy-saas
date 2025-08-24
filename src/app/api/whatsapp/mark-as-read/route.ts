@@ -14,8 +14,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'contactId es requerido' }, { status: 400 });
     }
 
-    console.log('📝 Marcando mensajes como leídos para:', contactId);
-
     // Actualizar todos los mensajes recibidos de este contacto como leídos
     const { data, error } = await supabase
       .from('whatsapp_messages')
@@ -24,16 +22,16 @@ export async function POST(request: NextRequest) {
         read_at: new Date().toISOString()
       })
       .eq('contact_id', contactId)
-      .eq('message_type', 'text')
-      .eq('status', 'delivered');
+      .eq('message_type', 'received')
+      .neq('status', 'read')
+      .select();
 
     if (error) {
-      console.error('❌ Error actualizando mensajes en Supabase:', error);
+      // console.error('❌ Error actualizando mensajes en Supabase:', error);
       return NextResponse.json({ error: 'Error actualizando mensajes' }, { status: 500 });
     }
-
-    console.log('✅ Mensajes marcados como leídos:', data);
     
+    // console.log('📝 Marcando mensajes como leídos para:', contactId);
     return NextResponse.json({ 
       success: true, 
       message: 'Mensajes marcados como leídos',
@@ -41,7 +39,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ Error en mark-as-read:', error);
+    // console.error('❌ Error en mark-as-read:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }

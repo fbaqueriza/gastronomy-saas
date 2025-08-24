@@ -9,7 +9,7 @@ interface DataContextType {
   stockItems: StockItem[];
   loading: boolean;
   fetchAll: () => Promise<void>;
-  addOrder: (order: Partial<Order>, user_id: string) => Promise<void>;
+  addOrder: (order: Partial<Order>, user_id: string) => Promise<Order | null>;
   updateOrder: (order: Order) => Promise<void>;
   deleteOrder: (id: string, user_id: string) => Promise<void>;
   addProvider: (provider: Partial<Provider> | Partial<Provider>[], user_id: string, batch?: boolean) => Promise<any>;
@@ -222,18 +222,32 @@ export const DataProvider: React.FC<{ userEmail?: string; userId?: string; child
         created_at: (order as any).createdAt,
         updated_at: (order as any).updatedAt,
       };
-      const { error } = await supabase.from('orders').insert([snakeCaseOrder]);
+      
+      // console.log('📝 Insertando orden en Supabase:', snakeCaseOrder);
+      
+      const { data, error } = await supabase.from('orders').insert([snakeCaseOrder]).select();
+      
       if (error) {
         console.error('Error adding order:', error);
         setErrorMsg('Error al agregar pedido: ' + (error.message || error.details || ''));
         throw error;
       }
-      await fetchAll();
+      
+      // console.log('✅ Orden insertada exitosamente:', data);
+      
+      // Retornar la orden creada
+      if (data && data.length > 0) {
+        const createdOrder = mapOrderFromDb(data[0]);
+        // console.log('📋 Orden mapeada:', createdOrder);
+        return createdOrder;
+      }
+      
+      return null;
     } catch (error) {
       console.error('Error in addOrder:', error);
       throw error;
     }
-  }, [fetchAll]);
+  }, []);
 
   const updateOrder = useCallback(async (order: Order) => {
     try {

@@ -30,8 +30,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Error obteniendo mensajes' }, { status: 500 });
     }
     
-    console.log(`📨 API - Mensajes obtenidos: ${messages?.length || 0} (desde: ${since || 'inicio'})`);
-    
     return NextResponse.json({
       messages: messages || [],
       count: messages?.length || 0,

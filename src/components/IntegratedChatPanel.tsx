@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Paperclip, Phone, Video, MoreVertical, Plus, Search, MessageSquare, UserPlus, X, FileText, Download, Image, File, Smile, Mic, RefreshCw } from 'lucide-react';
+import { Send, Paperclip, Phone, Video, MoreVertical, Plus, Search, MessageSquare, X, FileText, Download, Image, File, Smile, Mic, RefreshCw } from 'lucide-react';
 import { useChat } from '../contexts/ChatContext';
 import { useGlobalChat } from '../contexts/GlobalChatContext';
 import { WhatsAppMessage, Contact } from '../types/whatsapp';
@@ -93,16 +93,16 @@ const MessageStatus = ({ status }: { status: 'sent' | 'delivered' | 'read' | 'fa
   );
 };
 
-export default function IntegratedChatPanel({
+export default function IntegratedChatPanel({ 
   providers,
-  isOpen,
+  isOpen, 
   onClose
 }: IntegratedChatPanelProps) {
-  
   const {
     selectedContact,
     messages,
     messagesByContact,
+    sortedContacts,
     unreadCounts,
     markAsRead,
     sendMessage,
@@ -135,15 +135,29 @@ export default function IntegratedChatPanel({
         window.location.reload();
       } else {
         alert(`❌ Error: ${data.messages?.length || 0} mensajes encontrados`);
-      }
-    } catch (error) {
+        }
+      } catch (error) {
       alert('❌ Error cargando mensajes');
     }
+  };
+
+  // Función de debug para mostrar información de contactos
+  const debugContactos = () => {
+    const contactosInfo = {
+      sortedContacts: sortedContacts.map(c => ({ phone: c.phone, name: c.name })),
+      providers: providers.map(p => ({ phone: p.phone, name: p.name })),
+      contacts: contacts.map(c => ({ phone: c.phone, name: c.name })),
+      messagesByContact: Object.keys(messagesByContact)
+    };
+    
+    console.log('🔍 DEBUG CONTACTOS:', contactosInfo);
+    alert(`Contactos disponibles: ${contactosInfo.sortedContacts.length}\nProveedores: ${contactosInfo.providers.length}\nContactos finales: ${contactosInfo.contacts.length}\nRevisa la consola para más detalles.`);
   };
 
   const { isGlobalChatOpen, closeGlobalChat, currentGlobalContact } = useGlobalChat();
 
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddContact, setShowAddContact] = useState(false);
@@ -168,39 +182,79 @@ export default function IntegratedChatPanel({
     if (onClose) onClose();
   };
 
-  // Convertir proveedores a contactos con mensajes actualizados
+  // Combinar proveedores con contactos de mensajes - CARGA CON ESTADO DE CARGA
   useEffect(() => {
-    if (providers && providers.length > 0) {
-      const providerContacts: Contact[] = providers.map(provider => {
-        const normalizedPhone = normalizeContactIdentifier(provider.phone);
-        
-        // Obtener el último mensaje de este contacto usando la normalización
-        const contactMessages = messagesByContact[normalizedPhone] || [];
-        const lastMessage = contactMessages.length > 0 
-          ? contactMessages[contactMessages.length - 1].content 
-          : provider.lastMessage || '';
-        
-        const lastMessageTime = contactMessages.length > 0 
-          ? new Date(contactMessages[contactMessages.length - 1].timestamp)
-          : (provider.lastMessageTime ? new Date(provider.lastMessageTime) : new Date());
-        
-        return {
-          id: provider.id,
-          name: provider.name || 'Sin nombre',
-          phone: normalizedPhone,
-          lastMessage: lastMessage,
-          lastMessageTime: lastMessageTime,
-          unreadCount: unreadCounts[normalizedPhone] || 0,
-          providerId: provider.id,
-          email: provider.email,
-          address: provider.address,
-          category: provider.category
-        };
-      });
-      
-      setContacts(providerContacts);
+    // Si no hay proveedores cargados, mantener estado de carga
+    if (!providers || providers.length === 0) {
+      setIsLoading(true);
+      return;
     }
-  }, [providers, messagesByContact, unreadCounts]); // Dependencias actualizadas
+
+    const allContacts: Contact[] = [];
+    
+    // PASO 1: Incluir todos los contactos con mensajes (menos estricto)
+    if (sortedContacts && sortedContacts.length > 0) {
+      sortedContacts.forEach(contact => {
+        // Incluir todos los contactos con mensajes, incluso si no tienen proveedor
+        allContacts.push(contact);
+      });
+    }
+    
+    // PASO 2: Agregar todos los proveedores con nombres correctos
+    providers.forEach(provider => {
+      const normalizedPhone = normalizeContactIdentifier(provider.phone);
+      const existingContact = allContacts.find(c => c.phone === normalizedPhone);
+      
+      if (!existingContact) {
+        // Proveedor sin mensajes - agregarlo con nombre correcto
+        const providerDisplayName = provider.contact_name 
+          ? `${provider.name} - ${provider.contact_name}`
+          : provider.name;
+        
+        allContacts.push({
+          id: provider.id,
+          name: providerDisplayName,
+          phone: normalizedPhone,
+          providerId: provider.id,
+          lastMessage: '',
+          lastMessageTime: new Date(),
+          unreadCount: 0
+        });
+      } else {
+        // Actualizar el nombre del contacto existente con el nombre del proveedor
+        const providerDisplayName = provider.contact_name 
+          ? `${provider.name} - ${provider.contact_name}`
+          : provider.name;
+        
+        existingContact.name = providerDisplayName;
+        existingContact.providerId = provider.id;
+      }
+    });
+    
+    setContacts(allContacts);
+    setIsLoading(false);
+    
+  }, [sortedContacts, providers]);
+
+  // Listener para seleccionar contactos desde botones externos
+  useEffect(() => {
+    const handleSelectContact = (event: CustomEvent) => {
+      const { contact } = event.detail;
+      if (contact && contact.phone) {
+        // Buscar el contacto en la lista
+        const foundContact = contacts.find(c => c.phone === contact.phone);
+        if (foundContact) {
+          selectContact(foundContact);
+        }
+      }
+    };
+
+    window.addEventListener('selectContact', handleSelectContact as EventListener);
+    
+    return () => {
+      window.removeEventListener('selectContact', handleSelectContact as EventListener);
+    };
+  }, [contacts, selectContact]);
 
   // Seleccionar automáticamente el primer contacto cuando se abre el chat
   useEffect(() => {
@@ -209,13 +263,13 @@ export default function IntegratedChatPanel({
     }
   }, [isPanelOpen, contacts, currentContact?.phone, selectContact]);
 
-  // Marcar como leído cuando cambia el contacto
+  // Marcar como leído cuando cambia el contacto (optimizado)
   useEffect(() => {
-    if (currentContact?.phone) {
+    if (currentContact?.phone && isPanelOpen) {
       const normalizedPhone = normalizeContactIdentifier(currentContact.phone);
       markAsRead(normalizedPhone);
     }
-  }, [currentContact?.phone, markAsRead]);
+  }, [currentContact?.phone, isPanelOpen, markAsRead]);
 
   // Scroll al final de los mensajes (optimizado)
   const scrollToBottom = useCallback(() => {
@@ -228,7 +282,7 @@ export default function IntegratedChatPanel({
     }
   }, []);
 
-  // Scroll automático cuando cambian los mensajes o se abre el chat
+  // Scroll automático solo cuando se cambia de contacto o se abre el chat
   useEffect(() => {
     if (currentContact && messagesEndRef.current) {
       // Scroll inmediatamente al final sin animación
@@ -242,9 +296,9 @@ export default function IntegratedChatPanel({
         }
       }, 200); // Aumentar delay para asegurar que el DOM esté listo
     }
-  }, [currentContact, messagesByContact]);
+  }, [currentContact?.phone]); // Solo cuando cambia el contacto, no cuando cambian los mensajes
 
-  // Scroll adicional cuando se abre el chat
+  // Scroll adicional cuando se abre el chat por primera vez
   useEffect(() => {
     if (isPanelOpen && currentContact && messagesEndRef.current) {
       setTimeout(() => {
@@ -257,7 +311,7 @@ export default function IntegratedChatPanel({
         }
       }, 300);
     }
-  }, [isPanelOpen, currentContact]);
+  }, [isPanelOpen, currentContact?.phone]); // Solo cuando se abre el panel o cambia el contacto
 
   // Auto-resize del textarea
   useEffect(() => {
@@ -279,6 +333,10 @@ export default function IntegratedChatPanel({
     
     try {
       await sendMessage(currentContact.phone, messageToSend);
+      // Scroll al final después de enviar el mensaje
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
     } catch (error) {
       // Restaurar el mensaje si falla
       setNewMessage(messageToSend);
@@ -296,7 +354,7 @@ export default function IntegratedChatPanel({
       formData.append('recipient', currentContact.phone);
 
       const response = await fetch('/api/whatsapp/send-document', {
-        method: 'POST',
+          method: 'POST',
         body: formData,
       });
 
@@ -304,7 +362,7 @@ export default function IntegratedChatPanel({
         const result = await response.json();
         
         // Documento enviado exitosamente
-      } else {
+        } else {
         throw new Error('Error al enviar documento');
       }
     } catch (error) {
@@ -349,6 +407,8 @@ export default function IntegratedChatPanel({
     }
   };
 
+
+
   const filteredContacts = contacts.filter(contact =>
     contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.phone.includes(searchTerm)
@@ -360,7 +420,7 @@ export default function IntegratedChatPanel({
 
   return (
     <div className="fixed inset-y-0 right-0 w-[800px] bg-white shadow-xl flex flex-col z-50">
-      {/* Header */}
+        {/* Header */}
       <div className="flex-shrink-0 bg-green-600 text-white p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -378,7 +438,7 @@ export default function IntegratedChatPanel({
             <X className="h-5 w-5" />
           </button>
         </div>
-      </div>
+        </div>
 
       <div className="flex flex-1 min-h-0">
         {/* Contactos */}
@@ -395,28 +455,42 @@ export default function IntegratedChatPanel({
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
             </div>
-          </div>
+            </div>
 
           {/* Lista de contactos */}
           <div className="flex-1 overflow-y-auto">
-            {filteredContacts.map((contact) => (
-              <ContactItem
-                key={contact.phone}
-                contact={contact}
-                isSelected={currentContact?.phone === contact.phone}
-                onSelect={() => {
-                  selectContact(contact);
-                  // Marcar como leído solo cuando se selecciona el contacto
-                  markAsRead(contact.phone);
-                }}
-                unreadCount={unreadCounts[contact.phone] || 0}
-              />
-            ))}
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+                  <p className="mt-2 text-gray-500 text-sm">Cargando contactos...</p>
+                </div>
+              </div>
+            ) : filteredContacts.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                  <p className="text-gray-500">No hay contactos disponibles</p>
+                </div>
+              </div>
+            ) : (
+              filteredContacts.map((contact) => (
+                <ContactItem
+                  key={contact.phone}
+                  contact={contact}
+                  isSelected={currentContact?.phone === contact.phone}
+                  onSelect={() => {
+                    selectContact(contact);
+                  }}
+                  unreadCount={unreadCounts[contact.phone] || 0}
+                />
+              ))
+            )}
           </div>
-        </div>
+                    </div>
 
         {/* Chat */}
-        <div className="w-2/3 flex flex-col">
+        <div className="w-2/3 flex flex-col min-h-0">
           {currentContact ? (
             <>
               {/* Header del chat */}
@@ -426,7 +500,7 @@ export default function IntegratedChatPanel({
                     <span className="text-white font-medium">
                       {currentContact.name.charAt(0).toUpperCase()}
                     </span>
-                  </div>
+                      </div>
                   <div className="flex-1">
                     <h3 className="font-medium text-gray-900">{currentContact.name}</h3>
                     <p className="text-sm text-gray-500">{currentContact.phone}</p>
@@ -451,20 +525,22 @@ export default function IntegratedChatPanel({
                      <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">
                        <MoreVertical className="h-4 w-4" />
                      </button>
-                   </div>
                 </div>
-              </div>
+            </div>
+        </div>
 
                                {/* Mensajes */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-100">
+                <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 bg-gray-100">
                   {(() => {
-                    const contactMessages = currentContact && messagesByContact[normalizeContactIdentifier(currentContact.phone)];
+                    const normalizedPhone = currentContact ? normalizeContactIdentifier(currentContact.phone) : '';
+                    const contactMessages = currentContact && messagesByContact[normalizedPhone];
+                    
                     return contactMessages?.map((message) => (
-                     <div
-                       key={message.id}
+              <div
+                key={message.id}
                        className={`flex ${message.type === 'sent' ? 'justify-end' : 'justify-start'}`}
-                     >
-                       <div
+              >
+                <div
                          className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                            message.type === 'sent'
                              ? 'bg-green-500 text-white'
@@ -485,14 +561,14 @@ export default function IntegratedChatPanel({
                              <MessageStatus status={message.status || 'sent'} />
                            )}
                          </div>
-                       </div>
-                     </div>
+                </div>
+              </div>
                    ));
                  })()}
-                 <div ref={messagesEndRef} />
-               </div>
+          <div ref={messagesEndRef} />
+        </div>
 
-              {/* Input */}
+        {/* Input */}
               <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-white">
                 <div className="flex items-end space-x-2">
                   <button
@@ -513,15 +589,15 @@ export default function IntegratedChatPanel({
                       ref={textareaRef}
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      placeholder="Escribe un mensaje..."
+                onKeyPress={handleKeyPress}
+                placeholder="Escribe un mensaje..."
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       rows={1}
                       style={{ minHeight: '40px', maxHeight: '120px' }}
-                    />
+              />
                   </div>
                   {newMessage.trim() ? (
-                    <button
+              <button
                       onClick={handleSendMessage}
                       disabled={uploadingDocument}
                       className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -541,18 +617,20 @@ export default function IntegratedChatPanel({
                   className="hidden"
                   accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png"
                 />
-              </div>
+            </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center text-gray-500">
                 <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                 <p>Selecciona un contacto para comenzar a chatear</p>
-              </div>
             </div>
-          )}
+          </div>
+        )}
         </div>
       </div>
+
+
     </div>
   );
 }

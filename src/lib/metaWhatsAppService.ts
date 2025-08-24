@@ -32,10 +32,10 @@ export class MetaWhatsAppService {
         openaiApiKey: process.env.OPENAI_API_KEY
       };
       
-      // Por defecto, usar modo simulación hasta verificar credenciales
+      // Usar modo producción si las credenciales están configuradas
       this.isEnabled = true;
-      this.isSimulationMode = true;
-      console.log('Meta WhatsApp Service: Inicializando en modo simulación');
+      this.isSimulationMode = false;
+      // console.log('Meta WhatsApp Service: Inicializando en modo PRODUCCIÓN');
     } else {
       console.log('Meta WhatsApp Service: Configuración no encontrada, usando modo simulación');
       this.isEnabled = true;
@@ -58,11 +58,11 @@ export class MetaWhatsAppService {
         openaiApiKey: process.env.OPENAI_API_KEY
       };
       
-      // Forzar modo producción si las credenciales están configuradas
+      // Usar modo producción si las credenciales están configuradas
       this.isEnabled = true;
       this.isSimulationMode = false;
       this.initialized = true;
-      console.log('Meta WhatsApp Service: Configuración válida, servicio habilitado en modo producción');
+      // console.log('Meta WhatsApp Service: Configuración válida, servicio habilitado en modo PRODUCCIÓN');
     } else {
       console.log('Meta WhatsApp Service: Configuración no encontrada, usando modo simulación');
       this.isEnabled = true;
@@ -77,6 +77,10 @@ export class MetaWhatsAppService {
 
   public isSimulationModeEnabled(): boolean {
     return this.isSimulationMode;
+  }
+
+  public forceSimulationMode(enabled: boolean): void {
+    this.isSimulationMode = enabled;
   }
 
   // Enviar mensaje simple
@@ -160,21 +164,17 @@ export class MetaWhatsAppService {
         const result = await response.json();
         console.log('✅ [REAL] Mensaje enviado exitosamente:', result);
 
-        // Guardar en base de datos
-        try {
-          await this.saveMessage({
-            id: result.messages?.[0]?.id || `msg_${Date.now()}`,
-            from: this.config.phoneNumberId,
-            to: normalizedPhone,
-            content,
-            timestamp: new Date(),
-            status: 'sent',
-            isAutomated: false,
-            isSimulated: false
-          });
-        } catch (error) {
-          console.log('Error guardando mensaje (no crítico):', error);
-        }
+        // Guardar mensaje enviado en base de datos
+        await this.saveMessage({
+          id: result.messages?.[0]?.id || `msg_${Date.now()}`,
+          from: this.config?.phoneNumberId || '123456789',
+          to,
+          content,
+          timestamp: new Date(),
+          status: 'sent',
+          isAutomated: false,
+          isSimulated: false
+        });
 
         return result;
       }
@@ -323,14 +323,14 @@ export class MetaWhatsAppService {
         normalizedFrom = normalizedFrom.substring(1);
       }
 
-      // Guardar mensaje
+      // Guardar mensaje - Los mensajes de prueba se guardan como leídos
       await this.saveMessage({
         id: messageData.id || `sim_${Date.now()}`,
         from: messageData.from,
         to: messageData.to,
         content: messageContent,
         timestamp: new Date(messageData.timestamp || Date.now()),
-        status: 'delivered',
+        status: this.isSimulationMode ? 'read' : 'delivered',
         isAutomated: false,
         isSimulated: this.isSimulationMode
       });
@@ -346,7 +346,6 @@ export class MetaWhatsAppService {
         status: 'delivered'
       };
       
-      console.log('📤 Meta Service - Enviando mensaje SSE:', sseMessage);
       sendMessageToClients(sseMessage);
       
       // Comentado: Respuesta automática desactivada
@@ -486,34 +485,68 @@ export class MetaWhatsAppService {
         });
       };
       
-      // DETECTAR SI EL FROM ES UN ID DE WHATSAPP BUSINESS
-      let contactId = message.from || 'unknown';
+             // Para mensajes enviados desde la plataforma, usar el número de destino
+       // Para mensajes recibidos, usar el número de origen
+       let contactId = 'unknown';
+       
+       // Siempre usar el número de destino para mensajes enviados
+       if (message.to) {
+         contactId = message.to;
+       } else if (message.from) {
+         contactId = message.from;
+       } else if (message.contact_id) {
+         contactId = message.contact_id;
+       }
       
-      // Si el from es el ID del número de WhatsApp Business, usar un identificador especial
-      if (contactId === process.env.WHATSAPP_PHONE_NUMBER_ID || 
-          contactId === `+${process.env.WHATSAPP_PHONE_NUMBER_ID}` ||
-          contactId.includes('670680919470999')) {
-        // Para mensajes simulados o del sistema, usar un identificador especial
+      // Normalizar el contact_id
+      if (contactId && contactId !== 'unknown') {
+        contactId = contactId.replace(/[\s\-\(\)]/g, '');
+        if (!contactId.startsWith('+')) {
+          contactId = `+${contactId}`;
+        }
+      }
+      
+      // Solo usar número de prueba si realmente no hay un contact_id válido
+      if (!contactId || contactId === 'unknown') {
         contactId = '+5491112345678'; // Número de prueba para mensajes del sistema
       }
       
+      // Determinar el tipo de mensaje basado en la dirección
+      let messageType = 'received'; // Por defecto, mensajes recibidos
+      if (message.from === this.config?.phoneNumberId || message.to && !message.from) {
+        // Si el mensaje viene de nuestro número de teléfono o solo tiene 'to', es enviado
+        messageType = 'sent';
+      }
+
       const messageData = {
-        id: generateUUID(), // Siempre generar UUID para el id
+        id: generateUUID(), // Siempre generar UUID válido para el id
         content: message.content || message.text?.body || '',
         timestamp: message.timestamp || new Date().toISOString(),
         message_sid: message.id || generateUUID(), // Usar el ID original de Meta como message_sid
         contact_id: contactId,
-        message_type: 'text',
-        user_id: 'default_user',
+        message_type: messageType, // Usar el tipo correcto basado en la dirección
+        user_id: 'default_user', // TODO: Obtener user_id real del contexto
         status: message.status || 'delivered'
       };
+
+      // Verificar si el mensaje ya existe para evitar duplicados usando message_sid
+      const { data: existingMessage } = await supabase
+        .from('whatsapp_messages')
+        .select('id')
+        .eq('message_sid', messageData.message_sid)
+        .single();
+
+      if (existingMessage) {
+        console.log('⚠️ Mensaje ya existe, evitando duplicado:', messageData.message_sid);
+        return;
+      }
 
       const { error } = await supabase
         .from('whatsapp_messages')
         .insert(messageData);
       
       if (error) {
-        // Error no crítico, continuar
+        console.error('❌ Error guardando mensaje en base de datos:', error);
       }
     } catch (error) {
       // Error no crítico, continuar
