@@ -72,30 +72,6 @@ export async function POST(request: NextRequest) {
 
       console.log('✅ Template disparado exitosamente:', result);
       
-      // Enviar mensaje de template usando el endpoint de send
-      try {
-        const templateMessage = 'Buenas! te envío el siguiente pedido, muchas gracias!';
-        
-        const sendResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/api/whatsapp/send`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: to,
-            message: templateMessage
-          }),
-        });
-
-        if (sendResponse.ok) {
-          console.log('✅ Template enviado y guardado exitosamente');
-        } else {
-          console.error('❌ Error enviando template:', await sendResponse.text());
-        }
-      } catch (sendError) {
-        console.error('❌ Error enviando template:', sendError);
-      }
-      
       return NextResponse.json({
         success: true,
         message: 'Conversación disparada exitosamente',
