@@ -271,9 +271,9 @@ export default function CreateOrderModal({
               >
                 <option value="">Elige un proveedor...</option>
                                  {providers.map((provider) => (
-                   <option key={provider.id} value={provider.id}>
-                     {provider.name} - {provider.contact_name}
-                   </option>
+                                   <option key={provider.id} value={provider.id}>
+                  {provider.name} - {provider.contactName}
+                </option>
                  ))}
               </select>
               
