@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
           productName: 'Producto de Prueba',
           quantity: 5,
           unit: 'kg',
+          price: 200,
           total: 1000
         }
       ],
