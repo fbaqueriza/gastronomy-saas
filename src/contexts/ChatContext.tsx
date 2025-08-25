@@ -91,10 +91,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       }
       
       // Obtener los proveedores del usuario actual
-      const { data: userProviders } = await supabase
+      const { data: userProviders, error: providersError } = await supabase
         .from('providers')
         .select('phone')
         .eq('user_id', currentUserId);
+      
+      if (providersError) {
+        console.error('Error obteniendo proveedores:', providersError);
+        return;
+      }
       
       const userProviderPhones = userProviders?.map(p => {
         let phone = p.phone;
@@ -248,17 +253,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           )
         );
         
-                 // Guardar mensaje en base de datos después de envío exitoso
-         try {
-           const { createClient } = await import('@supabase/supabase-js');
-           const supabase = createClient(
-             process.env.NEXT_PUBLIC_SUPABASE_URL!,
-             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-           );
-           
-           // Obtener el usuario actual
-           const { data: { user } } = await supabase.auth.getUser();
-           const userId = user?.id || 'default_user';
+                         // Guardar mensaje en base de datos después de envío exitoso
+        try {
+          // Obtener el usuario actual usando la instancia existente
+          const { data: { user } } = await supabase.auth.getUser();
+          const userId = user?.id || 'default_user';
            
            const generateUUID = () => {
              return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
