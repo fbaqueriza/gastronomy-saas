@@ -38,8 +38,8 @@ export async function POST(request: NextRequest) {
     const mockProvider = {
       id: providerId,
       name: 'Proveedor de Prueba',
-      phone: '+5491135562673',
-      contact_name: 'Juan'
+      phone: '+54935562673',
+      contactName: 'Juan'
     };
 
     console.log('📤 TEST - Enviando notificación de pedido de prueba...');

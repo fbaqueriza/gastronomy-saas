@@ -72,6 +72,35 @@ export async function POST(request: NextRequest) {
 
       console.log('✅ Template disparado exitosamente:', result);
       
+      // Guardar el mensaje del template en la base de datos
+      try {
+        const { metaWhatsAppService } = await import('../../../../lib/metaWhatsAppService');
+        
+        // Obtener el contenido real del template
+        let templateContent = '';
+        if (template_name === 'envio_de_orden') {
+          templateContent = '🛒 *NUEVO PEDIDO*\n\nHemos recibido un nuevo pedido. Por favor confirma la recepción respondiendo a este mensaje.';
+        } else if (template_name === 'inicializador_de_conv') {
+          templateContent = 'Hola, hemos iniciado una nueva conversación. ¿En qué podemos ayudarte?';
+        } else {
+          templateContent = `[Template: ${template_name}]`;
+        }
+        
+        await metaWhatsAppService.saveMessage({
+          id: result.messages?.[0]?.id || `template_${Date.now()}`,
+          from: PHONE_NUMBER_ID,
+          to: to,
+          content: templateContent,
+          timestamp: new Date(),
+          status: 'sent',
+          isAutomated: true,
+          isSimulated: false
+        });
+        console.log('✅ Mensaje del template guardado en base de datos');
+      } catch (error) {
+        console.error('❌ Error guardando mensaje del template:', error);
+      }
+      
       return NextResponse.json({
         success: true,
         message: 'Conversación disparada exitosamente',

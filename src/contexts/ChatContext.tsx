@@ -81,18 +81,49 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   // CARGAR MENSAJES - VERSIÓN OPTIMIZADA CON NOTIFICACIONES
   const loadMessages = useCallback(async () => {
     try {
+      // Obtener el usuario actual
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
+      
+      if (!currentUserId) {
+        console.log('No hay usuario autenticado, no se pueden cargar mensajes');
+        return;
+      }
+      
+      // Obtener los proveedores del usuario actual
+      const { data: userProviders } = await supabase
+        .from('providers')
+        .select('phone')
+        .eq('user_id', currentUserId);
+      
+      const userProviderPhones = userProviders?.map(p => {
+        let phone = p.phone;
+        if (phone && !phone.startsWith('+')) {
+          phone = `+${phone}`;
+        }
+        return phone;
+      }) || [];
+      
+      console.log('📱 Proveedores del usuario actual:', userProviderPhones);
+      
       const response = await fetch('/api/whatsapp/messages');
       const data = await response.json();
       
       if (data.messages && Array.isArray(data.messages)) {
-        const transformedMessages = data.messages.map((msg: any) => ({
-          id: msg.id,
-          content: msg.content,
-          timestamp: new Date(msg.timestamp || msg.created_at),
-          type: msg.message_type === 'sent' ? 'sent' : 'received',
-          contact_id: msg.contact_id || msg.from,
-          status: msg.status || 'delivered'
-        }));
+        const transformedMessages = data.messages
+          .map((msg: any) => ({
+            id: msg.id,
+            content: msg.content,
+            timestamp: new Date(msg.timestamp || msg.created_at),
+            type: msg.message_type === 'sent' ? 'sent' : 'received',
+            contact_id: msg.contact_id || msg.from,
+            status: msg.status || 'delivered'
+          }))
+          // Filtrar mensajes que correspondan a los proveedores del usuario actual
+          .filter((msg: any) => {
+            const contactId = normalizeContactIdentifier(msg.contact_id);
+            return userProviderPhones.includes(contactId);
+          });
         
         // PRESERVAR MENSAJES LOCALES Y DETECTAR NUEVOS MENSAJES
         setMessages(prev => {
@@ -101,7 +132,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             newMessages.some((msg, index) => !prev[index] || msg.id !== prev[index].id);
           
           if (hasNewMessages) {
-            console.log('🔄 Mensajes actualizados:', newMessages.length, 'mensajes');
             return newMessages;
           }
           return prev;
@@ -120,10 +150,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }, [connectionStatus]);
 
-  // CARGAR MENSAJES INICIALES Y POLLING OPTIMIZADO
+    // CARGAR MENSAJES INICIALES Y POLLING OPTIMIZADO
   useEffect(() => {
+    let isMounted = true;
+    
     // Cargar inmediatamente
-    loadMessages();
+    if (isMounted) {
+      loadMessages();
+    }
     
     // Solicitar permisos de notificación
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
@@ -132,19 +166,24 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     // Listener para actualizar mensajes cuando se envía una orden
     const handleOrderSent = () => {
-      setTimeout(() => {
-        loadMessages();
-      }, 1000);
+      if (isMounted) {
+        setTimeout(() => {
+          loadMessages();
+        }, 1000);
+      }
     };
 
     window.addEventListener('orderSent', handleOrderSent);
 
-                                       // Recargar cada 3 segundos para reducir carga y logs
-       const interval = setInterval(() => {
-         loadMessages();
-       }, 3000);
+    // Recargar cada 3 segundos para reducir carga y logs
+    const interval = setInterval(() => {
+      if (isMounted) {
+        loadMessages();
+      }
+    }, 3000);
 
     return () => {
+      isMounted = false;
       clearInterval(interval);
       window.removeEventListener('orderSent', handleOrderSent);
     };
@@ -209,36 +248,40 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           )
         );
         
-        // Guardar mensaje en base de datos después de envío exitoso
-        try {
-          const { createClient } = await import('@supabase/supabase-js');
-          const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-          );
-          
-          const generateUUID = () => {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-              const r = Math.random() * 16 | 0;
-              const v = c == 'x' ? r : (r & 0x3 | 0x8);
-              return v.toString(16);
-            });
-          };
-          
-          await supabase.from('whatsapp_messages').insert({
-            id: generateUUID(),
-            message_sid: result.messageId || `msg_${Date.now()}`,
-            from: process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID || '670680919470999',
-            to: contactId,
-            content: content.trim(),
-            timestamp: new Date().toISOString(),
-            status: 'sent',
-            message_type: 'sent',
-            user_id: 'default_user'
-          });
-        } catch (error) {
-          console.error('Error saving message to DB:', error);
-        }
+                 // Guardar mensaje en base de datos después de envío exitoso
+         try {
+           const { createClient } = await import('@supabase/supabase-js');
+           const supabase = createClient(
+             process.env.NEXT_PUBLIC_SUPABASE_URL!,
+             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+           );
+           
+           // Obtener el usuario actual
+           const { data: { user } } = await supabase.auth.getUser();
+           const userId = user?.id || 'default_user';
+           
+           const generateUUID = () => {
+             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+               const r = Math.random() * 16 | 0;
+               const v = c == 'x' ? r : (r & 0x3 | 0x8);
+               return v.toString(16);
+             });
+           };
+           
+           await supabase.from('whatsapp_messages').insert({
+             id: generateUUID(),
+             message_sid: result.messageId || `msg_${Date.now()}`,
+             from: process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID || '670680919470999',
+             to: contactId,
+             content: content.trim(),
+             timestamp: new Date().toISOString(),
+             status: 'sent',
+             message_type: 'sent',
+             user_id: userId
+           });
+         } catch (error) {
+           console.error('Error saving message to DB:', error);
+         }
       } else {
         // Marcar como fallido si hay error
         setMessages(prev => 
@@ -331,10 +374,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setIsChatOpen(false);
   }, []);
 
-  // Calcular mensajes agrupados por contacto y ordenar por última actividad
+    // Calcular mensajes agrupados por contacto y ordenar por última actividad
   const messagesByContact = useMemo(() => {
           const grouped: { [contactId: string]: ChatWhatsAppMessage[] } = {};
-    
+     
     messages.forEach(message => {
       const contactId = normalizeContactIdentifier(message.contact_id);
       if (!grouped[contactId]) {
@@ -357,13 +400,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     
     // Solo procesar si tenemos mensajes válidos
     if (!messages || messages.length === 0) {
-      console.log('📱 No hay mensajes para procesar');
       return contacts;
     }
     
-    console.log('📱 Procesando', messages.length, 'mensajes para contactos');
-    
     Object.entries(messagesByContact).forEach(([contactId, contactMessages]) => {
+      
       if (contactMessages.length === 0) return;
       
       // Filtrar el contacto de prueba (ambas versiones)
@@ -420,7 +461,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       if (contactId === '+5491112345678' || contactId === '5491112345678') return;
       
       // Solo incluir contactos argentinos válidos
-      if (!contactId.includes('+549')) return;
+      if (!contactId.includes('+549')) {
+        return;
+      }
       
       // Contar solo mensajes recibidos que no están leídos
       const unreadCount = contactMessages.filter(msg =>
@@ -445,25 +488,27 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     return Object.values(unreadCounts).reduce((total, count) => total + count, 0);
   }, [unreadCounts]);
 
-  const value = useMemo(() => ({
-    messages,
-    messagesByContact,
-    sortedContacts,
-    selectedContact,
-    unreadCounts,
-    totalUnreadCount,
-    isConnected,
-    connectionStatus,
-    isChatOpen,
-    openChat,
-    closeChat,
-    sendMessage,
-    markAsRead,
-    selectContact,
-    loadMessages,
-    forceReconnectSSE,
-    addMessage
-  }), [
+  const value = useMemo(() => {
+    return {
+      messages,
+      messagesByContact,
+      sortedContacts,
+      selectedContact,
+      unreadCounts,
+      totalUnreadCount,
+      isConnected,
+      connectionStatus,
+      isChatOpen,
+      openChat,
+      closeChat,
+      sendMessage,
+      markAsRead,
+      selectContact,
+      loadMessages,
+      forceReconnectSSE,
+      addMessage
+    };
+  }, [
     messages,
     messagesByContact,
     sortedContacts,

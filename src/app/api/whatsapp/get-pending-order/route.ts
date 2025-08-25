@@ -17,14 +17,40 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const { data, error } = await supabase
+    // Normalizar el número de teléfono para la búsqueda
+    let normalizedPhone = providerPhone.replace(/[\s\-\(\)]/g, '');
+    if (!normalizedPhone.startsWith('+')) {
+      normalizedPhone = `+${normalizedPhone}`;
+    }
+    
+    console.log('🔍 Buscando pedido pendiente para:', normalizedPhone);
+    
+    // Buscar con el número normalizado
+    let { data, error } = await supabase
       .from('pending_orders')
       .select('*')
-      .eq('provider_phone', providerPhone)
+      .eq('provider_phone', normalizedPhone)
       .eq('status', 'pending_confirmation')
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
+    
+    // Si no se encuentra, buscar sin el +
+    if (error || !data) {
+      console.log('🔍 No encontrado con +, buscando sin +...');
+      const phoneWithoutPlus = normalizedPhone.replace('+', '');
+      const result = await supabase
+        .from('pending_orders')
+        .select('*')
+        .eq('provider_phone', phoneWithoutPlus)
+        .eq('status', 'pending_confirmation')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      data = result.data;
+      error = result.error;
+    }
 
     if (error || !data) {
       return NextResponse.json(

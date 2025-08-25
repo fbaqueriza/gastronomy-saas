@@ -317,16 +317,16 @@ export class MetaWhatsAppService {
         messageContent = '[Mensaje no soportado]';
       }
 
-      // Normalizar número de teléfono - SIN el + para consistencia con el frontend
+      // Normalizar número de teléfono - CON el + para consistencia con el frontend
       let normalizedFrom = messageData.from;
-      if (normalizedFrom && normalizedFrom.startsWith('+')) {
-        normalizedFrom = normalizedFrom.substring(1);
+      if (normalizedFrom && !normalizedFrom.startsWith('+')) {
+        normalizedFrom = `+${normalizedFrom}`;
       }
 
       // Guardar mensaje - Los mensajes de prueba se guardan como leídos
       await this.saveMessage({
         id: messageData.id || `sim_${Date.now()}`,
-        from: messageData.from,
+        from: normalizedFrom,
         to: messageData.to,
         content: messageContent,
         timestamp: new Date(messageData.timestamp || Date.now()),
@@ -467,7 +467,7 @@ export class MetaWhatsAppService {
   }
 
   // Guardar mensaje en base de datos
-  private async saveMessage(message: any): Promise<void> {
+  public async saveMessage(message: any): Promise<void> {
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -514,10 +514,15 @@ export class MetaWhatsAppService {
       
       // Determinar el tipo de mensaje basado en la dirección
       let messageType = 'received'; // Por defecto, mensajes recibidos
-      if (message.from === this.config?.phoneNumberId || message.to && !message.from) {
+      if (message.from === this.config?.phoneNumberId || (message.to && !message.from)) {
         // Si el mensaje viene de nuestro número de teléfono o solo tiene 'to', es enviado
         messageType = 'sent';
       }
+      
+
+
+      // Usar el user_id del mensaje si está disponible, sino usar default_user
+      const userId = message.user_id || 'default_user';
 
       const messageData = {
         id: generateUUID(), // Siempre generar UUID válido para el id
@@ -526,7 +531,7 @@ export class MetaWhatsAppService {
         message_sid: message.id || generateUUID(), // Usar el ID original de Meta como message_sid
         contact_id: contactId,
         message_type: messageType, // Usar el tipo correcto basado en la dirección
-        user_id: 'default_user', // TODO: Obtener user_id real del contexto
+        user_id: userId,
         status: message.status || 'delivered'
       };
 
