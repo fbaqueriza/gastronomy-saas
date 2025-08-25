@@ -81,7 +81,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('❌ Error en API de WhatsApp Business:', error);
     return NextResponse.json(
-      { error: 'Error interno del servidor', details: error.message },
+      { 
+        error: 'Error interno del servidor', 
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      },
       { status: 500 }
     );
   }
