@@ -638,6 +638,74 @@ export class MetaWhatsAppService {
       businessAccountId: this.config?.businessAccountId
     };
   }
+
+  // Obtener plantillas disponibles
+  async getTemplates(): Promise<any[]> {
+    await this.initializeIfConfigured();
+
+    if (!this.isServiceEnabled()) {
+      console.log('Meta WhatsApp Service: Servicio deshabilitado');
+      return [];
+    }
+
+    try {
+      if (this.isSimulationMode) {
+        // Modo simulación - devolver plantillas de ejemplo
+        return [
+          {
+            name: 'envio_de_orden',
+            language: 'es',
+            category: 'UTILITY',
+            components: [
+              {
+                type: 'HEADER',
+                text: 'Nuevo pedido recibido'
+              },
+              {
+                type: 'BODY',
+                text: 'Hemos recibido un nuevo pedido. Por favor confirma la recepción.'
+              }
+            ]
+          },
+          {
+            name: 'inicializador_de_conv',
+            language: 'es',
+            category: 'UTILITY',
+            components: [
+              {
+                type: 'HEADER',
+                text: 'Conversación iniciada'
+              },
+              {
+                type: 'BODY',
+                text: 'Hola, hemos iniciado una nueva conversación. ¿En qué podemos ayudarte?'
+              }
+            ]
+          }
+        ];
+      }
+
+      // Modo producción - obtener plantillas reales de Meta
+      const response = await fetch(`${this.baseUrl}/${this.config.phoneNumberId}/message_templates`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.config.accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        console.error('❌ Error obteniendo plantillas de Meta:', response.status, response.statusText);
+        return [];
+      }
+
+      const data = await response.json();
+      return data.data || [];
+    } catch (error) {
+      console.error('❌ Error en getTemplates:', error);
+      return [];
+    }
+  }
 }
 
 // Instancia global
