@@ -52,12 +52,12 @@ export default function ProviderConfigModal({
     // console.log('DEBUG: ProviderConfigModal - useEffect triggered:', { provider: provider?.name, isEditing, isOpen });
     
     if (provider && isEditing && isOpen) {
-              // console.log('DEBUG: ProviderConfigModal - Loading provider data for editing:', provider);
-        // console.log('DEBUG: ProviderConfigModal - Provider config fields:', {
-        defaultDeliveryDays: provider.defaultDeliveryDays,
-        defaultDeliveryTime: provider.defaultDeliveryTime,
-        defaultPaymentMethod: provider.defaultPaymentMethod
-      });
+      // console.log('DEBUG: ProviderConfigModal - Loading provider data for editing:', provider);
+      // console.log('DEBUG: ProviderConfigModal - Provider config fields:', {
+      //   defaultDeliveryDays: provider.defaultDeliveryDays,
+      //   defaultDeliveryTime: provider.defaultDeliveryTime,
+      //   defaultPaymentMethod: provider.defaultPaymentMethod
+      // });
       
       setFormData({
         name: provider.name || '',

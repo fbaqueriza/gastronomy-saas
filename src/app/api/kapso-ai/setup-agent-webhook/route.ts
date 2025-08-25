@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { KapsoAIService } from '@/lib/kapsoAIService';
+import { KapsoService } from '@/lib/kapsoService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,11 +15,9 @@ export async function POST(request: NextRequest) {
     console.log('🔧 Configurando webhook del agente de Kapso AI...');
     console.log('📡 URL del webhook:', webhookUrl);
 
-    const kapsoService = new KapsoAIService({
+    const kapsoService = new KapsoService({
       apiKey: process.env.KAPSO_API_KEY!,
-      baseUrl: process.env.KAPSO_BASE_URL!,
-      phoneNumberId: process.env.KAPSO_PHONE_NUMBER_ID!,
-      agentId: process.env.KAPSO_AGENT_ID!
+      baseUrl: process.env.KAPSO_BASE_URL!
     });
     
     // Configurar el webhook del agente

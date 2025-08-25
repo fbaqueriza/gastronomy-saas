@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getKapsoAIService } from '@/lib/kapsoAIService';
+import { KapsoService } from '@/lib/kapsoService';
 import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
@@ -29,11 +29,10 @@ export async function POST(request: NextRequest) {
     console.log('📋 Webhook Outbound - Datos parseados:', data);
 
     // Procesar el mensaje de Kapso AI
-    const kapsoService = getKapsoAIService();
-    if (!kapsoService) {
-      console.error('❌ Webhook Outbound - Servicio no disponible');
-      return NextResponse.json({ error: 'Servicio no disponible' }, { status: 500 });
-    }
+    const kapsoService = new KapsoService({
+      apiKey: process.env.KAPSO_API_KEY!,
+      baseUrl: process.env.KAPSO_BASE_URL!
+    });
 
     // Extraer información del mensaje
     const message = {
