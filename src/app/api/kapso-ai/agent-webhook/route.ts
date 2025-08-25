@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       execution_id,
       session_id,
       message_id: `${execution_id}_${Date.now()}`, // Generar ID único
-      type: 'message_received',
+      type: 'message_received' as const,
       timestamp
     };
     
