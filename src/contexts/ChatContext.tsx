@@ -86,7 +86,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       const currentUserId = user?.id;
       
       if (!currentUserId) {
-        console.log('No hay usuario autenticado, no se pueden cargar mensajes');
+        // console.log('No hay usuario autenticado, no se pueden cargar mensajes');
         return;
       }
       
@@ -104,7 +104,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         return phone;
       }) || [];
       
-      console.log('📱 Proveedores del usuario actual:', userProviderPhones);
+      // console.log('📱 Proveedores del usuario actual:', userProviderPhones);
       
       const response = await fetch('/api/whatsapp/messages');
       const data = await response.json();

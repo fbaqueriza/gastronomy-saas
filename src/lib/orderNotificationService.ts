@@ -21,11 +21,11 @@ export class OrderNotificationService {
         normalizedPhone = `+${normalizedPhone}`;
       }
 
-      console.log('📦 Iniciando envío de pedido a:', provider.name);
-      console.log('📱 Número normalizado:', normalizedPhone);
+      // console.log('📦 Iniciando envío de pedido a:', provider.name);
+      // console.log('📱 Número normalizado:', normalizedPhone);
 
       // PASO 1: Solo disparar conversación de Meta usando template
-      console.log('🔗 Disparando conversación de Meta con template...');
+      // console.log('🔗 Disparando conversación de Meta con template...');
       const triggerResponse = await fetch('/api/whatsapp/trigger-conversation', {
         method: 'POST',
         headers: {
@@ -38,15 +38,15 @@ export class OrderNotificationService {
       });
 
       const triggerResult = await triggerResponse.json();
-      console.log('📋 Resultado del trigger:', triggerResult);
+      // console.log('📋 Resultado del trigger:', triggerResult);
       
       if (!triggerResponse.ok) {
         console.error('❌ Error disparando conversación de Meta:', triggerResult);
         return false;
       }
 
-      console.log('✅ Conversación de Meta disparada exitosamente con template');
-      console.log('⏳ Esperando respuesta del proveedor antes de enviar detalles completos...');
+      // console.log('✅ Conversación de Meta disparada exitosamente con template');
+      // console.log('⏳ Esperando respuesta del proveedor antes de enviar detalles completos...');
 
       // PASO 2: Guardar el pedido en estado "pendiente de confirmación"
       await this.savePendingOrder(order, provider, items);
@@ -84,7 +84,7 @@ export class OrderNotificationService {
       });
 
       if (response.ok) {
-        console.log('💾 Pedido guardado en estado pendiente de confirmación');
+        // console.log('💾 Pedido guardado en estado pendiente de confirmación');
       } else {
         console.error('❌ Error guardando pedido pendiente en BD');
       }

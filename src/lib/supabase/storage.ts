@@ -19,17 +19,17 @@ export async function uploadCatalogFile(
   userId: string
 ): Promise<UploadResult> {
   try {
-    console.log('DEBUG: Starting file upload to Supabase Storage');
-    console.log('DEBUG: File details:', {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      providerId,
-      userId
-    });
+    // console.log('DEBUG: Starting file upload to Supabase Storage');
+    // console.log('DEBUG: File details:', {
+    //   name: file.name,
+    //   size: file.size,
+    //   type: file.type,
+    //   providerId,
+    //   userId
+    // });
 
     // First, let's diagnose the storage situation
-    console.log('DEBUG: Diagnosing storage buckets...');
+    // console.log('DEBUG: Diagnosing storage buckets...');
     const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
     
     if (bucketsError) {
@@ -40,7 +40,7 @@ export async function uploadCatalogFile(
       };
     }
     
-    console.log('DEBUG: Available buckets:', buckets);
+    // console.log('DEBUG: Available buckets:', buckets);
     
     // Try different bucket names in order of preference
     const bucketNames = ['files', 'avatars', 'public', 'uploads'];
@@ -50,13 +50,13 @@ export async function uploadCatalogFile(
       const bucketExists = buckets?.some(bucket => bucket.name === name);
       if (bucketExists) {
         bucketName = name;
-        console.log('DEBUG: Found bucket:', bucketName);
+        // console.log('DEBUG: Found bucket:', bucketName);
         break;
       }
     }
     
     if (!bucketName) {
-      console.log('DEBUG: No suitable bucket found, will try to create one');
+      // console.log('DEBUG: No suitable bucket found, will try to create one');
       bucketName = 'files';
     }
 
@@ -65,7 +65,7 @@ export async function uploadCatalogFile(
     const fileExtension = file.name.split('.').pop();
     const fileName = `catalog_${providerId}_${timestamp}.${fileExtension}`;
     
-    console.log('DEBUG: Generated file name:', fileName);
+    // console.log('DEBUG: Generated file name:', fileName);
 
     // Upload file to Supabase Storage
     const { data, error } = await supabase.storage
@@ -80,27 +80,27 @@ export async function uploadCatalogFile(
       
       // Check if it's an RLS (Row Level Security) error
       if (error.message.includes('row-level security') || error.message.includes('violates row-level security')) {
-        console.log('DEBUG: RLS error detected - user lacks permissions, trying local storage');
+        // console.log('DEBUG: RLS error detected - user lacks permissions, trying local storage');
         
         // Try local storage as fallback
-        try {
-          const localResult = await uploadCatalogFileLocal(file, providerId, userId);
-          if (localResult.success) {
-            console.log('DEBUG: Successfully stored file locally');
-            return {
-              success: true,
-              url: localResult.url,
-              fileName: localResult.fileName,
-              isLocal: true // Flag to indicate this is a local file
-            };
-          } else {
-            return {
-              success: false,
-              error: 'Error de permisos: El usuario no tiene permisos para subir archivos. Contacta al administrador para configurar los permisos de Storage.'
-            };
-          }
-        } catch (localError) {
-          console.error('DEBUG: Local storage also failed:', localError);
+                  try {
+            const localResult = await uploadCatalogFileLocal(file, providerId, userId);
+            if (localResult.success) {
+              // console.log('DEBUG: Successfully stored file locally');
+              return {
+                success: true,
+                url: localResult.url,
+                fileName: localResult.fileName,
+                isLocal: true // Flag to indicate this is a local file
+              };
+            } else {
+              return {
+                success: false,
+                error: 'Error de permisos: El usuario no tiene permisos para subir archivos. Contacta al administrador para configurar los permisos de Storage.'
+              };
+            }
+          } catch (localError) {
+            console.error('DEBUG: Local storage also failed:', localError);
           return {
             success: false,
             error: 'Error de permisos: El usuario no tiene permisos para subir archivos. Contacta al administrador para configurar los permisos de Storage.'
@@ -110,7 +110,7 @@ export async function uploadCatalogFile(
       
       // If it's a bucket not found error, try with a different bucket
       if (error.message.includes('bucket') || error.message.includes('not found')) {
-        console.log('DEBUG: Bucket not found, trying with avatars bucket');
+        // console.log('DEBUG: Bucket not found, trying with avatars bucket');
         const { data: retryData, error: retryError } = await supabase.storage
           .from('avatars')
           .upload(`${userId}/catalogs/${fileName}`, file, {
@@ -144,7 +144,7 @@ export async function uploadCatalogFile(
       };
     }
 
-    console.log('DEBUG: File uploaded successfully:', data);
+    // console.log('DEBUG: File uploaded successfully:', data);
 
     // Get the public URL
     const { data: urlData } = supabase.storage
@@ -152,7 +152,7 @@ export async function uploadCatalogFile(
       .getPublicUrl(`${userId}/catalogs/${fileName}`);
 
     const publicUrl = urlData.publicUrl;
-    console.log('DEBUG: Public URL generated:', publicUrl);
+    // console.log('DEBUG: Public URL generated:', publicUrl);
 
     return {
       success: true,
@@ -173,7 +173,7 @@ export async function deleteCatalogFile(
   filePath: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    console.log('DEBUG: Deleting file from Supabase Storage:', filePath);
+    // console.log('DEBUG: Deleting file from Supabase Storage:', filePath);
 
     const { error } = await supabase.storage
       .from('files')
@@ -187,7 +187,7 @@ export async function deleteCatalogFile(
       };
     }
 
-    console.log('DEBUG: File deleted successfully');
+    // console.log('DEBUG: File deleted successfully');
     return { success: true };
 
   } catch (error) {
@@ -206,7 +206,7 @@ export async function uploadCatalogFileLocal(
   userId: string
 ): Promise<UploadResult> {
   try {
-    console.log('DEBUG: Using local file storage as fallback');
+    // console.log('DEBUG: Using local file storage as fallback');
     
     // Convert file to base64 for persistent storage
     const arrayBuffer = await file.arrayBuffer();
@@ -218,7 +218,7 @@ export async function uploadCatalogFileLocal(
     const base64 = btoa(String.fromCharCode.apply(null, bytes));
     const dataUrl = `data:${file.type};base64,${base64}`;
     
-    console.log('DEBUG: Created persistent data URL for file:', file.name);
+    // console.log('DEBUG: Created persistent data URL for file:', file.name);
     
     return {
       success: true,
