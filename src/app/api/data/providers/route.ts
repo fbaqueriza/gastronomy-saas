@@ -33,11 +33,36 @@ export async function GET(request: NextRequest) {
     // Crear cliente Supabase
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Obtener todos los providers
-    const { data: providers, error } = await supabase
-      .from('providers')
-      .select('*')
-      .order('name');
+    // Obtener el token de autorización del header
+    const authHeader = request.headers.get('authorization');
+    let userId = null;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      try {
+        // Verificar el token y obtener el usuario
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        if (user && !authError) {
+          userId = user.id;
+          console.log('🔐 API data/providers - Usuario autenticado:', userId);
+        }
+      } catch (error) {
+        console.log('⚠️ API data/providers - Error verificando token:', error);
+      }
+    }
+    
+    // Construir la consulta
+    let query = supabase.from('providers').select('*').order('name');
+    
+    // Si hay usuario autenticado, filtrar por user_id
+    if (userId) {
+      query = query.eq('user_id', userId);
+      console.log('🔍 API data/providers - Filtrando por usuario:', userId);
+    } else {
+      console.log('⚠️ API data/providers - Sin autenticación, devolviendo todos los providers');
+    }
+    
+    const { data: providers, error } = await query;
     
     if (error) {
       console.error('❌ API data/providers - Error obteniendo providers:', error);
