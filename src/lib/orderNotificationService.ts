@@ -24,8 +24,8 @@ export class OrderNotificationService {
       // console.log('📦 Iniciando envío de pedido a:', provider.name);
       // console.log('📱 Número normalizado:', normalizedPhone);
 
-      // PASO 1: Solo disparar conversación de Meta usando template
-      // console.log('🔗 Disparando conversación de Meta con template...');
+      // PASO 1: Enviar mensaje personalizado de disparador
+      // console.log('🔗 Enviando mensaje personalizado de disparador...');
       const triggerResponse = await fetch('/api/whatsapp/trigger-conversation', {
         method: 'POST',
         headers: {
@@ -33,7 +33,7 @@ export class OrderNotificationService {
         },
         body: JSON.stringify({
           to: normalizedPhone,
-          template_name: 'envio_de_orden'
+          message: 'Buenas! Espero que andes bien!\n¿Puedo hacerte un pedido?'
         }),
       });
 
