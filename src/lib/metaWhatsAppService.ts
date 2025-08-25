@@ -323,30 +323,56 @@ export class MetaWhatsAppService {
         normalizedFrom = `+${normalizedFrom}`;
       }
 
-      // Guardar mensaje - Los mensajes de prueba se guardan como leídos
-      await this.saveMessage({
-        id: messageData.id || `sim_${Date.now()}`,
-        from: normalizedFrom,
-        to: messageData.to,
-        content: messageContent,
-        timestamp: new Date(messageData.timestamp || Date.now()),
-        status: this.isSimulationMode ? 'read' : 'delivered',
-        isAutomated: false,
-        isSimulated: this.isSimulationMode
-      });
-
-      // ENVIAR POR SSE PARA TIEMPO REAL
-      const { sendMessageToClients } = await import('./sseUtils');
-      const sseMessage = {
-        type: 'whatsapp_message',
-        contactId: normalizedFrom,
-        id: messageData.id || `sim_${Date.now()}`,
-        content: messageContent,
-        timestamp: new Date().toISOString(),
-        status: 'delivered'
-      };
+      // Verificar si este mensaje ya existe en la base de datos antes de guardarlo
+      // Esto evita duplicados cuando Meta confirma mensajes enviados desde la plataforma
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
       
-      sendMessageToClients(sseMessage);
+      if (supabaseUrl && supabaseServiceKey) {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        
+        // Verificar si ya existe un mensaje con el mismo content y contact_id en los últimos 30 segundos
+        const thirtySecondsAgo = new Date(Date.now() - 30 * 1000).toISOString();
+        const { data: existingMessage } = await supabase
+          .from('whatsapp_messages')
+          .select('id')
+          .eq('content', messageContent)
+          .eq('contact_id', normalizedFrom)
+          .gte('timestamp', thirtySecondsAgo)
+          .single();
+        
+        if (existingMessage) {
+          console.log('🔄 Mensaje duplicado detectado en webhook, evitando guardar:', messageContent);
+          // No guardar el mensaje, pero sí enviar por SSE para actualizar el frontend
+        } else {
+          // Guardar mensaje - Los mensajes de prueba se guardan como leídos
+          await this.saveMessage({
+            id: messageData.id || `sim_${Date.now()}`,
+            from: normalizedFrom,
+            to: messageData.to,
+            content: messageContent,
+            timestamp: new Date(messageData.timestamp || Date.now()),
+            status: this.isSimulationMode ? 'read' : 'delivered',
+            isAutomated: false,
+            isSimulated: this.isSimulationMode
+          });
+        }
+      } else {
+        // Si no hay configuración de Supabase, guardar normalmente
+        await this.saveMessage({
+          id: messageData.id || `sim_${Date.now()}`,
+          from: normalizedFrom,
+          to: messageData.to,
+          content: messageContent,
+          timestamp: new Date(messageData.timestamp || Date.now()),
+          status: this.isSimulationMode ? 'read' : 'delivered',
+          isAutomated: false,
+          isSimulated: this.isSimulationMode
+        });
+      }
+
+      // SSE removido - el frontend se actualiza con polling
       
       // Comentado: Respuesta automática desactivada
       // const analysis = await this.analyzeWithAI(messageData.text?.body || messageData.message);

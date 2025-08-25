@@ -117,7 +117,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       if (data.messages && Array.isArray(data.messages)) {
         const transformedMessages = data.messages
           .map((msg: any) => ({
-            id: msg.id,
+            id: msg.message_sid || msg.id, // Usar message_sid (ID de Meta) como prioridad
             content: msg.content,
             timestamp: new Date(msg.timestamp || msg.created_at),
             type: msg.message_type === 'sent' ? 'sent' : 'received',
@@ -132,12 +132,45 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         
         // PRESERVAR MENSAJES LOCALES Y DETECTAR NUEVOS MENSAJES
         setMessages(prev => {
-          const newMessages = [...transformedMessages];
-          const hasNewMessages = newMessages.length !== prev.length || 
-            newMessages.some((msg, index) => !prev[index] || msg.id !== prev[index].id);
+          // Crear un mapa de mensajes existentes por ID para evitar duplicados
+          const existingMessagesMap = new Map(prev.map(msg => [msg.id, msg]));
+          
+          // Crear un mapa adicional para detectar duplicados por contenido y timestamp
+          const contentTimestampMap = new Map();
+          prev.forEach(msg => {
+            const key = `${msg.content}-${msg.contact_id}-${new Date(msg.timestamp).getTime()}`;
+            contentTimestampMap.set(key, true);
+          });
+          
+          // Agregar solo mensajes nuevos que no existan
+          let hasNewMessages = false;
+          const updatedMessages = [...prev];
+          
+                     transformedMessages.forEach((newMsg: ChatWhatsAppMessage) => {
+             const contentTimestampKey = `${newMsg.content}-${newMsg.contact_id}-${new Date(newMsg.timestamp).getTime()}`;
+             
+             // Verificar si el mensaje ya existe por ID o por contenido+timestamp
+             // También verificar si es un mensaje temporal que ya existe
+             const isDuplicate = existingMessagesMap.has(newMsg.id) || 
+                                contentTimestampMap.has(contentTimestampKey) ||
+                                prev.some(msg => msg.id.startsWith('temp_') && 
+                                              msg.content === newMsg.content && 
+                                              msg.contact_id === newMsg.contact_id);
+             
+             if (!isDuplicate) {
+               updatedMessages.push(newMsg);
+               hasNewMessages = true;
+               // Agregar al mapa para evitar futuros duplicados
+               contentTimestampMap.set(contentTimestampKey, true);
+             }
+             // Duplicados detectados y filtrados silenciosamente
+           });
           
           if (hasNewMessages) {
-            return newMessages;
+            // Ordenar por timestamp para mantener el orden correcto
+            return updatedMessages.sort((a, b) => 
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            );
           }
           return prev;
         });
@@ -148,12 +181,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const forceReconnectSSE = useCallback(() => {
-    console.log('🔄 Reconectando Supabase Realtime...');
-    // Solo reconectar si hay problemas de conexión
-    if (connectionStatus === 'disconnected') {
-      window.location.reload();
-    }
-  }, [connectionStatus]);
+    console.log('🔄 Recargando página para reconectar...');
+    window.location.reload();
+  }, []);
 
     // CARGAR MENSAJES INICIALES Y POLLING OPTIMIZADO
   useEffect(() => {
@@ -216,19 +246,25 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const sendMessage = useCallback(async (contactId: string, content: string) => {
     if (!content.trim()) return;
 
-                const newMessage: ChatWhatsAppMessage = {
-        id: Date.now().toString(),
-        content: content.trim(),
-        timestamp: new Date(),
-        type: 'sent',
-        contact_id: contactId,
-        status: 'sent'
-      };
+    console.log('📤 ChatContext - Enviando mensaje:', { contactId, content });
+
+    // Generar un ID temporal que será reemplazado por el ID real de la base de datos
+    const tempId = `temp_${Date.now()}`;
+    
+    const newMessage: ChatWhatsAppMessage = {
+      id: tempId,
+      content: content.trim(),
+      timestamp: new Date(),
+      type: 'sent',
+      contact_id: contactId,
+      status: 'sent'
+    };
 
     // Agregar mensaje localmente inmediatamente
     setMessages(prev => [...prev, newMessage]);
 
     try {
+      console.log('📤 ChatContext - Llamando a API sendMessage');
       // Enviar mensaje al servidor
       const response = await fetch('/api/whatsapp/send', {
         method: 'POST',
@@ -242,61 +278,26 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       });
 
       const result = await response.json();
+      console.log('📤 ChatContext - Respuesta de API:', result);
       
       if (result.success) {
-        // Actualizar estado del mensaje
+        // Actualizar el mensaje local con el ID real de la base de datos
+        const realMessageId = result.messageId || `msg_${Date.now()}`;
+        
         setMessages(prev => 
           prev.map(msg => 
-            msg.id === newMessage.id 
-              ? { ...msg, status: 'delivered' as const }
+            msg.id === tempId 
+              ? { ...msg, id: realMessageId, status: 'delivered' as const }
               : msg
           )
         );
         
-                         // Guardar mensaje en base de datos después de envío exitoso
-        try {
-          // Obtener el usuario actual usando la instancia existente
-          const { data: { user } } = await supabase.auth.getUser();
-          const userId = user?.id || 'default_user';
-           
-           const generateUUID = () => {
-             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-               const r = Math.random() * 16 | 0;
-               const v = c == 'x' ? r : (r & 0x3 | 0x8);
-               return v.toString(16);
-             });
-           };
-           
-           // Usar la API en lugar de inserción directa para evitar problemas de permisos
-           const saveResponse = await fetch('/api/whatsapp/save-message', {
-             method: 'POST',
-             headers: {
-               'Content-Type': 'application/json',
-             },
-             body: JSON.stringify({
-               id: generateUUID(),
-               message_sid: result.messageId || `msg_${Date.now()}`,
-               from: '670680919470999',
-               to: contactId,
-               content: content.trim(),
-               timestamp: new Date().toISOString(),
-               status: 'sent',
-               message_type: 'sent',
-               user_id: userId
-             }),
-           });
-           
-           if (!saveResponse.ok) {
-             console.error('Error guardando mensaje en BD:', await saveResponse.text());
-           }
-         } catch (error) {
-           console.error('Error saving message to DB:', error);
-         }
+        console.log('✅ Mensaje local actualizado con ID real:', realMessageId);
       } else {
         // Marcar como fallido si hay error
         setMessages(prev => 
           prev.map(msg => 
-            msg.id === newMessage.id 
+            msg.id === tempId 
               ? { ...msg, status: 'failed' as const }
               : msg
           )
@@ -313,7 +314,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         )
       );
     }
-  }, [loadMessages]);
+  }, []);
 
   // Función para agregar mensaje manualmente
   const addMessage = useCallback((contactId: string, message: ChatWhatsAppMessage) => {
@@ -386,9 +387,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     // Calcular mensajes agrupados por contacto y ordenar por última actividad
   const messagesByContact = useMemo(() => {
-          const grouped: { [contactId: string]: ChatWhatsAppMessage[] } = {};
-     
+    const grouped: { [contactId: string]: ChatWhatsAppMessage[] } = {};
+    
+    // Crear un Map para filtrar duplicados por ID antes de agrupar
+    const uniqueMessages = new Map<string, ChatWhatsAppMessage>();
+    
     messages.forEach(message => {
+      // Usar el ID del mensaje como clave para evitar duplicados
+      if (!uniqueMessages.has(message.id)) {
+        uniqueMessages.set(message.id, message);
+      }
+    });
+    
+    // Agrupar mensajes únicos por contacto
+    uniqueMessages.forEach(message => {
       const contactId = normalizeContactIdentifier(message.contact_id);
       if (!grouped[contactId]) {
         grouped[contactId] = [];
