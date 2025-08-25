@@ -561,7 +561,7 @@ function ProvidersPage() {
     'name': 'name',
     'contacto': 'contactName',
     'contactname': 'contactName',
-    'contact_name': 'contactName',
+    'contactName': 'contactName',
     'contacto_nombre': 'contactName',
     'nombre_contacto': 'contactName',
     'contact': 'contactName',
@@ -655,7 +655,7 @@ function ProvidersPage() {
       try {
         const safeItems = importedProviders.map(item => ({
           name: item.name,
-          contact_name: item.contactName || '',
+          contactName: item.contactName || '',
           categories: item.categories,
           tags: item.tags,
           notes: item.notes,
@@ -722,7 +722,7 @@ function ProvidersPage() {
         // Map camelCase to snake_case for DB
         const safeProviderSnake = {
           ...safeProvider,
-          contact_name: safeProvider.contactName,
+          contactName: safeProvider.contactName,
           razon_social: safeProvider.razonSocial,
           cuit_cuil: safeProvider.cuitCuil,
           created_at: safeProvider.createdAt,

@@ -23,7 +23,7 @@ export interface Message {
   content: string;
   message_type: 'text' | 'image' | 'document' | 'audio' | 'video';
   status: 'sent' | 'delivered' | 'read' | 'failed';
-  source: 'whatsapp' | 'kapso_agent' | 'system';
+  source: 'whatsapp' | 'system';
   metadata: Record<string, any>;
   is_read: boolean;
   created_at: string;
@@ -41,13 +41,10 @@ export interface Conversation {
   updated_at: string;
 }
 
-export interface KapsoWebhookPayload {
+export interface WhatsAppPayload {
   from: string;
   to: string;
   message: string;
-  agent_id?: string;
-  execution_id?: string;
-  session_id?: string;
   message_id?: string;
   type?: 'message_received' | 'message_sent' | 'status_update';
   timestamp?: string;
@@ -56,7 +53,7 @@ export interface KapsoWebhookPayload {
 // Servicio de mensajería (solo para servidor)
 export class MessagingService {
   // Guardar mensaje con idempotencia
-  static async saveMessage(payload: KapsoWebhookPayload, source: 'whatsapp' | 'kapso_agent' = 'whatsapp'): Promise<Message | null> {
+  static async saveMessage(payload: WhatsAppPayload, source: 'whatsapp' | 'system' = 'whatsapp'): Promise<Message | null> {
     try {
       console.log('💾 Guardando mensaje:', payload);
       
@@ -91,9 +88,6 @@ export class MessagingService {
           status: 'delivered',
           source: source,
           metadata: {
-            agent_id: payload.agent_id,
-            execution_id: payload.execution_id,
-            session_id: payload.session_id,
             type: payload.type
           }
         })

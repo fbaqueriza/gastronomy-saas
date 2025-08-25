@@ -233,7 +233,7 @@ export default function IntegratedChatPanel({
           name: contact.name,
           phone: contact.phone,
           lastMessage: contact.lastMessage,
-          lastMessageTime: contact.lastMessageTime,
+          lastMessageTime: contact.lastMessageTime || new Date(),
           unreadCount: contact.unreadCount
         };
         allContacts.push(contactWithId);

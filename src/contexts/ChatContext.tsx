@@ -18,6 +18,7 @@ interface Contact {
   phone: string;
   name: string;
   lastMessage?: string;
+  lastMessageTime?: Date;
   unreadCount?: number;
 }
 
@@ -38,6 +39,7 @@ interface ChatContextType {
   selectContact: (contact: Contact) => void;
   loadMessages: () => Promise<void>;
   forceReconnectSSE: () => void;
+  addMessage: (contactId: string, message: WhatsAppMessage) => void;
 }
 
 // Contexto

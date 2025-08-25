@@ -71,7 +71,7 @@ function mapOrderFromDb(order: any): Order {
 function mapProviderFromDb(provider: any): Provider {
   return {
     ...provider,
-    contactName: provider.contact_name,
+    contactName: provider.contactName,
     razonSocial: provider.razon_social,
     cuitCuil: provider.cuit_cuil,
     defaultDeliveryDays: provider.default_delivery_days || [],
