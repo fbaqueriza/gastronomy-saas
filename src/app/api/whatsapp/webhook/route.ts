@@ -80,15 +80,29 @@ export async function POST(request: NextRequest) {
           // Procesar mensaje en base de datos (incluye SSE)
           await metaWhatsAppService.processIncomingMessage(message);
 
-          // NUEVO: Verificar si es una respuesta de proveedor y enviar detalles del pedido
+          // Verificar si es una respuesta de proveedor y enviar detalles del pedido (solo una vez)
           if (messageContent && messageContent.trim().length > 0) {
             console.log('🔍 Verificando si es respuesta de proveedor:', normalizedFrom);
             
             try {
-              // Intentar enviar detalles del pedido si hay uno pendiente
-              const success = await OrderNotificationService.sendOrderDetailsAfterConfirmation(normalizedFrom);
-              if (success) {
-                console.log('✅ Detalles del pedido enviados automáticamente después de respuesta del proveedor');
+              // Verificar si ya se envió la orden para este proveedor
+              const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+              const checkResponse = await fetch(`${baseUrl}/api/whatsapp/get-pending-order`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ providerPhone: normalizedFrom }),
+              });
+
+              // Solo enviar si hay un pedido pendiente
+              if (checkResponse.ok) {
+                const success = await OrderNotificationService.sendOrderDetailsAfterConfirmation(normalizedFrom);
+                if (success) {
+                  console.log('✅ Detalles del pedido enviados automáticamente después de respuesta del proveedor');
+                }
+              } else {
+                console.log('ℹ️ No hay pedido pendiente para este proveedor, no se envía orden automática');
               }
             } catch (error) {
               console.error('❌ Error procesando respuesta de proveedor:', error);

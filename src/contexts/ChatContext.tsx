@@ -267,17 +267,28 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
              });
            };
            
-           await supabase.from('whatsapp_messages').insert({
-             id: generateUUID(),
-             message_sid: result.messageId || `msg_${Date.now()}`,
-             from: process.env.NEXT_PUBLIC_WHATSAPP_PHONE_NUMBER_ID || '670680919470999',
-             to: contactId,
-             content: content.trim(),
-             timestamp: new Date().toISOString(),
-             status: 'sent',
-             message_type: 'sent',
-             user_id: userId
+           // Usar la API en lugar de inserción directa para evitar problemas de permisos
+           const saveResponse = await fetch('/api/whatsapp/save-message', {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+             },
+             body: JSON.stringify({
+               id: generateUUID(),
+               message_sid: result.messageId || `msg_${Date.now()}`,
+               from: '670680919470999',
+               to: contactId,
+               content: content.trim(),
+               timestamp: new Date().toISOString(),
+               status: 'sent',
+               message_type: 'sent',
+               user_id: userId
+             }),
            });
+           
+           if (!saveResponse.ok) {
+             console.error('Error guardando mensaje en BD:', await saveResponse.text());
+           }
          } catch (error) {
            console.error('Error saving message to DB:', error);
          }
