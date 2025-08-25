@@ -238,8 +238,8 @@ export default function IntegratedChatPanel({
       
       if (!existingContact) {
         // Proveedor sin mensajes - agregarlo con nombre correcto
-        const providerDisplayName = provider.contact_name 
-          ? `${provider.name} - ${provider.contact_name}`
+        const providerDisplayName = provider.contactName 
+          ? `${provider.name} - ${provider.contactName}`
           : provider.name;
         
         allContacts.push({
@@ -253,8 +253,8 @@ export default function IntegratedChatPanel({
         });
       } else {
         // Actualizar el nombre del contacto existente con el nombre del proveedor
-        const providerDisplayName = provider.contact_name 
-          ? `${provider.name} - ${provider.contact_name}`
+        const providerDisplayName = provider.contactName 
+          ? `${provider.name} - ${provider.contactName}`
           : provider.name;
         
         existingContact.name = providerDisplayName;
