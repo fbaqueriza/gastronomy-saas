@@ -375,8 +375,8 @@ function DashboardPageContent({
       // Crear contacto para el chat con el formato correcto
       const contact = {
         id: provider.id,
-        name: provider.contact_name 
-          ? `${provider.name} - ${provider.contact_name}`
+        name: provider.contactName 
+          ? `${provider.name} - ${provider.contactName}`
           : provider.name,
         phone: normalizedPhone,
         providerId: provider.id,
