@@ -76,22 +76,11 @@ export function usePushNotifications() {
         badge: '/favicon.ico',
         tag: options.tag || 'whatsapp-message',
         requireInteraction: options.requireInteraction || true,
-        silent: false,
-        actions: options.actions || [
-          {
-            action: 'close',
-            title: 'Cerrar',
-            icon: '/close-icon.png'
-          }
-        ]
+        silent: false
       });
 
       notification.onclick = (event) => {
         event.preventDefault();
-        if (event.action === 'close') {
-          notification.close();
-          return;
-        }
         notification.close();
         if (window.focus) { window.focus(); }
         window.dispatchEvent(new CustomEvent('openChat'));

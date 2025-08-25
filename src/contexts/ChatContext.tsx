@@ -3,28 +3,18 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import supabase from '../lib/supabaseClient';
+import { WhatsAppMessage, Contact } from '../types/whatsapp';
 
 // Tipos
-interface WhatsAppMessage {
-  id: string;
-  content: string;
-  timestamp: string;
-  type: 'sent' | 'received';
+interface ChatWhatsAppMessage extends WhatsAppMessage {
   contact_id: string;
-  status: 'sent' | 'delivered' | 'read' | 'failed';
 }
 
-interface Contact {
-  phone: string;
-  name: string;
-  lastMessage?: string;
-  lastMessageTime?: Date;
-  unreadCount?: number;
-}
+
 
 interface ChatContextType {
-  messages: WhatsAppMessage[];
-  messagesByContact: { [contactId: string]: WhatsAppMessage[] };
+  messages: ChatWhatsAppMessage[];
+  messagesByContact: { [contactId: string]: ChatWhatsAppMessage[] };
   sortedContacts: Contact[];
   selectedContact: Contact | null;
   unreadCounts: { [contactId: string]: number };
@@ -39,7 +29,7 @@ interface ChatContextType {
   selectContact: (contact: Contact) => void;
   loadMessages: () => Promise<void>;
   forceReconnectSSE: () => void;
-  addMessage: (contactId: string, message: WhatsAppMessage) => void;
+  addMessage: (contactId: string, message: ChatWhatsAppMessage) => void;
 }
 
 // Contexto
@@ -66,7 +56,7 @@ const normalizeContactIdentifier = (contactId: string): string => {
 
 // Provider
 export function ChatProvider({ children }: { children: React.ReactNode }) {
-  const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
+  const [messages, setMessages] = useState<ChatWhatsAppMessage[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('disconnected');
@@ -181,14 +171,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const sendMessage = useCallback(async (contactId: string, content: string) => {
     if (!content.trim()) return;
 
-    const newMessage: WhatsAppMessage = {
-      id: Date.now().toString(),
-      content: content.trim(),
-      timestamp: new Date().toISOString(),
-      type: 'sent',
-      contact_id: contactId,
-      status: 'sent'
-    };
+                const newMessage: ChatWhatsAppMessage = {
+        id: Date.now().toString(),
+        content: content.trim(),
+        timestamp: new Date(),
+        type: 'sent',
+        contact_id: contactId,
+        status: 'sent'
+      };
 
     // Agregar mensaje localmente inmediatamente
     setMessages(prev => [...prev, newMessage]);
@@ -271,6 +261,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadMessages]);
 
+  // Función para agregar mensaje manualmente
+  const addMessage = useCallback((contactId: string, message: ChatWhatsAppMessage) => {
+    setMessages(prev => [...prev, message]);
+  }, []);
+
   // SOLUCIÓN INTEGRAL markAsRead - ACTUALIZACIÓN INMEDIATA Y PERSISTENTE
   const markAsRead = useCallback(async (contactId: string) => {
     if (!contactId) return;
@@ -337,7 +332,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   // Calcular mensajes agrupados por contacto y ordenar por última actividad
   const messagesByContact = useMemo(() => {
-    const grouped: { [contactId: string]: WhatsAppMessage[] } = {};
+          const grouped: { [contactId: string]: ChatWhatsAppMessage[] } = {};
     
     messages.forEach(message => {
       const contactId = normalizeContactIdentifier(message.contact_id);
@@ -388,6 +383,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       // No generar nombres temporales - dejar que IntegratedChatPanel los maneje
       const phoneNumber = contactId.replace('+', '');
       contacts.push({
+        id: contactId,
         phone: contactId,
         name: `Contacto ${phoneNumber.slice(-4)}`, // Nombre temporal básico
         lastMessage: lastMessage.content,
@@ -461,7 +457,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     markAsRead,
     selectContact,
     loadMessages,
-    forceReconnectSSE
+    forceReconnectSSE,
+    addMessage
   }), [
     messages,
     messagesByContact,
@@ -478,7 +475,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     markAsRead,
     selectContact,
     loadMessages,
-    forceReconnectSSE
+    forceReconnectSSE,
+    addMessage
   ]);
 
   return (

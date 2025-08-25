@@ -10,7 +10,12 @@ export function useWhatsAppSync() {
   // Función para agregar un mensaje entrante manualmente
   const addIncomingMessage = useCallback((contactId: string, message: WhatsAppMessage) => {
     console.log('📝 useWhatsAppSync - addIncomingMessage llamado:', { contactId, messageId: message.id });
-    addMessage(contactId, message);
+    // Convertir el mensaje al formato esperado por el contexto
+    const chatMessage = {
+      ...message,
+      contact_id: contactId
+    };
+    addMessage(contactId, chatMessage);
   }, [addMessage]);
 
   // Función para simular un mensaje entrante
