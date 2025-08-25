@@ -98,19 +98,7 @@ export interface WhatsAppTemplate {
   status: 'APPROVED' | 'PENDING' | 'REJECTED';
 }
 
-export interface ConversationSession {
-  id: string;
-  customerPhone: string;
-  providerId: string;
-  orderId?: string;
-  status: 'active' | 'resolved' | 'escalated';
-  messages: WhatsAppMessage[];
-  aiAnalysis: AIAnalysis[];
-  assignedAgent?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  lastMessageAt: Date;
-}
+// ConversationSession removido - no se usa en la implementación actual
 
 export interface DocumentAnalysis {
   id: string;
