@@ -372,18 +372,7 @@ export class MetaWhatsAppService {
         });
       }
 
-      // ENVIAR POR SSE PARA TIEMPO REAL
-      const { sendMessageToClients } = await import('./sseUtils');
-      const sseMessage = {
-        type: 'whatsapp_message',
-        contactId: normalizedFrom,
-        id: messageData.id || `sim_${Date.now()}`,
-        content: messageContent,
-        timestamp: new Date().toISOString(),
-        status: 'delivered'
-      };
-      
-      sendMessageToClients(sseMessage);
+      // SSE removido - el frontend se actualiza con polling
       
       // Comentado: Respuesta automática desactivada
       // const analysis = await this.analyzeWithAI(messageData.text?.body || messageData.message);

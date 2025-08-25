@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { metaWhatsAppService } from '../../../../lib/metaWhatsAppService';
-import { sendMessageToClients } from '../../../../lib/sseUtils';
+// SSE removido - usando polling en su lugar
 import { OrderNotificationService } from '../../../../lib/orderNotificationService';
 
 export async function GET(request: NextRequest) {

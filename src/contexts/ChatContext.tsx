@@ -181,12 +181,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const forceReconnectSSE = useCallback(() => {
-    console.log('🔄 Reconectando Supabase Realtime...');
-    // Solo reconectar si hay problemas de conexión
-    if (connectionStatus === 'disconnected') {
-      window.location.reload();
-    }
-  }, [connectionStatus]);
+    console.log('🔄 Recargando página para reconectar...');
+    window.location.reload();
+  }, []);
 
     // CARGAR MENSAJES INICIALES Y POLLING OPTIMIZADO
   useEffect(() => {
