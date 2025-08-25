@@ -360,18 +360,18 @@ export class MetaWhatsAppService {
             return; // Salir sin guardar
           }
         }
-          // Guardar mensaje - Los mensajes de prueba se guardan como leídos
-          await this.saveMessage({
-            id: messageData.id || `sim_${Date.now()}`,
-            from: normalizedFrom,
-            to: messageData.to,
-            content: messageContent,
-            timestamp: new Date(messageData.timestamp || Date.now()),
-            status: this.isSimulationMode ? 'read' : 'delivered',
-            isAutomated: false,
-            isSimulated: this.isSimulationMode
-          });
-        }
+        
+        // Guardar mensaje - Los mensajes de prueba se guardan como leídos
+        await this.saveMessage({
+          id: messageData.id || `sim_${Date.now()}`,
+          from: normalizedFrom,
+          to: messageData.to,
+          content: messageContent,
+          timestamp: new Date(messageData.timestamp || Date.now()),
+          status: this.isSimulationMode ? 'read' : 'delivered',
+          isAutomated: false,
+          isSimulated: this.isSimulationMode
+        });
       } else {
         // Si no hay configuración de Supabase, guardar normalmente
         await this.saveMessage({
