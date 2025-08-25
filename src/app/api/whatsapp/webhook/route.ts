@@ -80,12 +80,12 @@ export async function POST(request: NextRequest) {
           // Procesar mensaje en base de datos (incluye SSE)
           await metaWhatsAppService.processIncomingMessage(message);
 
-          // Verificar si es una respuesta de proveedor y enviar detalles del pedido (solo una vez)
+          // Verificar si es una respuesta de proveedor y enviar detalles del pedido (solo después del disparador inicial)
           if (messageContent && messageContent.trim().length > 0) {
             console.log('🔍 Verificando si es respuesta de proveedor:', normalizedFrom);
             
             try {
-              // Verificar si ya se envió la orden para este proveedor
+              // Verificar si hay un pedido pendiente para este proveedor
               const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
               const checkResponse = await fetch(`${baseUrl}/api/whatsapp/get-pending-order`, {
                 method: 'POST',
@@ -95,11 +95,27 @@ export async function POST(request: NextRequest) {
                 body: JSON.stringify({ providerPhone: normalizedFrom }),
               });
 
-              // Solo enviar si hay un pedido pendiente
+              // Solo enviar la orden si hay un pedido pendiente Y es la primera respuesta después del disparador
               if (checkResponse.ok) {
-                const success = await OrderNotificationService.sendOrderDetailsAfterConfirmation(normalizedFrom);
-                if (success) {
-                  console.log('✅ Detalles del pedido enviados automáticamente después de respuesta del proveedor');
+                const checkResult = await checkResponse.json();
+                if (checkResult.success) {
+                  // Verificar si este es el primer mensaje después del disparador
+                  // Solo enviar la orden si el pedido fue creado recientemente (últimos 5 minutos)
+                  const orderCreatedAt = new Date(checkResult.createdAt);
+                  const now = new Date();
+                  const timeDiff = now.getTime() - orderCreatedAt.getTime();
+                  const fiveMinutes = 5 * 60 * 1000; // 5 minutos en milisegundos
+                  
+                  if (timeDiff <= fiveMinutes) {
+                    const success = await OrderNotificationService.sendOrderDetailsAfterConfirmation(normalizedFrom);
+                    if (success) {
+                      console.log('✅ Detalles del pedido enviados automáticamente después de respuesta del proveedor');
+                    }
+                  } else {
+                    console.log('ℹ️ Pedido pendiente pero no es la primera respuesta, no se envía orden automática');
+                  }
+                } else {
+                  console.log('ℹ️ No hay pedido pendiente para este proveedor, no se envía orden automática');
                 }
               } else {
                 console.log('ℹ️ No hay pedido pendiente para este proveedor, no se envía orden automática');

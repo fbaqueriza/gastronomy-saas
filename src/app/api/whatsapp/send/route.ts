@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     if (result && (result.id || result.simulated || result.messages)) {
       return NextResponse.json({
         success: true,
-        messageId: result.id || result.messages?.[0]?.id,
+        messageId: result.messages?.[0]?.id || result.id, // Priorizar el message_sid de Meta
         timestamp: new Date().toISOString(),
         simulated: result.simulated || false,
         mode: metaWhatsAppService.isSimulationModeEnabled() ? 'simulation' : 'production'

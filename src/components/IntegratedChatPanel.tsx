@@ -361,26 +361,42 @@ export default function IntegratedChatPanel({
     }
   }, [newMessage]);
 
+  const [isSending, setIsSending] = useState(false);
+
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !currentContact) {
+    if (!newMessage.trim() || !currentContact || isSending) {
       return;
     }
 
     const messageToSend = newMessage.trim();
     
+    // Prevenir envíos duplicados con protección adicional
+    if (isSending) {
+      console.log('⚠️ Envío en progreso, ignorando llamada duplicada');
+      return;
+    }
+    
+    setIsSending(true);
+    
     // Limpiar el input inmediatamente para mejor UX
     setNewMessage('');
     
     try {
+      console.log('📤 Enviando mensaje:', messageToSend);
       await sendMessage(currentContact.phone, messageToSend);
+      console.log('✅ Mensaje enviado exitosamente');
+      
       // Scroll al final después de enviar el mensaje
       setTimeout(() => {
         scrollToBottom();
       }, 100);
     } catch (error) {
+      console.error('❌ Error enviando mensaje:', error);
       // Restaurar el mensaje si falla
       setNewMessage(messageToSend);
       alert('Error al enviar mensaje. Inténtalo de nuevo.');
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -425,8 +441,11 @@ export default function IntegratedChatPanel({
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (newMessage.trim() && currentContact) {
+      if (newMessage.trim() && currentContact && !isSending) {
+        console.log('🔑 Enter presionado, enviando mensaje');
         handleSendMessage();
+      } else if (isSending) {
+        console.log('⚠️ Enter presionado pero envío en progreso, ignorando');
       }
     }
   };
@@ -664,7 +683,7 @@ export default function IntegratedChatPanel({
                   {newMessage.trim() && !hanPasado24Horas() ? (
               <button
                       onClick={handleSendMessage}
-                      disabled={uploadingDocument}
+                      disabled={uploadingDocument || isSending}
                       className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <Send className="h-5 w-5" />
