@@ -29,7 +29,7 @@ export default function GlobalChatWrapper() {
             return;
           }
 
-          fetch('/api/providers', {
+          fetch('/api/data/providers', {
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
               'Content-Type': 'application/json'
@@ -60,7 +60,7 @@ export default function GlobalChatWrapper() {
         });
       } else {
         // Si no hay usuario, intentar cargar sin autenticación (para landing page)
-        fetch('/api/providers')
+        fetch('/api/data/providers')
           .then(r => r.json())
           .then(result => {
             if (result.providers && Array.isArray(result.providers)) {
