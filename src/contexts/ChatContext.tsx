@@ -88,7 +88,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         const transformedMessages = data.messages.map((msg: any) => ({
           id: msg.id,
           content: msg.content,
-          timestamp: msg.timestamp || msg.created_at,
+          timestamp: new Date(msg.timestamp || msg.created_at),
           type: msg.message_type === 'sent' ? 'sent' : 'received',
           contact_id: msg.contact_id || msg.from,
           status: msg.status || 'delivered'
@@ -101,6 +101,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             newMessages.some((msg, index) => !prev[index] || msg.id !== prev[index].id);
           
           if (hasNewMessages) {
+            console.log('🔄 Mensajes actualizados:', newMessages.length, 'mensajes');
             return newMessages;
           }
           return prev;
@@ -356,8 +357,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     
     // Solo procesar si tenemos mensajes válidos
     if (!messages || messages.length === 0) {
+      console.log('📱 No hay mensajes para procesar');
       return contacts;
     }
+    
+    console.log('📱 Procesando', messages.length, 'mensajes para contactos');
     
     Object.entries(messagesByContact).forEach(([contactId, contactMessages]) => {
       if (contactMessages.length === 0) return;
