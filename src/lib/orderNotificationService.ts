@@ -26,7 +26,8 @@ export class OrderNotificationService {
 
       // PASO 1: Enviar mensaje personalizado de disparador
       // console.log('🔗 Enviando mensaje personalizado de disparador...');
-      const triggerResponse = await fetch('/api/whatsapp/trigger-conversation', {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+      const triggerResponse = await fetch(`${baseUrl}/api/whatsapp/trigger-conversation`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -49,7 +50,9 @@ export class OrderNotificationService {
       // console.log('⏳ Esperando respuesta del proveedor antes de enviar detalles completos...');
 
       // PASO 2: Guardar el pedido en estado "pendiente de confirmación"
+      console.log('💾 Guardando pedido pendiente para:', normalizedPhone);
       await this.savePendingOrder(order, provider, items);
+      console.log('✅ Pedido pendiente guardado exitosamente');
 
       return true;
 
@@ -84,9 +87,11 @@ export class OrderNotificationService {
       });
 
       if (response.ok) {
-        // console.log('💾 Pedido guardado en estado pendiente de confirmación');
+        console.log('💾 Pedido guardado en estado pendiente de confirmación');
       } else {
         console.error('❌ Error guardando pedido pendiente en BD');
+        const errorData = await response.json();
+        console.error('❌ Detalles del error:', errorData);
       }
     } catch (error) {
       console.error('❌ Error guardando pedido pendiente:', error);
