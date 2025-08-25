@@ -109,9 +109,11 @@ function OrdersPage({ user }: OrdersPageProps) {
           // Forzar recarga de mensajes después de enviar la orden
           setTimeout(() => {
             // Disparar un evento personalizado para actualizar el chat
-            window.dispatchEvent(new CustomEvent('orderSent', {
-              detail: { orderId: newOrder.id, providerId: orderData.providerId }
-            }));
+            if (newOrder) {
+              window.dispatchEvent(new CustomEvent('orderSent', {
+                detail: { orderId: newOrder.id, providerId: orderData.providerId }
+              }));
+            }
           }, 2000); // Esperar 2 segundos para que se procese el mensaje
         } else {
           console.error('❌ Error enviando notificación de pedido');
