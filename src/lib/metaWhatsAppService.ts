@@ -332,20 +332,34 @@ export class MetaWhatsAppService {
         const { createClient } = await import('@supabase/supabase-js');
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
         
-        // Verificar si ya existe un mensaje con el mismo content y contact_id en los últimos 30 segundos
-        const thirtySecondsAgo = new Date(Date.now() - 30 * 1000).toISOString();
-        const { data: existingMessage } = await supabase
-          .from('whatsapp_messages')
-          .select('id')
-          .eq('content', messageContent)
-          .eq('contact_id', normalizedFrom)
-          .gte('timestamp', thirtySecondsAgo)
-          .single();
-        
-        if (existingMessage) {
-          console.log('🔄 Mensaje duplicado detectado en webhook, evitando guardar:', messageContent);
-          // No guardar el mensaje, pero sí enviar por SSE para actualizar el frontend
+        // Verificar si ya existe un mensaje con el mismo ID de Meta (más preciso que content)
+        if (messageData.id) {
+          const { data: existingMessage } = await supabase
+            .from('whatsapp_messages')
+            .select('id')
+            .eq('message_sid', messageData.id)
+            .single();
+          
+          if (existingMessage) {
+            console.log('🔄 Mensaje duplicado detectado en webhook (por ID), evitando guardar:', messageContent);
+            return; // Salir sin guardar
+          }
         } else {
+          // Fallback: verificar por content y contact_id en los últimos 10 segundos (más restrictivo)
+          const tenSecondsAgo = new Date(Date.now() - 10 * 1000).toISOString();
+          const { data: existingMessage } = await supabase
+            .from('whatsapp_messages')
+            .select('id')
+            .eq('content', messageContent)
+            .eq('contact_id', normalizedFrom)
+            .gte('timestamp', tenSecondsAgo)
+            .single();
+          
+          if (existingMessage) {
+            console.log('🔄 Mensaje duplicado detectado en webhook (por contenido), evitando guardar:', messageContent);
+            return; // Salir sin guardar
+          }
+        }
           // Guardar mensaje - Los mensajes de prueba se guardan como leídos
           await this.saveMessage({
             id: messageData.id || `sim_${Date.now()}`,

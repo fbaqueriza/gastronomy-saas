@@ -98,21 +98,30 @@ export async function POST(request: NextRequest) {
               // Solo enviar la orden si hay un pedido pendiente Y es la primera respuesta después del disparador
               if (checkResponse.ok) {
                 const checkResult = await checkResponse.json();
-                if (checkResult.success) {
+                if (checkResult.success && checkResult.order) {
                   // Verificar si este es el primer mensaje después del disparador
-                  // Solo enviar la orden si el pedido fue creado recientemente (últimos 5 minutos)
-                  const orderCreatedAt = new Date(checkResult.createdAt);
+                  // Solo enviar la orden si el pedido fue creado recientemente (últimos 2 minutos)
+                  const orderCreatedAt = new Date(checkResult.order.created_at);
                   const now = new Date();
                   const timeDiff = now.getTime() - orderCreatedAt.getTime();
-                  const fiveMinutes = 5 * 60 * 1000; // 5 minutos en milisegundos
+                  const twoMinutes = 2 * 60 * 1000; // 2 minutos en milisegundos
                   
-                  if (timeDiff <= fiveMinutes) {
+                  console.log('⏰ Verificación de tiempo:', {
+                    orderCreatedAt: orderCreatedAt.toISOString(),
+                    now: now.toISOString(),
+                    timeDiff: timeDiff,
+                    twoMinutes: twoMinutes,
+                    shouldSend: timeDiff <= twoMinutes
+                  });
+                  
+                  if (timeDiff <= twoMinutes) {
+                    console.log('📝 Enviando detalles completos del pedido después de confirmación...');
                     const success = await OrderNotificationService.sendOrderDetailsAfterConfirmation(normalizedFrom);
                     if (success) {
-                      console.log('✅ Detalles del pedido enviados automáticamente después de respuesta del proveedor');
+                      console.log('✅ Detalles del pedido enviados exitosamente después de confirmación');
                     }
                   } else {
-                    console.log('ℹ️ Pedido pendiente pero no es la primera respuesta, no se envía orden automática');
+                    console.log('ℹ️ Pedido pendiente pero no es la primera respuesta (pasaron más de 2 minutos), no se envía orden automática');
                   }
                 } else {
                   console.log('ℹ️ No hay pedido pendiente para este proveedor, no se envía orden automática');
