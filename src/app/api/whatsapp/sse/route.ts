@@ -27,12 +27,6 @@ export async function GET(request: NextRequest) {
         clearInterval(cleanupInterval);
         removeClient(clientId);
       });
-
-      // También manejar el cierre del stream
-      controller.signal?.addEventListener('abort', () => {
-        clearInterval(cleanupInterval);
-        removeClient(clientId);
-      });
     }
   });
 
