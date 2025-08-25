@@ -227,7 +227,16 @@ export default function IntegratedChatPanel({
     if (sortedContacts && sortedContacts.length > 0) {
       sortedContacts.forEach(contact => {
         // Incluir todos los contactos con mensajes, incluso si no tienen proveedor
-        allContacts.push(contact);
+        // Asegurar que el contacto tenga un id
+        const contactWithId: Contact = {
+          id: contact.phone || `contact_${Date.now()}_${Math.random()}`,
+          name: contact.name,
+          phone: contact.phone,
+          lastMessage: contact.lastMessage,
+          lastMessageTime: contact.lastMessageTime,
+          unreadCount: contact.unreadCount
+        };
+        allContacts.push(contactWithId);
       });
     }
     
