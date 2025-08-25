@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Paperclip, Phone, Video, MoreVertical, Plus, Search, MessageSquare, X, FileText, Download, Image, File, Smile, Mic, RefreshCw } from 'lucide-react';
+import { Send, Paperclip, Phone, Video, MoreVertical, Plus, Search, MessageSquare, X, FileText, Download, Image, File, Smile, Mic, RefreshCw, MessageCircle } from 'lucide-react';
 import { useChat } from '../contexts/ChatContext';
 import { useGlobalChat } from '../contexts/GlobalChatContext';
 import { WhatsAppMessage, Contact } from '../types/whatsapp';
@@ -112,32 +112,63 @@ export default function IntegratedChatPanel({
     selectContact
   } = useChat();
 
-  // Función para cargar mensajes manualmente
-  const cargarMensajesManual = async () => {
+  // Función para verificar si han pasado 24 horas desde el último mensaje
+  const hanPasado24Horas = (): boolean => {
+    if (!currentContact) return false;
+    
+    const normalizedPhone = normalizeContactIdentifier(currentContact.phone);
+    const contactMessages = messagesByContact[normalizedPhone];
+    
+    if (!contactMessages || contactMessages.length === 0) {
+      return true; // Si no hay mensajes, considerar que han pasado 24h
+    }
+    
+    // Obtener el último mensaje enviado
+    const lastSentMessage = contactMessages
+      .filter(msg => msg.type === 'sent')
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+    
+    if (!lastSentMessage) {
+      return true; // Si no hay mensajes enviados, considerar que han pasado 24h
+    }
+    
+    const lastMessageTime = new Date(lastSentMessage.timestamp);
+    const now = new Date();
+    const hoursDiff = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60 * 60);
+    
+    return hoursDiff >= 24;
+  };
+
+  // Función para enviar inicializador de conversación
+  const enviarInicializadorConversacion = async () => {
+    if (!currentContact) return;
+    
     try {
-      const response = await fetch('/api/whatsapp/messages');
-      const data = await response.json();
+      const normalizedPhone = normalizeContactIdentifier(currentContact.phone);
       
-      if (data.messages && Array.isArray(data.messages)) {
-        // Transformar y cargar mensajes directamente
-        const transformedMessages = data.messages.map((msg: any) => ({
-          id: msg.id,
-          content: msg.content,
-          timestamp: msg.timestamp || msg.created_at,
-          type: msg.message_type === 'text' ? 'received' : 'sent',
-          contact_id: msg.contact_id || msg.from,
-          status: msg.status || 'delivered'
-        }));
-        
-        alert(`✅ ${transformedMessages.length} mensajes procesados manualmente`);
-        
-        // Recargar la página para forzar la actualización
+      const response = await fetch('/api/whatsapp/trigger-conversation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: normalizedPhone,
+          template_name: 'inicializador_de_conv'
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert('✅ Inicializador de conversación enviado exitosamente\n\nSe ha reiniciado la ventana de 24 horas. Ahora puedes enviar mensajes manuales.');
+        // Recargar la página para mostrar el nuevo mensaje
         window.location.reload();
       } else {
-        alert(`❌ Error: ${data.messages?.length || 0} mensajes encontrados`);
-        }
-      } catch (error) {
-      alert('❌ Error cargando mensajes');
+        alert('❌ Error enviando inicializador: ' + (result.error || 'Error desconocido'));
+      }
+    } catch (error) {
+      console.error('Error enviando inicializador:', error);
+      alert('❌ Error enviando inicializador de conversación');
     }
   };
 
@@ -509,13 +540,6 @@ export default function IntegratedChatPanel({
                     )}
                   </div>
                   <div className="flex items-center space-x-2">
-                    <button 
-                      onClick={cargarMensajesManual}
-                      className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                      title="Forzar recarga de mensajes"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                    </button>
                      <button className="p-2 text-gray-500 hover:text-gray-700 transition-colors">
                        <Phone className="h-4 w-4" />
                      </button>
@@ -570,6 +594,33 @@ export default function IntegratedChatPanel({
 
         {/* Input */}
               <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-white">
+                {/* Inicializador de conversación - Solo visible si han pasado 24h */}
+                {hanPasado24Horas() && (
+                  <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <MessageCircle className="h-5 w-5 text-yellow-600" />
+                        <div>
+                          <p className="text-sm font-medium text-yellow-800">
+                            Ventana de 24 horas expirada
+                          </p>
+                          <p className="text-xs text-yellow-600">
+                            No puedes enviar mensajes manuales. Usa el inicializador para reactivar la conversación.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={enviarInicializadorConversacion}
+                        className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors flex items-center space-x-2"
+                        title="Reiniciar ventana de 24 horas para poder enviar mensajes manuales"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        <span>Reiniciar Conversación</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex items-end space-x-2">
                   <button
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -590,17 +641,30 @@ export default function IntegratedChatPanel({
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Escribe un mensaje..."
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                placeholder={hanPasado24Horas() ? "No puedes enviar mensajes. Usa el inicializador arriba." : "Escribe un mensaje..."}
+                      className={`w-full px-4 py-2 border rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent ${
+                        hanPasado24Horas() 
+                          ? 'border-yellow-300 bg-yellow-50 text-gray-500' 
+                          : 'border-gray-300'
+                      }`}
                       rows={1}
                       style={{ minHeight: '40px', maxHeight: '120px' }}
+                      disabled={hanPasado24Horas()}
               />
                   </div>
-                  {newMessage.trim() ? (
+                  {newMessage.trim() && !hanPasado24Horas() ? (
               <button
                       onClick={handleSendMessage}
                       disabled={uploadingDocument}
                       className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Send className="h-5 w-5" />
+                    </button>
+                  ) : hanPasado24Horas() ? (
+                    <button 
+                      disabled
+                      className="p-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed"
+                      title="No puedes enviar mensajes. Usa el inicializador para reactivar la conversación."
                     >
                       <Send className="h-5 w-5" />
                     </button>

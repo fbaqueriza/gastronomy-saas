@@ -49,11 +49,11 @@ export default function ProviderConfigModal({
 
   // Initialize form when provider changes
   useEffect(() => {
-    console.log('DEBUG: ProviderConfigModal - useEffect triggered:', { provider: provider?.name, isEditing, isOpen });
+    // console.log('DEBUG: ProviderConfigModal - useEffect triggered:', { provider: provider?.name, isEditing, isOpen });
     
     if (provider && isEditing && isOpen) {
-      console.log('DEBUG: ProviderConfigModal - Loading provider data for editing:', provider);
-      console.log('DEBUG: ProviderConfigModal - Provider config fields:', {
+              // console.log('DEBUG: ProviderConfigModal - Loading provider data for editing:', provider);
+        // console.log('DEBUG: ProviderConfigModal - Provider config fields:', {
         defaultDeliveryDays: provider.defaultDeliveryDays,
         defaultDeliveryTime: provider.defaultDeliveryTime,
         defaultPaymentMethod: provider.defaultPaymentMethod
@@ -76,14 +76,14 @@ export default function ProviderConfigModal({
         defaultPaymentMethod: provider.defaultPaymentMethod || 'efectivo',
       });
       
-      console.log('DEBUG: ProviderConfigModal - Form data set:', {
-        name: provider.name || '',
-        defaultDeliveryDays: provider.defaultDeliveryDays || [],
-        defaultDeliveryTime: Array.isArray(provider.defaultDeliveryTime) ? provider.defaultDeliveryTime : (provider.defaultDeliveryTime ? [provider.defaultDeliveryTime] : []) as string[],
-        defaultPaymentMethod: provider.defaultPaymentMethod || 'efectivo',
-      });
+      // console.log('DEBUG: ProviderConfigModal - Form data set:', {
+      //   name: provider.name || '',
+      //   defaultDeliveryDays: provider.defaultDeliveryDays || [],
+      //   defaultDeliveryTime: Array.isArray(provider.defaultDeliveryTime) ? provider.defaultDeliveryTime : (provider.defaultDeliveryTime ? [provider.defaultDeliveryTime] : []) as string[],
+      //   defaultPaymentMethod: provider.defaultPaymentMethod || 'efectivo',
+      // });
     } else if (!isEditing && isOpen) {
-      console.log('DEBUG: ProviderConfigModal - Resetting form for new provider');
+      // console.log('DEBUG: ProviderConfigModal - Resetting form for new provider');
       // Reset form for new provider
       setFormData({
         name: '',
@@ -163,15 +163,15 @@ export default function ProviderConfigModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('DEBUG: ProviderConfigModal - handleSubmit called');
-    console.log('DEBUG: ProviderConfigModal - isEditing:', isEditing);
-    console.log('DEBUG: ProviderConfigModal - provider:', provider);
-    console.log('DEBUG: ProviderConfigModal - onAdd exists:', !!onAdd);
-    console.log('DEBUG: ProviderConfigModal - onAdd function:', onAdd);
+    // console.log('DEBUG: ProviderConfigModal - handleSubmit called');
+    // console.log('DEBUG: ProviderConfigModal - isEditing:', isEditing);
+    // console.log('DEBUG: ProviderConfigModal - provider:', provider);
+    // console.log('DEBUG: ProviderConfigModal - onAdd exists:', !!onAdd);
+    // console.log('DEBUG: ProviderConfigModal - onAdd function:', onAdd);
     
     if (isEditing && provider) {
       // Update existing provider with all fields
-      console.log('DEBUG: ProviderConfigModal - Saving provider:', formData);
+      // console.log('DEBUG: ProviderConfigModal - Saving provider:', formData);
       
       const updatedProvider = {
         ...provider,
@@ -234,7 +234,7 @@ export default function ProviderConfigModal({
     onClose();
   };
 
-  console.log('DEBUG: ProviderConfigModal - Render check:', { isOpen, provider: provider?.name, isEditing });
+  // console.log('DEBUG: ProviderConfigModal - Render check:', { isOpen, provider: provider?.name, isEditing });
   
   // Don't render if modal is not open
   if (!isOpen) return null;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { metaWhatsAppService } from '../../../../lib/metaWhatsAppService';
 import { sendMessageToClients } from '../../../../lib/sseUtils';
+import { OrderNotificationService } from '../../../../lib/orderNotificationService';
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,6 +79,21 @@ export async function POST(request: NextRequest) {
 
           // Procesar mensaje en base de datos (incluye SSE)
           await metaWhatsAppService.processIncomingMessage(message);
+
+          // NUEVO: Verificar si es una respuesta de proveedor y enviar detalles del pedido
+          if (messageContent && messageContent.trim().length > 0) {
+            console.log('🔍 Verificando si es respuesta de proveedor:', normalizedFrom);
+            
+            try {
+              // Intentar enviar detalles del pedido si hay uno pendiente
+              const success = await OrderNotificationService.sendOrderDetailsAfterConfirmation(normalizedFrom);
+              if (success) {
+                console.log('✅ Detalles del pedido enviados automáticamente después de respuesta del proveedor');
+              }
+            } catch (error) {
+              console.error('❌ Error procesando respuesta de proveedor:', error);
+            }
+          }
         }
         
         return new NextResponse('OK', { status: 200 });

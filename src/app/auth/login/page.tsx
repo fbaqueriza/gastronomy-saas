@@ -12,8 +12,15 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberEmail, setRememberEmail] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
+  const [resetError, setResetError] = useState('');
+
+
   const router = useRouter();
-  const { needsEmailVerification, clearEmailVerification } = useSupabaseAuth();
+  const { needsEmailVerification, clearEmailVerification, resetPassword, signIn } = useSupabaseAuth();
 
   useEffect(() => {
     const savedEmail = localStorage.getItem('rememberedEmail');
@@ -22,8 +29,6 @@ export default function LoginPage() {
       setRememberEmail(true);
     }
   }, []);
-
-  const { signIn } = useSupabaseAuth();
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -43,6 +48,36 @@ export default function LoginPage() {
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    setResetError('');
+    try {
+      await resetPassword(resetEmail);
+      setResetSuccess(true);
+    } catch (err: any) {
+      setResetError(err.message || 'Error al enviar el email de recuperación.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleShowResetPassword = () => {
+    setShowResetPassword(true);
+    setResetEmail(email); // Pre-llenar con el email actual
+    setResetError('');
+    setResetSuccess(false);
+  };
+
+  const handleBackToLogin = () => {
+    setShowResetPassword(false);
+    setResetEmail('');
+    setResetError('');
+    setResetSuccess(false);
+  };
+
+
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -159,6 +194,13 @@ export default function LoginPage() {
                 />
                 <span className="ml-2 text-sm text-gray-700">Recordar correo</span>
               </label>
+              <button
+                type="button"
+                onClick={handleShowResetPassword}
+                className="text-sm text-green-600 hover:text-green-700 font-medium transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
             </div>
 
             <button
@@ -176,6 +218,85 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          {/* Reset Password Form */}
+          {showResetPassword && (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+                Recuperar contraseña
+              </h3>
+              
+              {resetSuccess && (
+                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-green-800">
+                        Email enviado exitosamente
+                      </h3>
+                      <div className="mt-2 text-sm text-green-700">
+                        <p>
+                          Hemos enviado un enlace de recuperación a tu correo electrónico. 
+                          Revisa tu bandeja de entrada y sigue las instrucciones para restablecer tu contraseña.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {resetError && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-700 text-sm">{resetError}</p>
+                </div>
+              )}
+              
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div>
+                  <label htmlFor="resetEmail" className="block text-sm font-medium text-gray-700 mb-2">
+                    Correo electrónico
+                  </label>
+                  <input
+                    id="resetEmail"
+                    type="email"
+                    placeholder="tu@email.com"
+                    value={resetEmail}
+                    onChange={e => setResetEmail(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-colors"
+                    required
+                  />
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    type="button"
+                    onClick={handleBackToLogin}
+                    className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+                  >
+                    Volver al login
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="flex-1 bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {resetLoading ? (
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        Enviando...
+                      </div>
+                    ) : (
+                      'Enviar email de recuperación'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">

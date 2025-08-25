@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Reset Button</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .button-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0;
+        }
+        .reset-button {
+            background: none;
+            border: none;
+            color: #059669;
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .reset-button:hover {
+            color: #047857;
+        }
+        .reset-form {
+            display: none;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+        .reset-form.show {
+            display: block;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background-color: #059669;
+            color: white;
+        }
+        .btn-secondary {
+            background-color: #6b7280;
+            color: white;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Test Reset Password Button</h2>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" placeholder="tu@email.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Contraseña:</label>
+                <input type="password" id="password" placeholder="••••••••" required>
+            </div>
+            
+            <div class="button-row">
+                <label>
+                    <input type="checkbox" id="rememberEmail">
+                    Recordar correo
+                </label>
+                <button type="button" class="reset-button" onclick="showResetForm()">
+                    ¿Olvidaste tu contraseña?
+                </button>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                Iniciar sesión
+            </button>
+        </form>
+        
+        <div id="resetForm" class="reset-form">
+            <h3>Recuperar contraseña</h3>
+            <div class="form-group">
+                <label for="resetEmail">Email:</label>
+                <input type="email" id="resetEmail" placeholder="tu@email.com" required>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="hideResetForm()">
+                    Volver al login
+                </button>
+                <button type="button" class="btn btn-primary" onclick="sendResetEmail()">
+                    Enviar email de recuperación
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showResetForm() {
+            console.log('🔍 showResetForm llamado');
+            const resetForm = document.getElementById('resetForm');
+            const email = document.getElementById('email').value;
+            document.getElementById('resetEmail').value = email;
+            resetForm.classList.add('show');
+            console.log('✅ Formulario de reset mostrado');
+        }
+        
+        function hideResetForm() {
+            console.log('🔍 hideResetForm llamado');
+            const resetForm = document.getElementById('resetForm');
+            resetForm.classList.remove('show');
+            console.log('✅ Formulario de reset ocultado');
+        }
+        
+        function sendResetEmail() {
+            console.log('🔍 sendResetEmail llamado');
+            const email = document.getElementById('resetEmail').value;
+            alert(`Email de recuperación enviado a: ${email}`);
+            console.log('✅ Email de recuperación enviado');
+        }
+        
+        // Test del botón al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔍 Página cargada');
+            const resetButton = document.querySelector('.reset-button');
+            console.log('🔍 Botón encontrado:', resetButton);
+        });
+    </script>
+</body>
+</html>

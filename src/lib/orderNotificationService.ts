@@ -9,6 +9,7 @@ interface OrderNotificationData {
 export class OrderNotificationService {
   /**
    * Envía notificación automática de nuevo pedido al proveedor
+   * NUEVO FLUJO: Solo envía el disparador y espera confirmación
    */
   static async sendOrderNotification(data: OrderNotificationData): Promise<boolean> {
     try {
@@ -23,7 +24,7 @@ export class OrderNotificationService {
       console.log('📦 Iniciando envío de pedido a:', provider.name);
       console.log('📱 Número normalizado:', normalizedPhone);
 
-      // PASO 1: Disparar conversación de Meta usando template configurado
+      // PASO 1: Solo disparar conversación de Meta usando template
       console.log('🔗 Disparando conversación de Meta con template...');
       const triggerResponse = await fetch('/api/whatsapp/trigger-conversation', {
         method: 'POST',
@@ -45,44 +46,118 @@ export class OrderNotificationService {
       }
 
       console.log('✅ Conversación de Meta disparada exitosamente con template');
+      console.log('⏳ Esperando respuesta del proveedor antes de enviar detalles completos...');
 
-      // PASO 2: Esperar un momento y enviar el mensaje detallado del pedido
-      return new Promise((resolve) => {
-        setTimeout(async () => {
-          try {
-            const orderMessage = this.createOrderMessage(order, provider, items);
-            
-            console.log('📝 Enviando detalles completos del pedido...');
-            
-            const messageResponse = await fetch('/api/whatsapp/send', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                to: normalizedPhone,
-                message: orderMessage
-              }),
-            });
+      // PASO 2: Guardar el pedido en estado "pendiente de confirmación"
+      await this.savePendingOrder(order, provider, items);
 
-            const messageResult = await messageResponse.json();
-            
-            if (messageResponse.ok) {
-              console.log('✅ Detalles del pedido enviados exitosamente a:', provider.name);
-              resolve(true);
-            } else {
-              console.error('❌ Error enviando detalles del pedido:', messageResult);
-              resolve(false);
-            }
-          } catch (error) {
-            console.error('❌ Error enviando detalles del pedido:', error);
-            resolve(false);
-          }
-        }, 2000); // Esperar 2 segundos entre el trigger y el mensaje
-      });
+      return true;
 
     } catch (error) {
       console.error('❌ Error en sendOrderNotification:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Guarda el pedido en estado pendiente de confirmación
+   */
+  private static async savePendingOrder(order: Order, provider: Provider, items: OrderItem[]): Promise<void> {
+    try {
+      // Guardar en Supabase en lugar de localStorage
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+      const response = await fetch(`${baseUrl}/api/whatsapp/save-pending-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orderId: order.id,
+          providerId: provider.id,
+          providerPhone: provider.phone,
+          orderData: {
+            order,
+            provider,
+            items
+          }
+        }),
+      });
+
+      if (response.ok) {
+        console.log('💾 Pedido guardado en estado pendiente de confirmación');
+      } else {
+        console.error('❌ Error guardando pedido pendiente en BD');
+      }
+    } catch (error) {
+      console.error('❌ Error guardando pedido pendiente:', error);
+    }
+  }
+
+  /**
+   * Envía los detalles completos del pedido después de recibir confirmación
+   */
+  static async sendOrderDetailsAfterConfirmation(providerPhone: string): Promise<boolean> {
+    try {
+      // Buscar el pedido pendiente para este proveedor usando la API
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+      const response = await fetch(`${baseUrl}/api/whatsapp/get-pending-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ providerPhone }),
+      });
+
+      if (!response.ok) {
+        console.log('❌ No se encontró pedido pendiente para:', providerPhone);
+        return false;
+      }
+
+      const pendingOrder = await response.json();
+      const { order, provider, items } = pendingOrder.orderData;
+      const orderMessage = this.createOrderMessage(order, provider, items);
+
+      // Normalizar el número de teléfono
+      let normalizedPhone = providerPhone.replace(/[\s\-\(\)]/g, '');
+      if (!normalizedPhone.startsWith('+')) {
+        normalizedPhone = `+${normalizedPhone}`;
+      }
+
+      console.log('📝 Enviando detalles completos del pedido después de confirmación...');
+      
+      const messageResponse = await fetch(`${baseUrl}/api/whatsapp/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: normalizedPhone,
+          message: orderMessage
+        }),
+      });
+
+      const messageResult = await messageResponse.json();
+      
+      if (messageResponse.ok) {
+        console.log('✅ Detalles del pedido enviados exitosamente después de confirmación');
+        
+        // Remover el pedido de la lista de pendientes
+        await fetch(`${baseUrl}/api/whatsapp/remove-pending-order`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ providerPhone }),
+        });
+        
+        return true;
+      } else {
+        console.error('❌ Error enviando detalles del pedido:', messageResult);
+        return false;
+      }
+
+    } catch (error) {
+      console.error('❌ Error en sendOrderDetailsAfterConfirmation:', error);
       return false;
     }
   }

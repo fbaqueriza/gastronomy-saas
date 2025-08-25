@@ -6,6 +6,7 @@ import SuggestedOrders from '../../components/SuggestedOrders';
 import CreateOrderModal from '../../components/CreateOrderModal';
 import EditOrderModal from '../../components/EditOrderModal';
 import ComprobanteButton from '../../components/ComprobanteButton';
+import PendingOrderList from '../../components/PendingOrderList';
 
 import { useChat } from '../../contexts/ChatContext';
 import { useGlobalChat } from '../../contexts/GlobalChatContext';
@@ -495,6 +496,10 @@ function OrdersPage({ user }: OrdersPageProps) {
             </div>
           </div>
         </div>
+
+        {/* Pedidos Pendientes de Confirmación */}
+        <PendingOrderList />
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-4 sm:px-0">
           {/* Suggested Orders */}
           <div className="lg:col-span-1">

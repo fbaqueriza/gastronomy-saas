@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,14 +75,14 @@ export async function POST(request: NextRequest) {
     // Guardar en base de datos
     const userId = 'default-user'; // En una implementación real, obtendrías el userId del contexto
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/whatsapp_messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+
+      const { error } = await supabase
+        .from('whatsapp_messages')
+        .insert({
           message_sid: messageId,
           contact_id: to,
           content: `Documento: ${file.name}`,
@@ -92,11 +93,10 @@ export async function POST(request: NextRequest) {
           document_name: file.name,
           document_size: file.size,
           document_type: file.type
-        }),
-      });
+        });
 
-      if (!response.ok) {
-        console.error('Error guardando documento en BD:', await response.text());
+      if (error) {
+        console.error('Error guardando documento en BD:', error);
       }
     } catch (error) {
       console.error('Error guardando documento en BD:', error);

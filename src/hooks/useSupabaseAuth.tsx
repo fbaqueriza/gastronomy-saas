@@ -12,6 +12,7 @@ interface SupabaseAuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   clearEmailVerification: () => void;
   clearEmailVerified: () => void;
 }
@@ -93,6 +94,15 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     setLoading(false);
   };
 
+  const resetPassword = async (email: string) => {
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/reset-password`,
+    });
+    setLoading(false);
+    if (error) throw error;
+  };
+
   return (
     <SupabaseAuthContext.Provider value={{ 
       user, 
@@ -102,6 +112,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       signIn, 
       signUp, 
       signOut, 
+      resetPassword,
       clearEmailVerification, 
       clearEmailVerified 
     }}>

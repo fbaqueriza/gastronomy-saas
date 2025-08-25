@@ -470,9 +470,10 @@ export class MetaWhatsAppService {
   private async saveMessage(message: any): Promise<void> {
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
       
-      if (!supabaseUrl || !supabaseAnonKey) {
+      if (!supabaseUrl || !supabaseServiceKey) {
+        console.log('❌ Supabase no configurado para guardar mensaje');
         return;
       }
 
@@ -528,6 +529,10 @@ export class MetaWhatsAppService {
         user_id: 'default_user', // TODO: Obtener user_id real del contexto
         status: message.status || 'delivered'
       };
+
+      // Crear cliente de Supabase con service role key
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
       // Verificar si el mensaje ya existe para evitar duplicados usando message_sid
       const { data: existingMessage } = await supabase
